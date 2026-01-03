@@ -4,6 +4,8 @@
 #pragma once
 
 class Input;
+class OpenGLClass;
+class Camera;
 
 class Game
 {
@@ -16,6 +18,12 @@ public:
     virtual void OnRender()=0;
     virtual void OnShutdown()=0;
 
+    void SetRenderer(OpenGLClass* renderer) { m_Renderer = renderer; }
+    void SetCamera(Camera* camera) { m_Camera = camera; }
+
+protected:
+    OpenGLClass* m_Renderer = nullptr;
+    Camera* m_Camera = nullptr;
 };
 
 

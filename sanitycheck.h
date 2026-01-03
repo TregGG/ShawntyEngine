@@ -4,15 +4,25 @@
 #pragma once
 #include "core/game.h"
 
+#include <glm/glm.hpp>
+
 class SanityGame : public Game
 {
 public:
-    virtual bool OnInit() override;
-    virtual void OnInput(const Input& input) override;
-    virtual void OnUpdate(float deltaTime) override;
-    virtual void OnRender() override;
-    virtual void OnShutdown() override;
-};
+    bool OnInit() override;
+    void OnInput(const Input& input) override;
+    void OnUpdate(float deltaTime) override;
+    void OnRender() override;
+    void OnShutdown() override;
 
+
+
+
+private:
+    glm::vec2 m_PlayerPos { 0.0f, 0.0f };   // WASD-controlled quad
+    glm::vec2 m_StaticPos { 3.0f, 0.0f };   // reference quad
+
+    float m_MoveSpeed = 5.0f;               // world units / second
+};
 
 #endif // SANITYCHECK_H_INCLUDED

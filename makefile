@@ -19,7 +19,7 @@ OBJS := $(OBJS:.c=.o)
 OBJS := $(patsubst %,$(OBJ_DIR)/%,$(OBJS))
 
 # Compiler & linker flags
-CXXFLAGS := -std=c++17 -Wall -Wextra -Icore -Ilevels -Iexternal/glad/include
+CXXFLAGS := -std=c++17 -Wall -Wextra -Icore -Ilevels -Iexternal/glad/include -Iexternal/glm
 LDFLAGS  := $(shell pkg-config --cflags --libs glfw3) -lGL
 
 # Final binary

@@ -5,7 +5,9 @@
 #include "system.h"
 #include "timer.h"
 #include "input.h"
+
 #include "../render/openglclass.h"
+#include "../render/camera.h"
 
 
 Engine::Engine()
@@ -30,6 +32,8 @@ bool Engine::Initialize(Game* game)
     m_Timer= new Timer();
     m_Input= new Input();
     m_OpenGL=new OpenGLClass();
+    m_Camera=new Camera(20,16);// just temp, ideally we want scene to create the camera
+
     if(!m_System->Initialize(800,600,"Engine"))
     {
         return false;
@@ -43,6 +47,9 @@ bool Engine::Initialize(Game* game)
     {
         return false;
     }
+    m_OpenGL->SetCamera(m_Camera);
+    m_Game->SetCamera(m_Camera);
+    m_Game->SetRenderer(m_OpenGL);
     return true;
 }
 

@@ -6,6 +6,7 @@ class System;
 class Timer;
 class Input;
 class OpenGLClass;
+class Camera;
 
 class Engine
 {
@@ -28,6 +29,7 @@ private:
     //Not owned by engine
     Game* m_Game;
     OpenGLClass* m_OpenGL=nullptr;
+    Camera* m_Camera=nullptr;
 };
 
 #endif // ENGINE_H

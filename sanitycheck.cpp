@@ -1,8 +1,12 @@
 #include "sanitycheck.h"
 #include "core/input.h"
-
+#include"render/camera.h"
+#include"render/openglclass.h"
 #include <iostream>
 #include <GLFW/glfw3.h>
+static glm::vec2 g_MoveDir { 0.0f, 0.0f };
+static glm::vec2 g_CameraDir { 0.0f, 0.0f };
+
 
 bool SanityGame::OnInit()
 {
@@ -13,47 +17,49 @@ bool SanityGame::OnInit()
 
 void SanityGame::OnInput(const Input& input)
 {
-    // ---- Keyboard sanity ----
-    if (input.IsKeyPressed(GLFW_KEY_W))
-        std::cout << "W pressed\n";
+    g_MoveDir = { 0.0f, 0.0f };
+    g_CameraDir = { 0.0f, 0.0f };
 
-    if (input.IsKeyReleased(GLFW_KEY_W))
-        std::cout << "W released\n";
+    // ---- WASD → move quad ----
+    if (input.IsKeyDown(GLFW_KEY_W)) g_MoveDir.y += 1.0f;
+    if (input.IsKeyDown(GLFW_KEY_S)) g_MoveDir.y -= 1.0f;
+    if (input.IsKeyDown(GLFW_KEY_A)) g_MoveDir.x -= 1.0f;
+    if (input.IsKeyDown(GLFW_KEY_D)) g_MoveDir.x += 1.0f;
 
-    if (input.IsKeyDown(GLFW_KEY_A))
-        std::cout << "Holding A\n";
-
-    // ---- Mouse buttons ----
-    if (input.IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
-        std::cout << "Left mouse button pressed\n";
-
-    if (input.IsMouseButtonReleased(GLFW_MOUSE_BUTTON_LEFT))
-        std::cout << "Left mouse button released\n";
-
-    // ---- Mouse position ----
-    double x, y;
-    input.GetMousePosition(x, y);
-    //std::cout << "Mouse Pos: (" << x << ", " << y << ")\n";
-
-    // ---- Mouse delta ----
-    double dx, dy;
-    input.GetMouseDelta(dx, dy);
-    if (dx != 0.0 || dy != 0.0)
-    {
-      //  std::cout << "Mouse Delta: (" << dx << ", " << dy << ")\n";
-    }
+    // ---- Arrow keys → move camera ----
+    if (input.IsKeyDown(GLFW_KEY_UP))    g_CameraDir.y += 1.0f;
+    if (input.IsKeyDown(GLFW_KEY_DOWN))  g_CameraDir.y -= 1.0f;
+    if (input.IsKeyDown(GLFW_KEY_LEFT))  g_CameraDir.x -= 1.0f;
+    if (input.IsKeyDown(GLFW_KEY_RIGHT)) g_CameraDir.x += 1.0f;
 }
 
 void SanityGame::OnUpdate(float deltaTime)
 {
-    // Optional: show delta time occasionally
-    // std::cout << "Delta: " << deltaTime << "\n";
+    // Move quad
+    if (g_MoveDir.x != 0.0f || g_MoveDir.y != 0.0f)
+    {
+        m_PlayerPos += g_MoveDir * m_MoveSpeed * deltaTime;
+    }
+
+    // Move camera
+    if (g_CameraDir.x != 0.0f || g_CameraDir.y != 0.0f)
+    {
+        glm::vec2 camPos = m_Camera->GetCameraPosition();
+        camPos += g_CameraDir * m_MoveSpeed * deltaTime;
+        m_Camera->SetCameraPosition(camPos.x, camPos.y);
+    }
 }
+
 
 void SanityGame::OnRender()
 {
-    // Nothing to render yet
+    // Movable quad (player)
+    m_Renderer->DrawQuad(m_PlayerPos);
+
+    // Static quad (reference)
+    m_Renderer->DrawQuad(m_StaticPos);
 }
+
 
 void SanityGame::OnShutdown()
 {

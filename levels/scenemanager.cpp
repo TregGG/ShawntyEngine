@@ -1,4 +1,4 @@
-#include"scenemanger.h"
+#include"scenemanager.h"
 #include"scene.h"
 
 #include<iostream>
@@ -55,13 +55,13 @@ void SceneManager::Update(float deltaTime)
     m_ActiveScene->Update(deltaTime);
 }
 
-void SceneManager::Render()
-{
-    if(!m_ActiveScene)
-    {
-        std::cerr<<"SceneManager:: Failed Render: no scene set\n";
-        return;
-    }
- m_ActiveScene->Render();
-}
+//void SceneManager::Render()
+//{
+//    if(!m_ActiveScene)
+//   {
+//        std::cerr<<"SceneManager:: Failed Render: no scene set\n";
+//        return;
+//    }
+// m_ActiveScene->Render();
+//}
 

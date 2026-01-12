@@ -62,3 +62,13 @@ void Camera::RecalculateMatrix()
     m_ViewProjectionMatrix = projection * view;
 }
 
+
+const float Camera::GetScale() const
+{
+    return m_Scale;
+}
+
+void Camera::SetScale(float scale)
+{
+    m_Scale=scale;
+}

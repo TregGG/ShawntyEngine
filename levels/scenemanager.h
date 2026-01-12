@@ -3,10 +3,11 @@
 class Scene;
 class SceneManager
 {
+public:
+
     SceneManager();
     ~SceneManager();
 
-public:
 
     //----Scene management functions----
     Scene* GetActiveScene() const;
@@ -16,7 +17,7 @@ public:
     //----forwards these calls to the active scene----
     //and we are also doing this to help in transitioning from active scene to another
     void Update(float deltaTime);
-    void Render();
+    //void Render();
 
 private:
     Scene* m_ActiveScene=nullptr;

@@ -43,13 +43,14 @@ bool Engine::Initialize(Game* game)
          return false;
     }
     m_Timer->Start();
+      m_Game->SetCamera(m_Camera);
+   // m_Game->SetRenderer(m_OpenGL);
     if(!m_Game->OnInit())
     {
         return false;
     }
     m_OpenGL->SetCamera(m_Camera);
-    m_Game->SetCamera(m_Camera);
-    m_Game->SetRenderer(m_OpenGL);
+
     return true;
 }
 

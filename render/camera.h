@@ -19,10 +19,13 @@ public:
 
     const glm::mat4& GetViewProjection() const;
 
+    const float GetScale() const ;
+    void SetScale(float scale);
 private:
     void RecalculateMatrix();
 
 private:
+    float m_Scale=0.0f;
     glm::vec2 m_Position;
 
     glm::vec2 m_ViewSize;

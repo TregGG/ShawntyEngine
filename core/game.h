@@ -6,6 +6,12 @@
 class Input;
 class OpenGLClass;
 class Camera;
+class Scene;
+
+#include "../levels/scenemanager.h"
+#include "../render/rendermanager.h"
+#include "../assets/assetmanager.h"
+
 
 class Game
 {
@@ -18,11 +24,20 @@ public:
     virtual void OnRender()=0;
     virtual void OnShutdown()=0;
 
-    void SetRenderer(OpenGLClass* renderer) { m_Renderer = renderer; }
+    //void SetRenderer(OpenGLClass* renderer) { m_Renderer = renderer; }
     void SetCamera(Camera* camera) { m_Camera = camera; }
 
+
+    void SetScene(Scene* scene) {m_SceneManager.SetActiveScene(scene);m_RenderManager.BindScene(scene);}
+
 protected:
-    OpenGLClass* m_Renderer = nullptr;
+    //permanent
+
+    SceneManager m_SceneManager;
+    RenderManager m_RenderManager;
+    AssetManager m_AssetManager;
+    //temp
+    //OpenGLClass* m_Renderer = nullptr;
     Camera* m_Camera = nullptr;
 };
 

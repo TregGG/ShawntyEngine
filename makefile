@@ -11,7 +11,9 @@ SRCS := main.cpp \
         external/glad/src/glad.c \
         $(wildcard core/*.cpp) \
         $(wildcard levels/*.cpp)\
-	$(wildcard render/*.cpp)
+	$(wildcard render/*.cpp)\
+	$(wildcard assets/*.cpp)\
+	$(wildcard objects/*.cpp)
 
 # Object files
 OBJS := $(SRCS:.cpp=.o)

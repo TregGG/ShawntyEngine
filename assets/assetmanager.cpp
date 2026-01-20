@@ -10,9 +10,6 @@
 
 namespace fs = std::filesystem;
 
-// ------------------------------------------------------------
-// Helper: very simple uncompressed TGA loader (local CPU buffer)
-// ------------------------------------------------------------
 static bool LoadTGA(const std::string& filepath,
                     int& outWidth,
                     int& outHeight,

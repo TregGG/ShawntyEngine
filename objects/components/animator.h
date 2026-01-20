@@ -1,43 +1,51 @@
 #pragma once
 
-#include <cstddef>
 #include "component.h"
+#include <string>
 
+// forward declarations (data-only)
+struct AnimationSetAsset;
 struct AnimationClip;
 struct SpriteSheetAsset;
 
-class Animator : public Component
+class AnimatorComponent : public Component
 {
 public:
-    Animator() = default;
-     virtual ~AnimatorComponent() = default;
-    // ---- Control ----
-    void Play(const AnimationClip* clip,
-              const SpriteSheetAsset* sheet,
-              bool loop = true);
+    AnimatorComponent() = default;
+    virtual ~AnimatorComponent() = default;
 
+    // ---------- Binding (one-time setup) ----------
+    void BindAnimationSet(const AnimationSetAsset* animSet,
+                          const SpriteSheetAsset* spriteSheet);
+
+    // ---------- Playback ----------
+    void Play(const std::string& clipName, bool loop = true);
     void Stop();
 
-    // ---- Update ----
-    virtual void Update(float deltaTime) override;
-
-    // ---- Output ----
-    int  GetFrameIndex() const;
-    const SpriteSheetAsset* GetSpriteSheet() const;
-
+    bool HasAnimation(const std::string& clipName) const;
     bool IsPlaying() const { return m_Playing; }
 
     void SetSpeed(float speed) { m_Speed = speed; }
 
+    // ---------- Output (used by Scene) ----------
+    int GetFrameIndex() const;
+    const SpriteSheetAsset* GetSpriteSheet() const;
+
+    // ---------- Component ----------
+    void Update(float deltaTime) override;
+
 private:
-    const AnimationClip*     m_CurrentClip  = nullptr;
-    const SpriteSheetAsset*  m_SpriteSheet  = nullptr;
+    // Bound assets (non-owning)
+    const AnimationSetAsset* m_AnimSet     = nullptr;
+    const SpriteSheetAsset*  m_SpriteSheet = nullptr;
 
-    bool  m_Playing   = false;
-    bool  m_Loop      = true;
+    // Runtime state
+    const AnimationClip* m_CurrentClip = nullptr;
 
-    float m_Speed     = 1.0f;
-    float m_TimeInFrame = 0.0f;
+    bool   m_Playing = false;
+    bool   m_Loop    = true;
 
-    std::size_t m_ClipFrameIndex = 0;
+    float  m_Speed        = 1.0f;
+    float  m_TimeInFrame  = 0.0f;
+    size_t m_ClipFrameIdx = 0;
 };

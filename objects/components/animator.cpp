@@ -1,27 +1,49 @@
 #include "animator_component.h"
-#include "assets/data/asset_types.h"
+#include "../../assets/assetdatastruct.h"
 
-void AnimatorComponent::Play(const AnimationClip* clip,
-                             const SpriteSheetAsset* sheet,
-                             bool loop)
+void AnimatorComponent::BindAnimationSet(const AnimationSetAsset* animSet,
+                                        const SpriteSheetAsset* spriteSheet)
 {
-    if (!clip || !sheet || clip->frames.empty())
+    m_AnimSet     = animSet;
+    m_SpriteSheet = spriteSheet;
+
+    // Reset state
+    m_CurrentClip   = nullptr;
+    m_ClipFrameIdx  = 0;
+    m_TimeInFrame   = 0.0f;
+    m_Playing       = false;
+}
+
+bool AnimatorComponent::HasAnimation(const std::string& clipName) const
+{
+    if (!m_AnimSet)
+        return false;
+
+    return m_AnimSet->clips.find(clipName) != m_AnimSet->clips.end();
+}
+
+void AnimatorComponent::Play(const std::string& clipNam3e, bool loop)
+{
+    if (!m_AnimSet)
         return;
 
-    m_CurrentClip     = clip;
-    m_SpriteSheet     = sheet;
-    m_Loop            = loop;
+    auto it = m_AnimSet->clips.find(clipName);
+    if (it == m_AnimSet->clips.end())
+        return;
 
-    m_ClipFrameIndex  = 0;
-    m_TimeInFrame     = 0.0f;
-    m_Playing         = true;
+    m_CurrentClip  = &it->second;
+    m_Loop         = loop;
+    m_Playing      = true;
+
+    m_ClipFrameIdx = 0;
+    m_TimeInFrame  = 0.0f;
 }
 
 void AnimatorComponent::Stop()
 {
-    m_Playing = false;
-    m_ClipFrameIndex = 0;
-    m_TimeInFrame = 0.0f;
+    m_Playing      = false;
+    m_ClipFrameIdx = 0;
+    m_TimeInFrame  = 0.0f;
 }
 
 void AnimatorComponent::Update(float deltaTime)
@@ -31,23 +53,22 @@ void AnimatorComponent::Update(float deltaTime)
 
     m_TimeInFrame += deltaTime * m_Speed;
 
-    const auto& frame =
-        m_CurrentClip->frames[m_ClipFrameIndex];
+    const auto& frame = m_CurrentClip->frames[m_ClipFrameIdx];
 
     if (m_TimeInFrame >= frame.duration)
     {
         m_TimeInFrame -= frame.duration;
-        m_ClipFrameIndex++;
+        ++m_ClipFrameIdx;
 
-        if (m_ClipFrameIndex >= m_CurrentClip->frames.size())
+        if (m_ClipFrameIdx >= m_CurrentClip->frames.size())
         {
             if (m_Loop)
             {
-                m_ClipFrameIndex = 0;
+                m_ClipFrameIdx = 0;
             }
             else
             {
-                m_ClipFrameIndex = m_CurrentClip->frames.size() - 1;
+                m_ClipFrameIdx = m_CurrentClip->frames.size() - 1;
                 m_Playing = false;
             }
         }
@@ -59,7 +80,7 @@ int AnimatorComponent::GetFrameIndex() const
     if (!m_CurrentClip)
         return 0;
 
-    return m_CurrentClip->frames[m_ClipFrameIndex].frameIndex;
+    return m_CurrentClip->frames[m_ClipFrameIdx].frameIndex;
 }
 
 const SpriteSheetAsset* AnimatorComponent::GetSpriteSheet() const

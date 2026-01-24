@@ -18,7 +18,9 @@ public:
     void Shutdown();
 
     void Quit();
+
 private:
+    void OnWindowResized(int width, int height);
 
     bool m_Running=false;
 
@@ -28,6 +30,9 @@ private:
     //Not owned by engine
     Game* m_Game;
     OpenGLClass* m_OpenGL=nullptr;
+
+    int m_LastWidth = 0;
+    int m_LastHeight = 0;
 };
 
 #endif // ENGINE_H

@@ -87,16 +87,16 @@ void TestScene::OnEnter()
     }
 
     // Set a reasonable view
-    m_Camera.SetViewSize(4.0f, 3.0f);
+    m_Camera.SetScale(1.0f);
     m_Camera.SetCameraPosition(0.0f, 0.0f);
 
     std::cout << "TestScene: entered and created 1 GameObject with Animator\n";
 }
 
-void TestScene::SetInput(const Input& input)
-{
-    m_Input = &input;
-}
+// void TestScene::SetInput(const Input& input)
+// {
+//     m_Input = &input;
+// }
 
 void TestScene::Update(float deltatime)
 {

@@ -4,6 +4,7 @@
 #include<iostream>
 #include<thread>
 #include<chrono>
+#include <iostream>
 
 
 //STATICS->InputMANAGEMENT
@@ -104,6 +105,17 @@ bool System::Initialize(int width, int height, const char* title)
     std::cout << "OpenGL Version:  " << glGetString(GL_VERSION) << "\n";
 
     std::cout<<"Initialized window\n";
+    glfwSetWindowUserPointer(m_Window, this);
+
+    glfwSetFramebufferSizeCallback(
+        m_Window,
+        [](GLFWwindow* window, int width, int height)
+        {
+            auto* system = static_cast<System*>(glfwGetWindowUserPointer(window));
+            system->OnWindowResized(width, height);
+        }
+    );
+    
     return true;
 }
 
@@ -165,3 +177,16 @@ void System::PushRawInputEvent(const RawInputEvent& event)
 }
 
 
+void System::OnWindowResized(int width, int height)
+{
+    if (width <= 0 || height <= 0)
+        return;
+
+    m_Width = width;
+    m_Height = height;
+    std::cout << "System: Window resized to " << width << "x" << height << "\n";
+
+    glViewport(0, 0, width, height);
+
+    // DO NOT touch scene or camera here
+}

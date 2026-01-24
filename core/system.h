@@ -34,6 +34,10 @@ public:
     void Shutdown();
 
     void SwapBuffers();
+     void OnWindowResized(int width, int height);
+
+    int GetWindowWidth() const { return m_Width; }
+    int GetWindowHeight() const { return m_Height; }
 
     //Input Management
     const std::vector<RawInputEvent>& GetInputEvents() const;
@@ -46,6 +50,8 @@ protected:
 private:
 
     GLFWwindow* m_Window=nullptr;
+    int m_Width = 1280;
+    int m_Height = 720;
     bool m_shouldClose=false;
     std::vector<RawInputEvent> m_InputEvents;
 };

@@ -63,6 +63,16 @@ void Engine::Run()
             Quit();
             break;
         }
+        int w = m_System->GetWindowWidth();
+        int h = m_System->GetWindowHeight();
+
+        if (w != m_LastWidth || h != m_LastHeight)
+        {
+            m_LastWidth = w;
+            m_LastHeight = h;
+
+            OnWindowResized(w, h);
+        }
 
         // Time & input
         m_Timer->Tick();
@@ -117,4 +127,12 @@ void Engine::Shutdown()
 void Engine::Quit()
 {
     m_Running=false;
+}
+
+void Engine::OnWindowResized(int width, int height)
+{
+    if (m_Game)
+    {
+        m_Game->OnResize(width, height);
+    }
 }

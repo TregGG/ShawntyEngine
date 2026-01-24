@@ -22,6 +22,8 @@ public:
     virtual void OnRender()=0;
     virtual void OnShutdown()=0;
 
+
+    void OnResize(int width, int height) {m_RenderManager.OnScreenChange(width, height);}
     void SetScene(Scene* scene) {m_SceneManager.SetActiveScene(scene);m_RenderManager.BindScene(scene);}
 
 protected:

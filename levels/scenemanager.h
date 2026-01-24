@@ -18,6 +18,7 @@ public:
     //and we are also doing this to help in transitioning from active scene to another
     void Update(float deltaTime);
     //void Render();
+    void Shutdown();
 
 private:
     Scene* m_ActiveScene=nullptr;

@@ -1,4 +1,4 @@
-#include "animator_component.h"
+#include "animator.h"
 #include "../../assets/assetdatastruct.h"
 
 void AnimatorComponent::BindAnimationSet(const AnimationSetAsset* animSet,
@@ -22,7 +22,7 @@ bool AnimatorComponent::HasAnimation(const std::string& clipName) const
     return m_AnimSet->clips.find(clipName) != m_AnimSet->clips.end();
 }
 
-void AnimatorComponent::Play(const std::string& clipNam3e, bool loop)
+void AnimatorComponent::Play(const std::string& clipName, bool loop)
 {
     if (!m_AnimSet)
         return;
@@ -48,7 +48,7 @@ void AnimatorComponent::Stop()
 
 void AnimatorComponent::Update(float deltaTime)
 {
-    if (!m_Enabled || !m_Playing || !m_CurrentClip)
+    if (!m_Active|| !m_Playing || !m_CurrentClip)
         return;
 
     m_TimeInFrame += deltaTime * m_Speed;

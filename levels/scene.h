@@ -5,6 +5,8 @@
 #include "../render/camera.h"
 #include "../assets/assetdatastruct.h"
 #include "../objects/gameobject.h"
+
+class Input;
 struct RenderableSprite
 {
     Transform2D transform;
@@ -23,6 +25,7 @@ public:
     virtual void OnEnter() =0;
     virtual void OnExit()=0;
     virtual void Update(float deltatime)=0;
+    virtual void SetInput(const Input& input) {}
 //    virtual void Render() =0;
 
     const std::vector<RenderableSprite>& GetRenderables() const {return m_Renderables;};

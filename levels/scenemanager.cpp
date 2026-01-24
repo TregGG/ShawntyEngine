@@ -35,12 +35,14 @@ void SceneManager::SetInitialScene(Scene* scene)
 
 void SceneManager::SetActiveScene(Scene* scene)
 {
+    if(m_ActiveScene)
+        m_ActiveScene->OnExit();
     if(!scene|| scene==m_ActiveScene)
     {
-        std::cerr <<"SceneManager::Failed set Active: no scene to set\n";
+        std::cerr<<"SceneManager::Failed to set active Scene: invalid scene\n";
+        m_ActiveScene=nullptr;
         return;
     }
-    m_ActiveScene->OnExit();
     m_ActiveScene=scene;
     m_ActiveScene->OnEnter();
 }
@@ -55,6 +57,7 @@ void SceneManager::Update(float deltaTime)
     m_ActiveScene->Update(deltaTime);
 }
 
+// DEPRECATED
 //void SceneManager::Render()
 //{
 //    if(!m_ActiveScene)
@@ -65,3 +68,13 @@ void SceneManager::Update(float deltaTime)
 // m_ActiveScene->Render();
 //}
 
+
+
+void SceneManager::Shutdown()
+{
+    if(m_ActiveScene)
+    {
+        m_ActiveScene->OnExit();
+        m_ActiveScene=nullptr;
+    }
+}

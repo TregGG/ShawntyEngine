@@ -16,8 +16,7 @@ public:
 
     // object-level queries
     const SpriteSheetAsset* GetSpriteSheet(const ObjectID& objectId) const;
-    const AnimationClip* GetAnimation(const ObjectID& objectId,
-                                      const AssetID& animationName) const;
+    const AnimationSetAsset* GetAnimationSet(const ObjectID& objectId) const;
 
 protected:
     // internal loading helpers (NOT part of public API)

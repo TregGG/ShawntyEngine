@@ -7,13 +7,14 @@ BIN_DIR := bin
 
 # Source files
 SRCS := main.cpp \
-	sanitycheck.cpp \
         external/glad/src/glad.c \
         $(wildcard core/*.cpp) \
         $(wildcard levels/*.cpp) \
-	$(wildcard render/*.cpp) \
-	$(wildcard assets/*.cpp) \
-	$(wildcard objects/*.cpp)
+		$(wildcard render/*.cpp) \
+		$(wildcard assets/*.cpp) \
+		$(wildcard objects/*.cpp)\
+		$(wildcard objects/components/*.cpp)\
+		$(wildcard test/*.cpp)	
 
 # Object files
 OBJS := $(SRCS:.cpp=.o)

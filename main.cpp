@@ -1,13 +1,12 @@
 #include "core/engine.h"
 #include "core/game.h"
-#include"sanitycheck.h"
+#include "test/testgame.h"
 
 
 int main()
 {
     Engine engine;
-    SanityGame game;
-
+    TestGame game;
 
     if (!engine.Initialize(&game))
         return -1;

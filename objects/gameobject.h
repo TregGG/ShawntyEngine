@@ -18,6 +18,9 @@ class GameObject
 {
 public:
     virtual ~GameObject() = default;
+    explicit GameObject(const std::string& name)
+        : m_Name(name)
+    {}
 
     const std::string& GetName() const { return m_Name; }
     void SetName(const std::string& name) { m_Name = name; }
@@ -38,6 +41,19 @@ public:
     {
         component->SetOwner(this);
         m_Components.emplace_back(std::move(component));
+    }
+
+    // Get a component by type
+    template<typename T>
+    T* GetComponent()
+    {
+        for (auto& comp : m_Components)
+        {
+            T* typedComp = dynamic_cast<T*>(comp.get());
+            if (typedComp)
+                return typedComp;
+        }
+        return nullptr;
     }
 
 protected:

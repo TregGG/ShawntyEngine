@@ -58,6 +58,7 @@ bool AssetManager::Initialize(const std::string& compiledAssetRoot)
         {
             AssetID id = entry.path().stem().string();
             LoadTexture(id, entry.path().string());
+            // std::cout<<"Loaded texture: " << id <<" at: " << entry.path().string() << "\n";
         }
     }
 
@@ -282,10 +283,8 @@ const SpriteSheetAsset* AssetManager::GetSpriteSheet(const ObjectID& objectId) c
     return &m_spriteSheets.at(obj.spriteSheet);
 }
 
-const AnimationClip* AssetManager::GetAnimation(const ObjectID& objectId,
-                                                 const AssetID& animationName) const
+const AnimationSetAsset* AssetManager::GetAnimationSet(const ObjectID& objectId) const
 {
     const auto& obj = m_objectAssets.at(objectId);
-    const auto& animSet = m_animationSets.at(obj.animationSet);
-    return &animSet.clips.at(animationName);
+    return &m_animationSets.at(obj.animationSet);
 }

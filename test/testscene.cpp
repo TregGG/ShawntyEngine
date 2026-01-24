@@ -66,25 +66,6 @@ void TestScene::OnEnter()
     m_GameObjects.push_back(std::move(refObj));
     std::cout << "TestScene::OnEnter: created reference object at (3.0, 0.0)\n";
 
-    std::cout << "TestScene::OnEnter: building renderables\n";
-    for (auto& obj : m_GameObjects)
-    {
-        if (obj && obj->IsActive())
-        {
-            // Query components for sprite data
-            auto spriteRenderer = obj->GetComponent<SpriteRenderer2D>();
-            auto animator = obj->GetComponent<AnimatorComponent>();
-            if (spriteRenderer && spriteRenderer->GetSpriteSheet())
-            {
-                RenderableSprite r;
-                r.transform = obj->GetTransform();
-                r.spriteSheet = spriteRenderer->GetSpriteSheet();
-                // Use animator's frame if available, otherwise sprite renderer's
-                r.frameIndex = animator ? animator->GetFrameIndex() : spriteRenderer->GetFrameIndex();
-                m_Renderables.push_back(r);
-            }
-        }
-    }
 
     // Set a reasonable view
     m_Camera.SetScale(1.0f);
@@ -140,22 +121,5 @@ void TestScene::Update(float deltatime)
     }
 
     // Rebuild renderables from GameObjects and their SpriteRenderer2D components
-    m_Renderables.clear();
-    for (auto& obj : m_GameObjects)
-    {
-        if (obj && obj->IsActive())
-        {
-            auto spriteRenderer = obj->GetComponent<SpriteRenderer2D>();
-            auto animator = obj->GetComponent<AnimatorComponent>();
-            if (spriteRenderer && spriteRenderer->GetSpriteSheet())
-            {
-                RenderableSprite r;
-                r.transform = obj->GetTransform();
-                r.spriteSheet = spriteRenderer->GetSpriteSheet();
-                // Use animator's frame if available, otherwise sprite renderer's
-                r.frameIndex = animator ? animator->GetFrameIndex() : spriteRenderer->GetFrameIndex();
-                m_Renderables.push_back(r);
-            }
-        }
-    }
+    
 }

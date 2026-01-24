@@ -22,6 +22,6 @@ public:
 
 private:
 
-    std::vector<std::unique_ptr<GameObject>> m_GameObjects;
+    // std::vector<std::unique_ptr<GameObject>> m_GameObjects;
     float m_MoveSpeed = 5.0f;
 };

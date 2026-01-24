@@ -61,7 +61,8 @@ void RenderManager::Render()
 
 void RenderManager::CollectRenderables()
 {
-    const auto& renderables = m_Scene->GetRenderables();
+   std::vector<RenderableSprite> renderables;
+    m_Scene->BuildRenderables(renderables);   
     const glm::mat4& vp = m_Camera->GetViewProjection();
 
     for (const RenderableSprite& r : renderables)

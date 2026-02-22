@@ -1,5 +1,3 @@
-// engine/services/base/entity_registry/entity_registry_service.cpp
-
 #include "entityregistry.h"
 
 EntityID EntityRegistryService::Create()

@@ -1,5 +1,4 @@
-#ifndef SCENEMANGER_H_INCLUDED
-#define SCENEMANGER_H_INCLUDED
+#pragma once 
 class Scene;
 class SceneManager
 {
@@ -22,7 +21,5 @@ public:
 
 private:
     Scene* m_ActiveScene=nullptr;
-
 };
 
-#endif // SCENEMANGER_H_INCLUDED

@@ -68,7 +68,7 @@ public:
         
             outRenderables.push_back(r);
         }
-        std::cout << "Scene: built " << outRenderables.size() << " renderables\n";
+        // std::cout << "Scene: built " << outRenderables.size() << " renderables\n";
     }
      
     

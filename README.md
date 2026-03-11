@@ -175,11 +175,8 @@ The engine supports both unit and integration testing:
 
 For detailed architecture notes and development guidelines, see [document.md](document.md).
 
-For AI coding assistant guidance, see [.github/copilot-instructions.md](.github/copilot-instructions.md).
 
-## License
 
-[Your License Here]
 
 ## Contributing
 

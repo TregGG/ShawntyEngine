@@ -11,22 +11,38 @@ public:
     EntityRegistryService() = default;
     ~EntityRegistryService() override = default;
 
-    void Init() override {}
+    void Init() override ;
     void Update(float dt) override;
     void Shutdown() override;
 
-    EntityID Create();
+    // Create entity with category
+    EntityID Create(EntityCategory category);
+
     void Destroy(EntityID entity);
     bool IsAlive(EntityID entity) const;
 
+    // Category queries
+    EntityCategory GetCategory(EntityID entity) const;
+
+    const std::vector<std::uint32_t>& GetEntities(EntityCategory category) const;
+
 private:
+
     struct Slot
     {
         std::uint32_t generation = 0;
         bool alive = false;
+        EntityCategory category = EntityCategory::Environment;
     };
 
     std::vector<Slot> m_Slots;
+
+    // Reuse destroyed slots
     std::vector<std::uint32_t> m_FreeList;
+
+    // Deferred destruction
     std::vector<std::uint32_t> m_PendingDestroy;
+
+    // Fast category access
+    std::vector<std::vector<std::uint32_t>> m_CategoryBuckets;
 };

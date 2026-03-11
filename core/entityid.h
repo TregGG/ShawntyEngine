@@ -20,3 +20,14 @@ inline EntityID MakeEntityID(std::uint32_t index, std::uint32_t generation)
     return (static_cast<std::uint64_t>(generation) << 32) |
            static_cast<std::uint64_t>(index);
 }
+
+enum class EntityCategory : uint8_t
+{
+    Environment = 0,
+    Enemy,
+    Projectile,
+    Player,
+    UI,
+
+    Count
+};

@@ -11,7 +11,16 @@
 std::ofstream Logger::m_File;
 Logger::Output Logger::m_Output = Logger::Output::Console;
 
-
+static const char* LevelToString(Logger::Level level)
+{
+    switch(level)
+    {
+        case Logger::Level::Log:   return "LOG";
+        case Logger::Level::Warn:  return "WARN";
+        case Logger::Level::Error: return "ERROR";
+        default: return "LOG";
+    }
+}
 void Logger::Init(Output output)
 {
     m_Output = output;
@@ -42,6 +51,7 @@ std::string Logger::GetTime()
 
 
 void Logger::Log(
+    Level level,
     const char* className,
     const char* function,
     int line,
@@ -59,26 +69,48 @@ void Logger::Log(
     std::stringstream final;
 
     final
-        << "["
-        << GetTime()
-        << "]"
-        << "[Thread "
-        << std::this_thread::get_id()
-        << "]"
-        << "["
-        << className
-        << "]"
-        << "["
-        << function
-        << ":"
-        << line
-        << "] "
-        << messageBuffer;
+    << "["
+    << GetTime()
+    << "]"
+    << "["
+    << LevelToString(level)
+    << "]"
+    << "[Thread "
+    << std::this_thread::get_id()
+    << "]"
+    << "["
+    << className
+    << "]"
+    << "["
+    << function
+    << ":"
+    << line
+    << "] "
+    << messageBuffer;
 
     std::string output = final.str();
 
     if (m_Output == Output::Console || m_Output == Output::Both)
-        std::cout << output << std::endl;
+{
+    const char* color = "\033[0m";
+
+    switch(level)
+    {
+        case Level::Log:
+            color = "\033[32m"; // green
+            break;
+
+        case Level::Warn:
+            color = "\033[33m"; // yellow
+            break;
+
+        case Level::Error:
+            color = "\033[31m"; // red
+            break;
+    }
+
+    std::cout << color << output << "\033[0m" << std::endl;
+}
 
     if ((m_Output == Output::File || m_Output == Output::Both) && m_File.is_open())
         m_File << output << std::endl;

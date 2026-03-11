@@ -22,7 +22,9 @@
 // Default: debug builds log to console + file
 #if defined(ENGINE_DEBUG)
 
-    #if !defined(ENGINE_LOG_CONSOLE) && !defined(ENGINE_LOG_FILE)
+    #if !defined(ENGINE_LOG_CONSOLE) && \
+        !defined(ENGINE_LOG_FILE) && \
+        !defined(ENGINE_LOG_BOTH)
 
         #define ENGINE_LOG_BOTH
 

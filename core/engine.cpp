@@ -5,9 +5,10 @@
 #include "system.h"
 #include "timer.h"
 #include "input.h"
-
+#include "logger.h"
 #include "../render/openglclass.h"
-
+#include "engineconfig.h"
+#include "enginedebug.h"
 
 Engine::Engine()
 {
@@ -22,6 +23,25 @@ Engine::~Engine()
 
 bool Engine::Initialize(Game* game)
 {
+
+    #if defined(ENGINE_RELEASE)
+
+        // No logging in release
+
+    #elif defined(ENGINE_LOG_CONSOLE)
+
+        Logger::Init(Logger::Output::Console);
+
+    #elif defined(ENGINE_LOG_FILE)
+
+        Logger::Init(Logger::Output::File);
+
+    #else
+
+        // Default
+        Logger::Init(Logger::Output::Both);
+
+    #endif
     if(!game)
     {
         return false;
@@ -46,6 +66,10 @@ bool Engine::Initialize(Game* game)
     {
         return false;
     }
+    ENGINE_LOG("Engine initialized");
+    ENGINE_WARN("Engine initialized");
+    ENGINE_ERROR("Engine initialized");
+
 
     return true;
 }
@@ -92,6 +116,9 @@ void Engine::Run()
 }
 void Engine::Shutdown()
 {
+    #if !defined(ENGINE_RELEASE)
+        Logger::Shutdown();
+    #endif
     if(m_Game)
     {
         m_Game->OnShutdown();

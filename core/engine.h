@@ -1,5 +1,6 @@
 #ifndef ENGINE_H
 #define ENGINE_H
+#define ENGINE_CLASS "ENGINE"
 #pragma once
 class Game;
 class System;

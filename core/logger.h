@@ -13,17 +13,24 @@ public:
         File,
         Both
     };
+    enum class Level
+    {
+        Log,
+        Warn,
+        Error
+    };
 
     static void Init(Output output = Output::Console);
     static void Shutdown();
 
     static void Log(
-        const char* className,
-        const char* function,
-        int line,
-        const char* format,
-        ...
-    );
+    Level level,
+    const char* className,
+    const char* function,
+    int line,
+    const char* format,
+    ...
+);
 
 private:
 

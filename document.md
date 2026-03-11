@@ -33,6 +33,44 @@ make
    - Rendering is performed by render subsystems (`RenderManager` → `SpriteRendererClass`) or legacy `OpenGLClass`.
 3. `Engine::Shutdown()` tears down systems and calls `Game::OnShutdown()`.
 
+## Logging and debug macros
+
+- Logger implementation lives in `core/logger.*` and debug macros in `core/enginedebug.h`.
+- Build flags in `core/engineconfig.h` control behavior:
+  - `ENGINE_RELEASE`: `ENGINE_LOG`, `ENGINE_WARN`, `ENGINE_ERROR` compile to no-ops.
+  - `ENGINE_DEBUG`: logging is enabled; default output is `ENGINE_LOG_BOTH` (console + file) unless overridden.
+- `Engine::Initialize()` calls `Logger::Init(...)` based on compile-time flags:
+  - `ENGINE_LOG_CONSOLE` → console only
+  - `ENGINE_LOG_FILE` → `logs.txt` only
+  - default (debug) → both
+- `Engine::Shutdown()` calls `Logger::Shutdown()` in non-release builds.
+
+### Message format
+
+Each log line includes:
+
+`[HH:MM:SS][LEVEL][Thread <id>][CLASS][Function:Line] message`
+
+- Console output is colorized (green log, yellow warn, red error).
+- File output is plain text written to `logs.txt` in the working directory.
+
+### Usage pattern in engine code
+
+In each `.cpp` using macros, define class tag before including `enginedebug.h`:
+
+```cpp
+#define ENGINE_CLASS "Engine"
+#include "enginedebug.h"
+```
+
+Then log with printf-style formatting:
+
+```cpp
+ENGINE_LOG("Loaded %d sprites", count);
+ENGINE_WARN("Missing clip: %s", clipName.c_str());
+ENGINE_ERROR("Failed to initialize renderer");
+```
+
 ## Where responsibilities lie
 
 - Gameplay: `Game`, `SceneManager`, `GameObject`, `Component` — no GL calls.

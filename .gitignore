@@ -3,3 +3,5 @@ bin/
 obj/
 .github/
 .vscode/
+logs.txt
+framework.layout

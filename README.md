@@ -163,6 +163,29 @@ framework/
    - Render via `RenderManager` → `SpriteRendererClass`
 3. **Shutdown** — `Engine::Shutdown()` tears down subsystems and calls `Game::OnShutdown()`
 
+## Logging
+
+The engine has a built-in logger in `core/logger.*` with debug macros in `core/enginedebug.h`.
+
+- In `ENGINE_RELEASE`, `ENGINE_LOG`, `ENGINE_WARN`, and `ENGINE_ERROR` are disabled.
+- In `ENGINE_DEBUG`, logging is enabled and defaults to both console and file (`logs.txt`) via `ENGINE_LOG_BOTH` in `core/engineconfig.h`.
+- `Engine::Initialize()` selects output mode (`Console`, `File`, or `Both`), and `Engine::Shutdown()` closes the logger.
+
+Quick usage:
+
+```cpp
+#define ENGINE_CLASS "RenderManager"
+#include "core/enginedebug.h"
+
+ENGINE_LOG("Render queue size: %zu", m_RenderQueue.size());
+ENGINE_WARN("Sprite sheet missing for object: %s", objectId.c_str());
+ENGINE_ERROR("Shader compile failed");
+```
+
+Log format:
+
+`[HH:MM:SS][LEVEL][Thread <id>][CLASS][Function:Line] message`
+
 ## Testing
 
 The engine supports both unit and integration testing:

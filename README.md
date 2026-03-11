@@ -72,6 +72,42 @@ make clean
 
 Removes all object files and binaries.
 
+### Build logging modes
+
+The `makefile` supports logging mode selection through the `BUILD` variable:
+
+- `BUILD=debug` (default): `ENGINE_DEBUG` + `ENGINE_LOG_BOTH` (console + `logs.txt`)
+- `BUILD=console`: `ENGINE_DEBUG` + `ENGINE_LOG_CONSOLE` (console only)
+- `BUILD=file`: `ENGINE_DEBUG` + `ENGINE_LOG_FILE` (`logs.txt` only)
+- `BUILD=release`: `ENGINE_RELEASE` (logging macros compile out)
+
+Use one of the following:
+
+```bash
+make clean
+make BUILD=debug
+./bin/framework
+```
+
+```bash
+make clean
+make BUILD=console
+./bin/framework
+```
+
+```bash
+make clean
+make BUILD=file
+./bin/framework
+# logs are written to ./logs.txt
+```
+
+```bash
+make clean
+make BUILD=release
+./release/framework
+```
+
 ## Creating a Game
 
 1. **Implement the Game interface** by inheriting from `Game`:

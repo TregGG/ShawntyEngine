@@ -8,6 +8,7 @@
 #include "logger.h"
 #include "../render/openglclass.h"
 #include "engineconfig.h"
+#define ENGINE_CLASS "Engine"
 #include "enginedebug.h"
 
 Engine::Engine()
@@ -44,6 +45,7 @@ bool Engine::Initialize(Game* game)
     #endif
     if(!game)
     {
+        ENGINE_ERROR("Initialize failed: game is null");
         return false;
     }
     m_Game=game;
@@ -54,21 +56,22 @@ bool Engine::Initialize(Game* game)
 
     if(!m_System->Initialize(800,600,"Engine"))
     {
+           ENGINE_ERROR("Initialize failed: System::Initialize failed");
         return false;
     }
     if (!m_OpenGL->Initialize(m_System, 800, 600))
     {
+            ENGINE_ERROR("Initialize failed: OpenGLClass::Initialize failed");
          return false;
     }
     m_Timer->Start();
     
     if(!m_Game->OnInit())
     {
+        ENGINE_ERROR("Initialize failed: Game::OnInit failed");
         return false;
     }
     ENGINE_LOG("Engine initialized");
-    ENGINE_WARN("Engine initialized");
-    ENGINE_ERROR("Engine initialized");
 
 
     return true;
@@ -149,6 +152,8 @@ void Engine::Shutdown()
         delete m_System;
         m_System = nullptr;
     }
+
+    ENGINE_LOG("Engine shutdown complete");
 }
 
 void Engine::Quit()

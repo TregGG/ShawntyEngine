@@ -1,10 +1,10 @@
 #include"system.h"
 #include<glad/glad.h>
 #include<GLFW/glfw3.h>
-#include<iostream>
 #include<thread>
 #include<chrono>
-#include <iostream>
+#define ENGINE_CLASS "System"
+#include "enginedebug.h"
 
 
 //STATICS->InputMANAGEMENT
@@ -64,11 +64,11 @@ System::~System()
 
 bool System::Initialize(int width, int height, const char* title)
 {
-    std::cout<<"Initializing window\n";
+    ENGINE_LOG("Initializing window %dx%d", width, height);
     m_shouldClose=false;
     if(!glfwInit())
     {
-        std::cerr<<"Failed to initialize GLFW\n";
+        ENGINE_ERROR("Failed to initialize GLFW");
         return false;
     }
 
@@ -82,7 +82,7 @@ bool System::Initialize(int width, int height, const char* title)
     m_Window= glfwCreateWindow(width,height,title,nullptr,nullptr);
     if(!m_Window)
     {
-        std::cerr<<"Failed to create a GLFW window\n";
+        ENGINE_ERROR("Failed to create GLFW window");
         glfwTerminate();
         return false;
     }
@@ -97,14 +97,15 @@ bool System::Initialize(int width, int height, const char* title)
 
     if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
-        std::cerr<<"Failed to initialize GLAD\n";
+        ENGINE_ERROR("Failed to initialize GLAD");
+        return false;
     }
     glfwSwapInterval(1);                            //VSYNC ON
-    std::cout << "OpenGL Vendor:   " << glGetString(GL_VENDOR) << "\n";
-    std::cout << "OpenGL Renderer: " << glGetString(GL_RENDERER) << "\n";
-    std::cout << "OpenGL Version:  " << glGetString(GL_VERSION) << "\n";
+    ENGINE_LOG("OpenGL Vendor: %s", reinterpret_cast<const char*>(glGetString(GL_VENDOR)));
+    ENGINE_LOG("OpenGL Renderer: %s", reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
+    ENGINE_LOG("OpenGL Version: %s", reinterpret_cast<const char*>(glGetString(GL_VERSION)));
 
-    std::cout<<"Initialized window\n";
+    ENGINE_LOG("Window initialized");
     glfwSetWindowUserPointer(m_Window, this);
 
     glfwSetFramebufferSizeCallback(
@@ -184,7 +185,7 @@ void System::OnWindowResized(int width, int height)
 
     m_Width = width;
     m_Height = height;
-    std::cout << "System: Window resized to " << width << "x" << height << "\n";
+    ENGINE_LOG("Window resized to %dx%d", width, height);
 
     glViewport(0, 0, width, height);
 

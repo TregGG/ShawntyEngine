@@ -1,7 +1,7 @@
 #include"scenemanager.h"
 #include"scene.h"
-
-#include<iostream>
+#define ENGINE_CLASS "SceneManager"
+#include "../core/enginedebug.h"
  SceneManager::SceneManager()
 {
     m_ActiveScene=nullptr;
@@ -21,12 +21,12 @@ void SceneManager::SetInitialScene(Scene* scene)
 {
     if(m_ActiveScene)
     {
-        std::cerr<<"SceneManager::Failed to set initial Scene:scene already set\n";
+        ENGINE_ERROR("Failed to set initial scene: scene already set");
         return;
     }
     if(!scene)
     {
-        std::cerr <<"SceneManager::Failed to load the scene\n";
+        ENGINE_ERROR("Failed to set initial scene: scene is null");
         return;
     }
     m_ActiveScene=scene;
@@ -39,7 +39,7 @@ void SceneManager::SetActiveScene(Scene* scene)
         m_ActiveScene->OnExit();
     if(!scene|| scene==m_ActiveScene)
     {
-        std::cerr<<"SceneManager::Failed to set active Scene: invalid scene\n";
+        ENGINE_WARN("Failed to set active scene: invalid scene");
         m_ActiveScene=nullptr;
         return;
     }
@@ -51,7 +51,7 @@ void SceneManager::Update(float deltaTime)
 {
     if(!m_ActiveScene)
     {
-        std::cerr<<"SceneManager:: Failed Update: no scene set\n";
+        ENGINE_WARN("Update skipped: no active scene");
         return;
     }
     m_ActiveScene->Update(deltaTime);

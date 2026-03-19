@@ -2,9 +2,10 @@
 #include "spriterendererclass.h"
 #include<glad/glad.h>
 #include "../levels/scene.h"
+#define ENGINE_CLASS "RenderManager"
+#include "../core/enginedebug.h"
 
 #include <glm/gtc/matrix_transform.hpp>
-#include <iostream>
 
 
 
@@ -38,8 +39,7 @@ void RenderManager::OnScreenChange(int width, int height)
     float viewWidth  = viewHeight * aspect;
 
     m_Camera->SetViewSize(viewWidth, viewHeight);
-    std::cout << "RenderManager: OnScreenChange to " << width << "x" << height
-              << ", view size " << viewWidth << "x" << viewHeight << "\n";
+    ENGINE_LOG("OnScreenChange %dx%d -> view %.2fx%.2f", width, height, viewWidth, viewHeight);
 }
 
 void RenderManager::BeginFrame()

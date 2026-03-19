@@ -3,7 +3,8 @@
 #include "../core/system.h"
 #include<glad/glad.h>
 #include"camera.h"
-#include<iostream>
+#define ENGINE_CLASS "OpenGLClass"
+#include "../core/enginedebug.h"
 #include<glm/gtc/matrix_transform.hpp>
 
 
@@ -21,7 +22,7 @@ bool OpenGLClass::Initialize(System* system, int screenWidth, int screenHeight)
 {
     if(!system)
     {
-        std::cerr<<"OpenGLClass::Initialize failed: System is null\n";
+        ENGINE_ERROR("Initialize failed: system is null");
         return false;
     }
 
@@ -41,7 +42,7 @@ bool OpenGLClass::Initialize(System* system, int screenWidth, int screenHeight)
     if (!InitializeShaders())
         return false;
 
-    std::cout<<"OpenGLClass::Initialize: passed";
+    ENGINE_LOG("Initialize passed");
     return true;
 
 

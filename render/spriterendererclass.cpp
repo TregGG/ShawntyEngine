@@ -3,7 +3,8 @@
 
 #include "spriterendererclass.h"
 #include <glm/glm.hpp>
-#include <iostream>
+#define ENGINE_CLASS "SpriteRendererClass"
+#include "../core/enginedebug.h"
 
 
 bool SpriteRendererClass::Initialize()
@@ -84,7 +85,6 @@ void SpriteRendererClass::DrawSprite(const TextureGPU& texture,
     glBindVertexArray(0);
 }
 #include <glad/glad.h>
-#include <iostream>
 
 void SpriteRendererClass::SetupShader()
 {
@@ -127,8 +127,7 @@ void main()
     if (!success)
     {
         glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-        std::cerr << "[SpriteRenderer] Vertex shader compile error:\n"
-                  << infoLog << std::endl;
+        ENGINE_ERROR("Vertex shader compile error: %s", infoLog);
     }
 
     // ---------------- Fragment Shader ----------------
@@ -140,8 +139,7 @@ void main()
     if (!success)
     {
         glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
-        std::cerr << "[SpriteRenderer] Fragment shader compile error:\n"
-                  << infoLog << std::endl;
+        ENGINE_ERROR("Fragment shader compile error: %s", infoLog);
     }
 
     // ---------------- Shader Program ----------------
@@ -154,8 +152,7 @@ void main()
     if (!success)
     {
         glGetProgramInfoLog(m_Shader, 512, nullptr, infoLog);
-        std::cerr << "[SpriteRenderer] Shader link error:\n"
-                  << infoLog << std::endl;
+        ENGINE_ERROR("Shader link error: %s", infoLog);
     }
 
     // shaders no longer needed after linking

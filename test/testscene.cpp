@@ -7,10 +7,14 @@
 #include "../objects/gameobject.h"
 #include "../objects/components/animator.h"
 #include "../objects/components/spriterenderer2d.h"
+#include "../objects/components/collidercomponent.h"
 #include <GLFW/glfw3.h>
 
 void TestScene::OnEnter()
 {
+    m_Registry.Init();
+    m_Physics.Init();
+
     if (!m_Assets)
     {
         ENGINE_ERROR("OnEnter failed: no AssetManager provided");
@@ -34,6 +38,7 @@ void TestScene::OnEnter()
     ENGINE_LOG("OnEnter: creating GameObject");
     // Create a GameObject and add AnimatorComponent and SpriteRenderer2D
     auto gameObj = std::make_unique<GameObject>("TestSprite");
+    m_Registry.Create(EntityCategory::Player, "TestSprite", "TestScene");
     gameObj->GetTransform().position = glm::vec2(0.0f, 0.0f);
     gameObj->GetTransform().size = glm::vec2(2.0f, 2.0f);
 
@@ -51,11 +56,16 @@ void TestScene::OnEnter()
     spriteRenderer->SetFrameIndex(0);
     gameObj->AddComponent(std::move(spriteRenderer));
 
+    auto playerCollider = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(2.0f, 2.0f));
+    m_Physics.RegisterCollider(playerCollider.get());
+    gameObj->AddComponent(std::move(playerCollider));
+
     m_GameObjects.push_back(std::move(gameObj));
 
     // Create second reference object (static, no animation)
     ENGINE_LOG("OnEnter: creating reference object");
     auto refObj = std::make_unique<GameObject>("static_ref");
+    m_Registry.Create(EntityCategory::Environment, "static_ref", "TestScene");
     refObj->GetTransform().position = glm::vec2(3.0f, 0.0f);
     refObj->GetTransform().size = glm::vec2(0.5f, 0.5f);
 
@@ -63,6 +73,10 @@ void TestScene::OnEnter()
     refSpriteRenderer->SetSpriteSheet(sheet);
     refSpriteRenderer->SetFrameIndex(0);  // Static frame
     refObj->AddComponent(std::move(refSpriteRenderer));
+
+    auto envCollider = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(0.5f, 0.5f));
+    m_Physics.RegisterCollider(envCollider.get());
+    refObj->AddComponent(std::move(envCollider));
 
     m_GameObjects.push_back(std::move(refObj));
     ENGINE_LOG("OnEnter: created reference object at (3.0, 0.0)");
@@ -73,6 +87,12 @@ void TestScene::OnEnter()
     m_Camera.SetCameraPosition(0.0f, 0.0f);
 
     // std::cout << "TestScene: entered and created 1 GameObject with Animator\n";
+}
+
+void TestScene::OnExit()
+{
+    m_Physics.Shutdown();
+    m_Registry.Shutdown();
 }
 
 // void TestScene::SetInput(const Input& input)
@@ -104,7 +124,16 @@ void TestScene::Update(float deltatime)
     // Apply input-driven movement to first GameObject (controllable sprite)
     if (m_GameObjects.size() > 0)
     {
+        glm::vec2 oldPos = m_GameObjects[0]->GetTransform().position;
         m_GameObjects[0]->GetTransform().position += moveDir * m_MoveSpeed * deltatime;
+
+        m_Physics.Update(deltatime);
+
+        ColliderComponent* playerCollider = m_GameObjects[0]->GetComponent<ColliderComponent>();
+        if (playerCollider && m_Physics.HasCollision(playerCollider))
+        {
+            m_GameObjects[0]->GetTransform().position = oldPos;
+        }
     }
 
     // Apply input-driven camera movement

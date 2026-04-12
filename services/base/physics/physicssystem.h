@@ -1,10 +1,12 @@
 #pragma once
 
 #include <vector>
+#include <memory>
 #include "../../service.h"
 
 // Forward declarations
 class ColliderComponent;
+class QuadtreeNode;
 
 // ============================
 // Collision Event
@@ -59,4 +61,7 @@ private:
 
     // Collision results
     std::vector<CollisionEvent> m_Collisions;
+    
+    // Quadtree instance
+    std::unique_ptr<QuadtreeNode> m_Quadtree;
 };

@@ -15,6 +15,10 @@ struct CollisionEvent
 {
     ColliderComponent* a;
     ColliderComponent* b;
+
+    bool operator==(const CollisionEvent& other) const {
+        return (a == other.a && b == other.b) || (a == other.b && b == other.a);
+    }
 };
 
 // ============================
@@ -42,16 +46,17 @@ public:
 
     // Check specific pair
     bool IsColliding(ColliderComponent* a, ColliderComponent* b) const;
+    
+    // Trigger separation methods
+    bool HasSolidCollision(ColliderComponent* obj) const;
+    std::vector<ColliderComponent*> GetOverlappingTriggers(ColliderComponent* obj) const;
 
     // Get all collisions (read-only)
     const std::vector<CollisionEvent>& GetCollisions() const;
 
 private:
-
     void CheckCollisions();
-    void ResolveCollisions(); // (empty for now, future use)
-
-    // AABB collision test
+    void DispatchEvents();
     bool Intersects(ColliderComponent* a, ColliderComponent* b);
 
 private:
@@ -60,6 +65,7 @@ private:
     std::vector<ColliderComponent*> m_Colliders;
 
     // Collision results
+    std::vector<CollisionEvent> m_PreviousCollisions;
     std::vector<CollisionEvent> m_Collisions;
     
     // Quadtree instance

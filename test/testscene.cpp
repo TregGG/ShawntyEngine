@@ -62,6 +62,57 @@ void TestScene::OnEnter()
 
     m_GameObjects.push_back(std::move(gameObj));
 
+    // Create trigger zone object
+    ENGINE_LOG("OnEnter: creating trigger object");
+    auto triggerObj = std::make_unique<GameObject>("trigger_zone");
+    m_Registry.Create(EntityCategory::Environment, "trigger_zone", "TestScene");
+    triggerObj->GetTransform().position = glm::vec2(-3.0f, 0.0f);
+    triggerObj->GetTransform().size = glm::vec2(1.5f, 1.5f);
+
+    auto triggerRenderer = std::make_unique<SpriteRenderer2D>();
+    triggerRenderer->SetSpriteSheet(sheet);
+    triggerRenderer->SetFrameIndex(0); 
+    triggerObj->AddComponent(std::move(triggerRenderer));
+
+    // 'true' explicitly maps this specifically to a trigger bounds!
+    auto triggerC = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.5f, 1.5f), true);
+    triggerC->SetOnTriggerEnter([](ColliderComponent* self, ColliderComponent* other) {
+        ENGINE_LOG("entity %s entered the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
+    });
+    triggerC->SetOnTriggerExit([](ColliderComponent* self, ColliderComponent* other) {
+        ENGINE_LOG("entity %s exited the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
+    });
+    
+    m_Physics.RegisterCollider(triggerC.get());
+    triggerObj->AddComponent(std::move(triggerC));
+
+    m_GameObjects.push_back(std::move(triggerObj));
+
+    // Create secondary trigger zone
+    ENGINE_LOG("OnEnter: creating second trigger object");
+    auto triggerObj2 = std::make_unique<GameObject>("trigger_zone_2");
+    m_Registry.Create(EntityCategory::Environment, "trigger_zone_2", "TestScene");
+    triggerObj2->GetTransform().position = glm::vec2(0.0f, 3.0f);
+    triggerObj2->GetTransform().size = glm::vec2(2.0f, 1.0f);
+
+    auto triggerRenderer2 = std::make_unique<SpriteRenderer2D>();
+    triggerRenderer2->SetSpriteSheet(sheet);
+    triggerRenderer2->SetFrameIndex(0); 
+    triggerObj2->AddComponent(std::move(triggerRenderer2));
+
+    auto triggerC2 = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(2.0f, 1.0f), true);
+    triggerC2->SetOnTriggerEnter([](ColliderComponent* self, ColliderComponent* other) {
+        ENGINE_LOG("entity %s entered the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
+    });
+    triggerC2->SetOnTriggerExit([](ColliderComponent* self, ColliderComponent* other) {
+        ENGINE_LOG("entity %s exited the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
+    });
+    
+    m_Physics.RegisterCollider(triggerC2.get());
+    triggerObj2->AddComponent(std::move(triggerC2));
+
+    m_GameObjects.push_back(std::move(triggerObj2));
+
     // Create second reference object (static, no animation)
     ENGINE_LOG("OnEnter: creating reference object");
     auto refObj = std::make_unique<GameObject>("static_ref");
@@ -130,7 +181,7 @@ void TestScene::Update(float deltatime)
         m_Physics.Update(deltatime);
 
         ColliderComponent* playerCollider = m_GameObjects[0]->GetComponent<ColliderComponent>();
-        if (playerCollider && m_Physics.HasCollision(playerCollider))
+        if (playerCollider && m_Physics.HasSolidCollision(playerCollider))
         {
             m_GameObjects[0]->GetTransform().position = oldPos;
         }
@@ -167,7 +218,9 @@ void TestScene::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) con
             glm::vec2 size(b.maxX - b.minX, b.maxY - b.minY);
             glm::vec3 pos(b.minX + size.x * 0.5f, b.minY + size.y * 0.5f, 0.0f);
             
-            outDebugRects.push_back({pos, size, glm::vec3(0.0f, 1.0f, 0.0f)});
+            // Render triggers as RED instead of yellow
+            glm::vec3 cColor = col->IsTrigger() ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+            outDebugRects.push_back({pos, size, cColor});
         }
     }
 #endif

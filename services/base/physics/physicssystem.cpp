@@ -119,12 +119,14 @@ void PhysicsSystem::Init() {
 
 void PhysicsSystem::Update(float /*dt*/) {
     CheckCollisions();
+    DispatchEvents();
 }
 
 void PhysicsSystem::Shutdown() {
     if (m_Quadtree) m_Quadtree->Clear();
     m_Colliders.clear();
     m_Collisions.clear();
+    m_PreviousCollisions.clear();
 }
 
 void PhysicsSystem::RegisterCollider(ColliderComponent* collider) {
@@ -152,6 +154,7 @@ bool PhysicsSystem::Intersects(ColliderComponent* a, ColliderComponent* b) {
 }
 
 void PhysicsSystem::CheckCollisions() {
+    m_PreviousCollisions = m_Collisions;
     m_Collisions.clear();
     if (m_Quadtree) {
         m_Quadtree->Clear();
@@ -197,6 +200,57 @@ bool PhysicsSystem::IsColliding(ColliderComponent* a, ColliderComponent* b) cons
         if ((ev.a == a && ev.b == b) || (ev.a == b && ev.b == a)) return true;
     }
     return false;
+}
+
+void PhysicsSystem::DispatchEvents() {
+    // Execute OnTriggerEnter by checking strictly for totally new overlap instances
+    for (const auto& ev : m_Collisions) {
+        auto it = std::find(m_PreviousCollisions.begin(), m_PreviousCollisions.end(), ev);
+        if (it == m_PreviousCollisions.end()) {
+            if (ev.a->IsTrigger()) {
+                auto& cb = ev.a->GetOnTriggerEnter();
+                if (cb) cb(ev.a, ev.b);
+            }
+            if (ev.b->IsTrigger()) {
+                auto& cb = ev.b->GetOnTriggerEnter();
+                if (cb) cb(ev.b, ev.a);
+            }
+        }
+    }
+
+    // Execute OnTriggerExit checking for expired overlaps missing from current frame
+    for (const auto& ev : m_PreviousCollisions) {
+        auto it = std::find(m_Collisions.begin(), m_Collisions.end(), ev);
+        if (it == m_Collisions.end()) {
+            if (ev.a->IsTrigger()) {
+                auto& cb = ev.a->GetOnTriggerExit();
+                if (cb) cb(ev.a, ev.b);
+            }
+            if (ev.b->IsTrigger()) {
+                auto& cb = ev.b->GetOnTriggerExit();
+                if (cb) cb(ev.b, ev.a);
+            }
+        }
+    }
+}
+
+bool PhysicsSystem::HasSolidCollision(ColliderComponent* obj) const {
+    if (obj->IsTrigger()) return false;
+
+    for (const auto& ev : m_Collisions) {
+        if (ev.a == obj && !ev.b->IsTrigger()) return true;
+        if (ev.b == obj && !ev.a->IsTrigger()) return true;
+    }
+    return false;
+}
+
+std::vector<ColliderComponent*> PhysicsSystem::GetOverlappingTriggers(ColliderComponent* obj) const {
+    std::vector<ColliderComponent*> triggers;
+    for (const auto& ev : m_Collisions) {
+        if (ev.a == obj && ev.b->IsTrigger()) triggers.push_back(ev.b);
+        if (ev.b == obj && ev.a->IsTrigger()) triggers.push_back(ev.a);
+    }
+    return triggers;
 }
 
 const std::vector<CollisionEvent>& PhysicsSystem::GetCollisions() const {

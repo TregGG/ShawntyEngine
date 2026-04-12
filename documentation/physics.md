@@ -1,51 +1,66 @@
-# Physics System
+# Physics System Architecture
 
-The `PhysicsSystem` implements rigid body collision detection and response completely abstractly. It dynamically inherits from an internal `Service` framework, managing its spatial boundaries without ever directly associating with visual `GameObject` implementations.
+The `PhysicsSystem` drives bounding box collisions natively through an explicitly decoupled `Service` architecture. It computes geometry limits completely isolated from Gameplay dependencies, operating transparently alongside visual abstractions.
 
-## How it works
+## Core Component Interface
 
-Instead of comparing every entity directly to every other entity ($O(n^2)$ complexity checks), the physics backend scales natively via a **Quadtree Spatial Partitioning** algorithm.
+### `ColliderComponent` Features
+The logic evaluates strictly against `ColliderComponent` structures. It evaluates the exact `AABB` dimensions exclusively on query calls, ensuring it doesn't incur constant framerate update costs:
 
-### 1. `ColliderComponent` Integration
-
-A target relies on the `ColliderComponent` to calculate boundary layouts dynamically:
 ```cpp
 class ColliderComponent : public Component {
-    // Computes world-coordinates lazily against the runtime transform only when actively responding to query requests!
+    // Re-evaluates world boundaries efficiently querying `GetTransform()` offsets solely when polled!
     AABB GetBounds() const;
+    
+    // Explicit behavioral flags dictate dynamic callbacks or strict blocks
+    bool IsTrigger() const;
 };
 ```
 
-Whenever a collider executes logic in the World Space, you inject it via:
+When building game states, you instantiate and explicitly inform the native engine loops:
 ```cpp
-auto playerCollider = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(2.0f, 2.0f));
-m_Physics.RegisterCollider(playerCollider.get());
+auto collider = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.0f));
+m_Physics.RegisterCollider(collider.get());
 ```
 
-### 2. Recursive Partitioning
-When `m_Physics.Update(deltatime)` runs prior to rendering frames, the core layout tears down and dynamically inserts active instances down partitioned localized quadrant leaves:
-```cpp
-void QuadtreeNode::Split() {
-    float subWidth = (bounds.maxX - bounds.minX) / 2.0f;
-    float subHeight = (bounds.maxY - bounds.minY) / 2.0f;
-    // Dissects current boundaries identically into NW, NE, SW, SE zones
-}
-```
+---
 
-### 3. Collision Resolution
-Queries recursively extract neighboring components occupying adjacent boundaries natively checking geometry overlaps.
+## 1. Spatial Partitioning Check
+Instead of natively querying every bounding structure against each other ($O(n^2)$), the backend slices layouts into localized boundaries using a **Quadtree** system.
 
-To stop entities passing through each other, store boundaries prior to modifications and revert dynamically!
+### Insertion
+At the very beginning of the `m_Physics.Update(deltatime)` frame:
+- The previous cache map completely destructs.
+- `QuadtreeNode` bounds branch radially dividing active space into NW, NE, SW, and SE grids based on active object clusters.
+- All valid instances dynamically shift down into the deepest local branch capable of housing them, severely lowering native overlap computations.
+
+---
+
+## 2. Event Dispatching & Trigger State Tracking
+During the query phase, the exact overlap configurations hit a complex state-diffing system to parse behaviors natively correctly firing event queues!
+
+A `CollisionEvent` object is constructed noting any active intersections, and pushed onto `m_Collisions`. Then, our `DispatchEvents()` runs a differential comparison:
+
+1. **`OnTriggerEnter`** - Loop over `m_Collisions`. Any intersection mapping entirely missing from `m_PreviousCollisions` must be explicitly new! Run native callbacks on any involved `IsTrigger()` objects!
+2. **`OnTriggerExit`** - Loop over `m_PreviousCollisions`. Any intersection parsing from the past frame but *missing* natively from the current frame indicates the entities broke contact! Safely resolve specific `.GetOnTriggerExit()` lambdas.
+
+---
+
+## 3. Resolving Rigid Bodies (`HasSolidCollision`)
+To isolate complex behavior, developers structure explicit boundary constraints internally explicitly. Rather than computing bounces mathematically in `PhysicsSystem`, gameplay natively evaluates and prevents bad states cleanly utilizing roll-backs!
+
 ```cpp
-// Apply Movement
+// 1. Snapshot previous legal coordinates safely
 glm::vec2 oldPos = obj->GetTransform().position;
+
+// 2. Adjust velocities and execute movements
 obj->GetTransform().position += velocity * deltaTime;
 
-// Refresh Engine Matrices
+// 3. Request Engine evaluation across all bodies natively parsing new states!
 m_Physics.Update(deltaTime);
 
-// Rollback rigid constraints!
-if (m_Physics.HasCollision(myCollider)) {
+// 4. Force roll-backs specifically only utilizing `HasSolidCollision`, explicitly bypassing trigger intersections!
+if (m_Physics.HasSolidCollision(myCollider)) {
     obj->GetTransform().position = oldPos;
 }
 ```

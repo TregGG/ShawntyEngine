@@ -1,117 +1,41 @@
 # Framework Engine
 
-A lightweight 2D game engine written in C++17 with clean separation between gameplay logic and rendering.
-
-## Features
-
-- **Component-based architecture** — Build game objects from reusable components
-- **Scene management** — Organize game states with scene transitions
-- **Sprite rendering & animation** — Modern render pipeline with sprite sheet and animation support
-- **Asset system** — Pre-compiled asset loading for textures, sprite sheets, and animations
-- **Input handling** — Keyboard input with GLFW integration
-- **Separation of concerns** — Strict boundaries between gameplay code and OpenGL rendering
-
-## Architecture
-
-The engine is organized into distinct subsystems:
-
-- **`core/`** — Engine loop, game interface, system management (GLFW), input, and timing
-- **`render/`** — Rendering pipeline with `RenderManager` and `SpriteRendererClass`
-- **`assets/`** — Asset loading and management for textures, sprite sheets, and animations
-- **`levels/`** — Scene system and scene manager
-- **`objects/`** — GameObject and component implementations
-- **`external/`** — Third-party dependencies (GLAD, GLM)
-
-### Key Design Principles
-
-- **Gameplay code never calls OpenGL directly** — All rendering goes through the render subsystem
-- **Component ownership** — GameObjects own components via `std::unique_ptr`, scenes own GameObjects
-- **Data-driven assets** — Assets are loaded from pre-compiled formats (`.tga`, `.ssheet`, `.anim`, `.objasset`)
-- **String-based asset IDs** — Type-safe asset references using `AssetID` and `ObjectID` types
+A lightweight 2D game engine written in C++17 with a strictly decoupled architecture, meaning gameplay logic safely manages state without interacting directly with OpenGL rasterization pipelines.
 
 ## Getting Started
 
 ### Prerequisites
 
-- C++17 compatible compiler (GCC, Clang)
-- OpenGL development libraries
-- GLFW3 (installed via package manager)
-- pkg-config
-
-**Ubuntu/Debian:**
+You need a C++17 compatible compiler seamlessly integrated with OpenGL/GLFW development libraries.
 ```bash
 sudo apt-get install build-essential libglfw3-dev libgl1-mesa-dev pkg-config
 ```
 
-**Fedora:**
-```bash
-sudo dnf install gcc-c++ glfw-devel mesa-libGL-devel pkg-config
-```
-
-### Building
+### Build & Compiler Options
+The engine compiles highly parallelized out of the box using recursive directory scans. We natively support varying console logging macros mapped dynamically to your build targets:
 
 ```bash
+# Compiles everything seamlessly in multi-threaded mode (using `-j(nproc)` scaling under the hood).
 make
-```
 
-This compiles all source files and produces the executable at `bin/framework`.
-
-### Running
-
-```bash
+# Execute the engine (Requires `bin/` folder)
 ./bin/framework
 ```
 
-Currently runs `TestGame` with `TestScene` as a demonstration.
+**Custom Macros:**
+- `make BUILD=debug` (default) — Emits highly detailed engine logging identically to both standard console streams *and* a local `logs.txt` file setup (`ENGINE_LOG_BOTH`).
+- `make BUILD=console` — Optimizes logging stream strictly forcing `ENGINE_LOG_CONSOLE` behavior.
+- `make BUILD=file` — Discards standard std logs and writes silently tracking outputs to local file contexts.
+- `make BUILD=release` — Completely trims the compilation removing ALL macro footprints for standard deployment.
 
-### Cleaning
-
-```bash
-make clean
-```
-
-Removes all object files and binaries.
-
-### Build logging modes
-
-The `makefile` supports logging mode selection through the `BUILD` variable:
-
-- `BUILD=debug` (default): `ENGINE_DEBUG` + `ENGINE_LOG_BOTH` (console + `logs.txt`)
-- `BUILD=console`: `ENGINE_DEBUG` + `ENGINE_LOG_CONSOLE` (console only)
-- `BUILD=file`: `ENGINE_DEBUG` + `ENGINE_LOG_FILE` (`logs.txt` only)
-- `BUILD=release`: `ENGINE_RELEASE` (logging macros compile out)
-
-Use one of the following:
-
-```bash
-make clean
-make BUILD=debug
-./bin/framework
-```
-
-```bash
-make clean
-make BUILD=console
-./bin/framework
-```
-
-```bash
-make clean
-make BUILD=file
-./bin/framework
-# logs are written to ./logs.txt
-```
-
-```bash
-make clean
-make BUILD=release
-./release/framework
-```
+**Tools:**
+- `make clean` natively discards all cached `.o` intermediate references safely prior to new rebuilds.
 
 ## Creating a Game
 
-1. **Implement the Game interface** by inheriting from `Game`:
+Starting a game revolves fundamentally around overriding Engine instances and wrapping your behaviors logically within `Component` chunks.
 
+1. **Implement the Root Engine Loop:**
 ```cpp
 class MyGame : public Game
 {
@@ -119,40 +43,35 @@ public:
     bool OnInit() override;
     void OnInput(const Input& input) override;
     void OnUpdate(float deltaTime) override;
-    void OnRender() override;
+    void OnRender() override;   // Offloads queries to specific Renderer
     void OnShutdown() override;
 };
 ```
 
-2. **Create a Scene** by inheriting from `Scene`:
-
+2. **Establish a Playing Field (`Scene`):**
 ```cpp
 class MyScene : public Scene
 {
 public:
     void OnEnter() override;
     void OnExit() override;
-    void Update(float deltaTime) override;
+    void Update(float deltatime) override;
 };
 ```
 
-3. **Build GameObjects with Components**:
-
+3. **Deploy Physical Actors:**
 ```cpp
-auto gameObj = std::make_unique<GameObject>("Player");
-gameObj->AddComponent(std::make_unique<SpriteRenderer2D>());
-gameObj->AddComponent(std::make_unique<AnimatorComponent>());
+auto player = std::make_unique<GameObject>("Player");
+player->AddComponent(std::make_unique<SpriteRenderer2D>());
+player->AddComponent(std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.0f)));
 ```
 
-4. **Wire it all together** in `main.cpp`:
-
+4. **Integrate your Boot System** (`main.cpp`):
 ```cpp
 Engine engine;
 MyGame game;
 
-if (!engine.Initialize(&game))
-    return -1;
-
+if (!engine.Initialize(&game)) return -1;
 engine.Run();
 engine.Shutdown();
 ```
@@ -184,6 +103,7 @@ framework/
 │   ├── gameobject.h      # GameObject base class
 │   └── components/       # Built-in components
 ├── test/                 # Test games and scenes
+├── documentation/        # Detailed engine subsystem guides
 └── external/             # Third-party libraries
     ├── glad/             # OpenGL loader
     └── glm/              # Math library
@@ -232,7 +152,11 @@ The engine supports both unit and integration testing:
 
 ## Documentation
 
-For detailed architecture notes and development guidelines, see [document.md](document.md).
+For deep structural breakdowns explaining our Quadtrees, slot registries, and renderer pipelines, see the [Documentation Module](documentation/):
+- **[Physics Architecture](documentation/physics.md)**
+- **[Rendering Pipeline](documentation/rendering.md)**
+- **[Entity Registry System](documentation/registry.md)**
+- **[Components & Layouts](documentation/components.md)**
 
 
 

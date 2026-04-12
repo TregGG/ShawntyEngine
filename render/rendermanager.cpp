@@ -48,6 +48,7 @@ void RenderManager::BeginFrame()
     glClear(GL_COLOR_BUFFER_BIT);
 
     m_RenderQueue.clear();
+    m_DebugQueue.clear();
 }
 
 void RenderManager::Render()
@@ -56,7 +57,10 @@ void RenderManager::Render()
         return;
 
     CollectRenderables();
+    CollectDebugRenderables();
+
     SubmitRenderables();
+    SubmitDebugRenderables();
 }
 
 void RenderManager::CollectRenderables()
@@ -109,6 +113,35 @@ void RenderManager::SubmitRenderables()
             entry.mvp
         );
     }
+}
+
+void RenderManager::CollectDebugRenderables()
+{
+#ifdef ENGINE_DEBUG
+    std::vector<DebugRect> debugRects;
+    m_Scene->BuildDebugRenderables(debugRects);
+
+    const glm::mat4& vp = m_Camera->GetViewProjection();
+
+    for (const DebugRect& r : debugRects)
+    {
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), r.position);
+        model = glm::scale(model, glm::vec3(r.size, 1.0f));
+
+        glm::mat4 mvp = vp * model;
+        m_DebugQueue.push_back({mvp, r.color});
+    }
+#endif
+}
+
+void RenderManager::SubmitDebugRenderables()
+{
+#ifdef ENGINE_DEBUG
+    for (const DebugRenderEntry& entry : m_DebugQueue)
+    {
+        m_SpriteRenderer.DrawDebugRect(entry.mvp, entry.color);
+    }
+#endif
 }
 
 void RenderManager::EndFrame()

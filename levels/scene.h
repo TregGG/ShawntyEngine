@@ -22,6 +22,13 @@ struct RenderableSprite
     int frameIndex = 0;
 };
 
+struct DebugRect
+{
+    glm::vec3 position;
+    glm::vec2 size;
+    glm::vec3 color;
+};
+
 
 class Scene
 {
@@ -71,6 +78,7 @@ public:
         // std::cout << "Scene: built " << outRenderables.size() << " renderables\n";
     }
      
+    virtual void BuildDebugRenderables(std::vector<DebugRect>& /*outDebugRects*/) const {}
     
     
     void SetInput(const Input& input) {m_Input=&input;};

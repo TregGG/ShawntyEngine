@@ -149,7 +149,26 @@ void TestScene::Update(float deltatime)
         if (obj && obj->IsActive())
             obj->Update(deltatime);
     }
+}
 
-    // Rebuild renderables from GameObjects and their SpriteRenderer2D components
-    
+void TestScene::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) const
+{
+#ifdef ENGINE_DEBUG
+    outDebugRects.clear();
+    for (const auto& obj : m_GameObjects) 
+    {
+        if (!obj || !obj->IsActive()) continue;
+        
+        // Temporarily bypassing const to pull the active component ptr mapping dynamically 
+        auto* objPtr = const_cast<GameObject*>(obj.get());
+        if (auto col = objPtr->GetComponent<ColliderComponent>()) 
+        {
+            auto b = col->GetBounds();
+            glm::vec2 size(b.maxX - b.minX, b.maxY - b.minY);
+            glm::vec3 pos(b.minX + size.x * 0.5f, b.minY + size.y * 0.5f, 0.0f);
+            
+            outDebugRects.push_back({pos, size, glm::vec3(0.0f, 1.0f, 0.0f)});
+        }
+    }
+#endif
 }

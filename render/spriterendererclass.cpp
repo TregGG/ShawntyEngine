@@ -14,6 +14,8 @@ bool SpriteRendererClass::Initialize()
 
     SetupQuad();
     SetupShader();
+    SetupDebugQuad();
+    SetupDebugShader();
 
     m_Initialized = true;
     return true;
@@ -84,6 +86,18 @@ void SpriteRendererClass::DrawSprite(const TextureGPU& texture,
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 }
+
+void SpriteRendererClass::DrawDebugRect(const glm::mat4& mvp, const glm::vec3& color)
+{
+    glUseProgram(m_DebugShader);
+    glUniformMatrix4fv(glGetUniformLocation(m_DebugShader, "u_MVP"), 1, GL_FALSE, &mvp[0][0]);
+    glUniform3f(glGetUniformLocation(m_DebugShader, "u_Color"), color.r, color.g, color.b);
+
+    glBindVertexArray(m_DebugVAO);
+    glDrawArrays(GL_LINE_LOOP, 0, 4);
+    glBindVertexArray(0);
+}
+
 void SpriteRendererClass::SetupShader()
 {
     const char* vertexSrc = R"(#version 330 core
@@ -157,13 +171,71 @@ void main()
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 }
+
+void SpriteRendererClass::SetupDebugQuad()
+{
+    float lineVertices[8] = {
+        -0.5f, -0.5f,
+         0.5f, -0.5f,
+         0.5f,  0.5f,
+        -0.5f,  0.5f
+    };
+
+    glGenVertexArrays(1, &m_DebugVAO);
+    glGenBuffers(1, &m_DebugVBO);
+
+    glBindVertexArray(m_DebugVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_DebugVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+}
+
+void SpriteRendererClass::SetupDebugShader()
+{
+    const char* vertexSrc = R"(#version 330 core
+layout (location = 0) in vec2 aPos;
+uniform mat4 u_MVP;
+void main() { gl_Position = u_MVP * vec4(aPos, 0.0, 1.0); }
+)";
+
+    const char* fragmentSrc = R"(#version 330 core
+uniform vec3 u_Color;
+out vec4 FragColor;
+void main() { FragColor = vec4(u_Color, 1.0); }
+)";
+
+    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertexSrc, nullptr);
+    glCompileShader(vertexShader);
+
+    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragmentSrc, nullptr);
+    glCompileShader(fragmentShader);
+
+    m_DebugShader = glCreateProgram();
+    glAttachShader(m_DebugShader, vertexShader);
+    glAttachShader(m_DebugShader, fragmentShader);
+    glLinkProgram(m_DebugShader);
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+}
+
 void SpriteRendererClass::Shutdown()
 {
     if (m_VAO)    glDeleteVertexArrays(1, &m_VAO);
     if (m_VBO)    glDeleteBuffers(1, &m_VBO);
     if (m_EBO)    glDeleteBuffers(1, &m_EBO);
     if (m_Shader) glDeleteProgram(m_Shader);
+    
+    if (m_DebugVAO) glDeleteVertexArrays(1, &m_DebugVAO);
+    if (m_DebugVBO) glDeleteBuffers(1, &m_DebugVBO);
+    if (m_DebugShader) glDeleteProgram(m_DebugShader);
 
-    m_VAO = m_VBO = m_EBO = m_Shader = 0;
+    m_VAO = m_VBO = m_EBO = m_Shader = m_DebugVAO = m_DebugVBO = m_DebugShader = 0;
 }
 

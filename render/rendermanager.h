@@ -29,7 +29,9 @@ public:
 
 private:
     void CollectRenderables();
+    void CollectDebugRenderables();
     void SubmitRenderables();
+    void SubmitDebugRenderables();
 
 private:
     Scene*  m_Scene  = nullptr;   // non-owning
@@ -43,8 +45,15 @@ private:
         const SpriteSheetAsset* sheet;
         int frameIndex;
     };
+    
+    struct DebugRenderEntry
+    {
+        glm::mat4 mvp;
+        glm::vec3 color;
+    };
 
     std::vector<RenderEntry> m_RenderQueue;
+    std::vector<DebugRenderEntry> m_DebugQueue;
 
     int m_ViewportWidth  = 1;
     int m_ViewportHeight = 1;

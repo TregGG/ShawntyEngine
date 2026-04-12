@@ -20,6 +20,7 @@ public:
     void OnEnter() override;
     void OnExit() override;
     void Update(float deltatime) override;
+    void BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) const override;
     // void SetInput(const Input& input) override;
 
 private:

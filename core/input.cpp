@@ -1,7 +1,5 @@
 #include "input.h"
 #include <GLFW/glfw3.h>
-#define ENGINE_CLASS "Input"
-#include "enginedebug.h"
 
 Input::Input()
 {

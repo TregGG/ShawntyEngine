@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <cstdint>
+#include <string>
+#include <string_view>
 #include "../../../core/entityid.h"
 #include "../../service.h"
 
@@ -16,7 +18,7 @@ public:
     void Shutdown() override;
 
     // Create entity with category
-    EntityID Create(EntityCategory category);
+    EntityID Create(EntityCategory category, std::string_view name, std::string_view registeredBy);
 
     void Destroy(EntityID entity);
     bool IsAlive(EntityID entity) const;
@@ -33,6 +35,8 @@ private:
         std::uint32_t generation = 0;
         bool alive = false;
         EntityCategory category = EntityCategory::Environment;
+        std::string name;
+        std::string registeredBy;
     };
 
     std::vector<Slot> m_Slots;

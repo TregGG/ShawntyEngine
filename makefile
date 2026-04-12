@@ -2,6 +2,9 @@ CXX := g++
 
 TARGET := framework
 
+# Enable parallel execution by default based on number of system cores
+MAKEFLAGS += -j$(shell nproc)
+
 # --------------------------------------------------
 # Build mode
 # --------------------------------------------------
@@ -26,15 +29,12 @@ BIN := $(BIN_DIR)/$(TARGET)
 # Source files
 # --------------------------------------------------
 
+# Recursive wildcard function
+rwildcard=$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
+
 SRCS := main.cpp \
         external/glad/src/glad.c \
-        $(wildcard core/*.cpp) \
-        $(wildcard levels/*.cpp) \
-        $(wildcard render/*.cpp) \
-        $(wildcard assets/*.cpp) \
-        $(wildcard objects/*.cpp) \
-        $(wildcard objects/components/*.cpp) \
-        $(wildcard test/*.cpp)
+        $(call rwildcard,core levels render assets objects test services,*.cpp)
 
 # --------------------------------------------------
 # Object files

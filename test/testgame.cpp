@@ -4,8 +4,9 @@
 #include "../core/engine.h"
 #include "../core/input.h"
 #include "../assets/assetmanager.h"
+#define ENGINE_CLASS "TestGame"
+#include "../core/enginedebug.h"
 
-#include <iostream>
 #include <string>
 #include <filesystem>
 #include <fstream>
@@ -64,46 +65,46 @@ bool WriteTestCompiledAssets(const std::string& compiledRoot)
         obj << "animations:test\n";
         obj.close();
 
-        std::cout << "Wrote test compiled assets to " << compiledRoot << "\n";
+        ENGINE_LOG("Wrote test compiled assets to %s", compiledRoot.c_str());
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "WriteTestCompiledAssets error: " << e.what() << "\n";
+        ENGINE_ERROR("WriteTestCompiledAssets error: %s", e.what());
         return false;
     }
 }
 
 bool TestGame::OnInit()
 {
-	std::cout << "TestGame: OnInit\n";
+	ENGINE_LOG("OnInit");
 
 	const std::string compiledRoot = "test_compiled";
 	if (!WriteTestCompiledAssets(compiledRoot))
 	{
-		std::cerr << "Failed to write compiled assets\n";
+        ENGINE_ERROR("Failed to write compiled assets");
 		return false;
 	}
 
-	std::cout << "TestGame: Assets written, initializing AssetManager\n";
+    ENGINE_LOG("Assets written, initializing AssetManager");
 	if (!m_AssetManager.Initialize(compiledRoot))
 	{
-		std::cerr << "AssetManager failed to initialize\n";
+        ENGINE_ERROR("AssetManager failed to initialize");
 		return false;
 	}
 
-	std::cout << "TestGame: AssetManager initialized, initializing RenderManager\n";
+    ENGINE_LOG("AssetManager initialized, initializing RenderManager");
 	if (!m_RenderManager.Initialize())
 	{
-		std::cerr << "RenderManager failed to initialize\n";
+        ENGINE_ERROR("RenderManager failed to initialize");
 		return false;
 	}
 
-	std::cout << "TestGame: RenderManager initialized, creating TestScene\n";
+    ENGINE_LOG("RenderManager initialized, creating TestScene");
 	m_TestScene = new TestScene(&m_AssetManager);
 
 	m_SceneManager.SetInitialScene(m_TestScene);
 	m_RenderManager.BindScene(m_TestScene);
 
-	std::cout << "TestGame: OnInit completed\n";
+    ENGINE_LOG("OnInit completed");
 	return true;
 }
 
@@ -139,6 +140,6 @@ void TestGame::OnShutdown()
     }
 
 	m_AssetManager.Shutdown();
-	std::cout << "TestGame: Shutdown\n";
+    ENGINE_LOG("Shutdown");
 }
 

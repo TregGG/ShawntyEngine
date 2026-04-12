@@ -1,8 +1,6 @@
 #include"system.h"
 #include<glad/glad.h>
 #include<GLFW/glfw3.h>
-#include<thread>
-#include<chrono>
 #define ENGINE_CLASS "System"
 #include "enginedebug.h"
 

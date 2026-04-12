@@ -84,8 +84,6 @@ void SpriteRendererClass::DrawSprite(const TextureGPU& texture,
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 }
-#include <glad/glad.h>
-
 void SpriteRendererClass::SetupShader()
 {
     const char* vertexSrc = R"(#version 330 core

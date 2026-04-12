@@ -1,5 +1,6 @@
 #include "testscene.h"
-#include <iostream>
+#define ENGINE_CLASS "TestScene"
+#include "../core/enginedebug.h"
 #include <glm/vec2.hpp>
 #include "../assets/assetmanager.h"
 #include "../core/input.h"
@@ -12,39 +13,39 @@ void TestScene::OnEnter()
 {
     if (!m_Assets)
     {
-        std::cerr << "TestScene: no AssetManager provided\n";
+        ENGINE_ERROR("OnEnter failed: no AssetManager provided");
         return;
     }
 
-    std::cout << "TestScene::OnEnter: getting sprite sheet and animation set\n";
+    ENGINE_LOG("OnEnter: getting sprite sheet and animation set");
     // Get sprite sheet and animation set for "testobj"
     const SpriteSheetAsset* sheet = nullptr;
     const AnimationSetAsset* animSet = nullptr;
     try {
         sheet = m_Assets->GetSpriteSheet("testobj");
-        std::cout << "TestScene::OnEnter: got sprite sheet\n";
+        ENGINE_LOG("OnEnter: got sprite sheet");
         animSet = m_Assets->GetAnimationSet("testobj");
-        std::cout << "TestScene::OnEnter: got animation set\n";
+        ENGINE_LOG("OnEnter: got animation set");
     } catch (const std::exception& e) {
-        std::cerr << "TestScene: failed to load assets for 'testobj': " << e.what() << "\n";
+        ENGINE_ERROR("OnEnter: failed to load assets for 'testobj': %s", e.what());
         return;
     }
 
-    std::cout << "TestScene::OnEnter: creating GameObject\n";
+    ENGINE_LOG("OnEnter: creating GameObject");
     // Create a GameObject and add AnimatorComponent and SpriteRenderer2D
     auto gameObj = std::make_unique<GameObject>("TestSprite");
     gameObj->GetTransform().position = glm::vec2(0.0f, 0.0f);
     gameObj->GetTransform().size = glm::vec2(2.0f, 2.0f);
 
-    std::cout << "TestScene::OnEnter: creating AnimatorComponent\n";
+    ENGINE_LOG("OnEnter: creating AnimatorComponent");
     auto animator = std::make_unique<AnimatorComponent>();
     animator->BindAnimationSet(animSet, sheet);
-    std::cout << "TestScene::OnEnter: animator bound, playing idle\n";
+    ENGINE_LOG("OnEnter: animator bound, playing idle");
     animator->Play("idle", true);
-    std::cout << "TestScene::OnEnter: animator playing\n";
+    ENGINE_LOG("OnEnter: animator playing");
     gameObj->AddComponent(std::move(animator));
 
-    std::cout << "TestScene::OnEnter: creating SpriteRenderer2D\n";
+    ENGINE_LOG("OnEnter: creating SpriteRenderer2D");
     auto spriteRenderer = std::make_unique<SpriteRenderer2D>();
     spriteRenderer->SetSpriteSheet(sheet);
     spriteRenderer->SetFrameIndex(0);
@@ -53,7 +54,7 @@ void TestScene::OnEnter()
     m_GameObjects.push_back(std::move(gameObj));
 
     // Create second reference object (static, no animation)
-    std::cout << "TestScene::OnEnter: creating reference object\n";
+    ENGINE_LOG("OnEnter: creating reference object");
     auto refObj = std::make_unique<GameObject>("static_ref");
     refObj->GetTransform().position = glm::vec2(3.0f, 0.0f);
     refObj->GetTransform().size = glm::vec2(0.5f, 0.5f);
@@ -64,7 +65,7 @@ void TestScene::OnEnter()
     refObj->AddComponent(std::move(refSpriteRenderer));
 
     m_GameObjects.push_back(std::move(refObj));
-    std::cout << "TestScene::OnEnter: created reference object at (3.0, 0.0)\n";
+    ENGINE_LOG("OnEnter: created reference object at (3.0, 0.0)");
 
 
     // Set a reasonable view

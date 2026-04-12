@@ -2,11 +2,13 @@
 
 #include <fstream>
 #include <sstream>
-#include <iostream>
 #include <vector>
 
 #include <glad/glad.h>
 #include <filesystem>
+
+#define ENGINE_CLASS "AssetManager"
+#include "../core/enginedebug.h"
 
 namespace fs = std::filesystem;
 
@@ -133,7 +135,7 @@ bool AssetManager::LoadTexture(const AssetID& id,
 
     if (!LoadTGA(filepath, width, height, channels, pixels))
     {
-        std::cerr << "Failed to load TGA: " << filepath << "\n";
+        ENGINE_ERROR("Failed to load TGA: %s", filepath.c_str());
         return false;
     }
 

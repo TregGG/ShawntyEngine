@@ -1,11 +1,14 @@
 #include "entityregistry.h"
 
+#define ENGINE_CLASS "EntityRegistryService"
+#include "../../../core/enginedebug.h"
+
 void EntityRegistryService::Init()
 {
     m_CategoryBuckets.resize(static_cast<size_t>(EntityCategory::Count));
 }
 
-EntityID EntityRegistryService::Create(EntityCategory category)
+EntityID EntityRegistryService::Create(EntityCategory category, std::string_view name, std::string_view registeredBy)
 {
     std::uint32_t index;
 
@@ -17,9 +20,13 @@ EntityID EntityRegistryService::Create(EntityCategory category)
         Slot& slot = m_Slots[index];
         slot.alive = true;
         slot.category = category;
+        slot.name = std::string(name);
+        slot.registeredBy = std::string(registeredBy);
 
         // Add to category bucket
         m_CategoryBuckets[(size_t)category].push_back(index);
+
+        ENGINE_LOG("Registered entity '%s' of category %d by '%s'", slot.name.c_str(), (int)category, slot.registeredBy.c_str());
 
         return MakeEntityID(index, slot.generation);
     }
@@ -31,11 +38,15 @@ EntityID EntityRegistryService::Create(EntityCategory category)
         slot.generation = 0;
         slot.alive = true;
         slot.category = category;
+        slot.name = std::string(name);
+        slot.registeredBy = std::string(registeredBy);
 
         m_Slots.push_back(slot);
 
         // Add to category bucket
         m_CategoryBuckets[(size_t)category].push_back(index);
+
+        ENGINE_LOG("Registered entity '%s' of category %d by '%s'", slot.name.c_str(), (int)category, slot.registeredBy.c_str());
 
         return MakeEntityID(index, slot.generation);
     }

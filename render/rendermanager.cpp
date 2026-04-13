@@ -49,6 +49,7 @@ void RenderManager::BeginFrame()
 
     m_RenderQueue.clear();
     m_DebugQueue.clear();
+    m_DebugLineQueue.clear();
 }
 
 void RenderManager::Render()
@@ -131,6 +132,23 @@ void RenderManager::CollectDebugRenderables()
         glm::mat4 mvp = vp * model;
         m_DebugQueue.push_back({mvp, r.color});
     }
+
+    std::vector<DebugLine> debugLines;
+    m_Scene->BuildDebugLines(debugLines);
+    for (const DebugLine& l : debugLines)
+    {
+        glm::vec2 diff = l.end - l.start;
+        float len = glm::length(diff);
+        if (len < 0.0001f) continue;
+        float angle = atan2(diff.y, diff.x);
+
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(l.start, 0.0f));
+        model = glm::rotate(model, angle, glm::vec3(0, 0, 1));
+        model = glm::scale(model, glm::vec3(len, 1.0f, 1.0f));
+
+        glm::mat4 mvp = vp * model;
+        m_DebugLineQueue.push_back({mvp, l.color});
+    }
 #endif
 }
 
@@ -140,6 +158,10 @@ void RenderManager::SubmitDebugRenderables()
     for (const DebugRenderEntry& entry : m_DebugQueue)
     {
         m_SpriteRenderer.DrawDebugRect(entry.mvp, entry.color);
+    }
+    for (const DebugRenderEntry& entry : m_DebugLineQueue)
+    {
+        m_SpriteRenderer.DrawDebugLine(entry.mvp, entry.color);
     }
 #endif
 }

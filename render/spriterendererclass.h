@@ -15,11 +15,13 @@ public:
                     const glm::mat4& mvp);
 
     void DrawDebugRect(const glm::mat4& mvp, const glm::vec3& color);
+    void DrawDebugLine(const glm::mat4& mvp, const glm::vec3& color);
 
 private:
     void SetupQuad();
     void SetupShader();
     void SetupDebugQuad();
+    void SetupDebugLine();
     void SetupDebugShader();
 
 private:
@@ -31,6 +33,9 @@ private:
     unsigned int m_DebugVAO = 0;
     unsigned int m_DebugVBO = 0;
     unsigned int m_DebugShader = 0;
+
+    unsigned int m_DebugLineVAO = 0;
+    unsigned int m_DebugLineVBO = 0;
 
     bool m_Initialized = false;
 

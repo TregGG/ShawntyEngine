@@ -29,6 +29,13 @@ struct DebugRect
     glm::vec3 color;
 };
 
+struct DebugLine
+{
+    glm::vec2 start;
+    glm::vec2 end;
+    glm::vec3 color;
+};
+
 
 class Scene
 {
@@ -79,6 +86,7 @@ public:
     }
      
     virtual void BuildDebugRenderables(std::vector<DebugRect>& /*outDebugRects*/) const {}
+    virtual void BuildDebugLines(std::vector<DebugLine>& /*outDebugLines*/) const {}
     
     
     void SetInput(const Input& input) {m_Input=&input;};

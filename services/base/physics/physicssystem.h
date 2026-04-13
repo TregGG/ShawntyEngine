@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include "../../service.h"
+#include <glm/vec2.hpp>
 
 // Forward declarations
 class ColliderComponent;
@@ -20,6 +21,9 @@ struct CollisionEvent
         return (a == other.a && b == other.b) || (a == other.b && b == other.a);
     }
 };
+
+// Forward declare explicitly handling queries independently
+struct RaycastHit;
 
 // ============================
 // Physics System
@@ -46,6 +50,10 @@ public:
 
     // Check specific pair
     bool IsColliding(ColliderComponent* a, ColliderComponent* b) const;
+    
+    // Explicit Ray query
+    // Runs mathematical projection natively evaluating overlaps independently across registered nodes
+    bool Raycast(const glm::vec2& start, const glm::vec2& dir, float length, RaycastHit& outHit, ColliderComponent* ignoreCollider = nullptr, bool hitTriggers = false) const;
     
     // Trigger separation methods
     bool HasSolidCollision(ColliderComponent* obj) const;

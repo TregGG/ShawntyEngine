@@ -2,12 +2,14 @@
 #define ENGINE_CLASS "TestScene"
 #include "../core/enginedebug.h"
 #include <glm/vec2.hpp>
+#include <glm/geometric.hpp>
 #include "../assets/assetmanager.h"
 #include "../core/input.h"
 #include "../objects/gameobject.h"
 #include "../objects/components/animator.h"
 #include "../objects/components/spriterenderer2d.h"
 #include "../objects/components/collidercomponent.h"
+#include "../services/base/raycast.h"
 #include <GLFW/glfw3.h>
 
 void TestScene::OnEnter()
@@ -56,7 +58,8 @@ void TestScene::OnEnter()
     spriteRenderer->SetFrameIndex(0);
     gameObj->AddComponent(std::move(spriteRenderer));
 
-    auto playerCollider = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(2.0f, 2.0f));
+    auto playerCollider = std::make_unique<ColliderComponent>();
+    playerCollider->SetAutoBounds(true);
     m_Physics.RegisterCollider(playerCollider.get());
     gameObj->AddComponent(std::move(playerCollider));
 
@@ -75,7 +78,8 @@ void TestScene::OnEnter()
     triggerObj->AddComponent(std::move(triggerRenderer));
 
     // 'true' explicitly maps this specifically to a trigger bounds!
-    auto triggerC = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.5f, 1.5f), true);
+    auto triggerC = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.0f), true);
+    triggerC->SetAutoBounds(true);
     triggerC->SetOnTriggerEnter([](ColliderComponent* self, ColliderComponent* other) {
         ENGINE_LOG("entity %s entered the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
     });
@@ -100,7 +104,8 @@ void TestScene::OnEnter()
     triggerRenderer2->SetFrameIndex(0); 
     triggerObj2->AddComponent(std::move(triggerRenderer2));
 
-    auto triggerC2 = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(2.0f, 1.0f), true);
+    auto triggerC2 = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.0f), true);
+    triggerC2->SetAutoBounds(true);
     triggerC2->SetOnTriggerEnter([](ColliderComponent* self, ColliderComponent* other) {
         ENGINE_LOG("entity %s entered the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
     });
@@ -125,7 +130,8 @@ void TestScene::OnEnter()
     refSpriteRenderer->SetFrameIndex(0);  // Static frame
     refObj->AddComponent(std::move(refSpriteRenderer));
 
-    auto envCollider = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(0.5f, 0.5f));
+    auto envCollider = std::make_unique<ColliderComponent>();
+    envCollider->SetAutoBounds(true);
     m_Physics.RegisterCollider(envCollider.get());
     refObj->AddComponent(std::move(envCollider));
 
@@ -200,6 +206,37 @@ void TestScene::Update(float deltatime)
         if (obj && obj->IsActive())
             obj->Update(deltatime);
     }
+    
+    // RAYCAST DEMONSTRATION
+    // Shoots a laser directly horizontally/upwards dynamically mapped off user input axes or standard up vector
+    m_TestLines.clear();
+    if (m_GameObjects.size() > 0) {
+        RaycastHit hit;
+        glm::vec2 rayStart = m_GameObjects[0]->GetTransform().position;
+        // Shoots a laser directly right explicitly as requested!
+        glm::vec2 rayDir = glm::vec2(1.0f, 0.0f); 
+        float rayLen = 50.0f;
+        
+        ColliderComponent* playerBounds = m_GameObjects[0]->GetComponent<ColliderComponent>();
+        
+        static std::string lastHit = "";
+        // Note: We explicitly pass `true` to the 6th argument strictly enabling the ray to detect transparent Triggers!
+        if (m_Physics.Raycast(rayStart, rayDir, rayLen, hit, playerBounds, true)) {
+            // Target Hit = Red Vector projecting exactly onto hit wall!
+            m_TestLines.push_back({rayStart, hit.point, glm::vec3(1.0f, 0.0f, 0.0f)});
+            
+            // Console properly outputting name of touched component owner
+            std::string currentHit = hit.collider->GetOwner()->GetName();
+            if (lastHit != currentHit) {
+                ENGINE_LOG("Raycast just hit: %s", currentHit.c_str());
+                lastHit = currentHit;
+            }
+        } else {
+            lastHit = ""; // Clears the state safely when we hit empty space!
+            // Target Missed = Continuous scaling Green Vector mappings!
+            m_TestLines.push_back({rayStart, rayStart + rayDir * rayLen, glm::vec3(0.0f, 1.0f, 0.0f)});
+        }
+    }
 }
 
 void TestScene::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) const
@@ -223,5 +260,12 @@ void TestScene::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) con
             outDebugRects.push_back({pos, size, cColor});
         }
     }
+#endif
+}
+
+void TestScene::BuildDebugLines(std::vector<DebugLine>& outDebugLines) const
+{
+#ifdef ENGINE_DEBUG
+    outDebugLines = m_TestLines;
 #endif
 }

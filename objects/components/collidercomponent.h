@@ -25,6 +25,9 @@ public:
     bool IsTrigger() const { return m_IsTrigger; }
     void SetTrigger(bool trigger) { m_IsTrigger = trigger; }
 
+    bool GetAutoBounds() const { return m_AutoBounds; }
+    void SetAutoBounds(bool autoBounds) { m_AutoBounds = autoBounds; }
+
     void SetOnTriggerEnter(TriggerCallback callback) { m_OnTriggerEnter = std::move(callback); }
     const TriggerCallback& GetOnTriggerEnter() const { return m_OnTriggerEnter; }
 
@@ -37,10 +40,17 @@ public:
         if (m_Owner) {
             const auto& transform = m_Owner->GetTransform();
             
-            float worldX = transform.position.x + m_LocalOffset.x;
-            float worldY = transform.position.y + m_LocalOffset.y;
-            float worldW = transform.size.x * m_LocalSize.x;
-            float worldH = transform.size.y * m_LocalSize.y;
+            float worldX = transform.position.x;
+            float worldY = transform.position.y;
+            float worldW = transform.size.x;
+            float worldH = transform.size.y;
+
+            if (!m_AutoBounds) {
+                worldX += m_LocalOffset.x;
+                worldY += m_LocalOffset.y;
+                worldW *= m_LocalSize.x;
+                worldH *= m_LocalSize.y;
+            }
 
             // Assuming position is the center of the object
             bounds.minX = worldX - (worldW * 0.5f);
@@ -55,6 +65,7 @@ private:
     glm::vec2 m_LocalOffset;
     glm::vec2 m_LocalSize;
     bool m_IsTrigger;
+    bool m_AutoBounds = false;
     TriggerCallback m_OnTriggerEnter;
     TriggerCallback m_OnTriggerExit;
 };

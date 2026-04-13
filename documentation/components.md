@@ -28,4 +28,4 @@ gameObj->AddComponent(std::make_unique<MyComponent>());
 ### Core Default Implementations
 * **`AnimatorComponent`**: Native tracking linking explicit `AnimationSetAsset` frame limits driving state machines dynamically.
 * **`SpriteRenderer2D`**: Passive visual tracking structure holding GPU IDs directly passed to external scenes!
-* **`ColliderComponent`**: A dynamic AABB boundary tracking implementation calculating matrices completely independently natively avoiding rendering and physics tight-coupling!
+* **`ColliderComponent`**: A dynamic AABB boundary tracking implementation calculating matrices completely independently natively avoiding rendering and physics tight-coupling! By calling `.SetAutoBounds(true)`, it natively scales the physical box directly to exactly mirror the visual graphic size of the `Transform2D` size values frame-by-frame!

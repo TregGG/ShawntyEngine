@@ -2,6 +2,8 @@
 #define ENGINE_CLASS "PhysicsSystem"
 #include "../../../core/enginedebug.h"
 #include "../../../objects/components/collidercomponent.h"
+#include "../raycast.h"
+#include <glm/geometric.hpp>
 #include <algorithm>
 
 // ============================
@@ -255,4 +257,79 @@ std::vector<ColliderComponent*> PhysicsSystem::GetOverlappingTriggers(ColliderCo
 
 const std::vector<CollisionEvent>& PhysicsSystem::GetCollisions() const {
     return m_Collisions;
+}
+
+// -------------------------------------------------------------
+// Core Raycasting Algorithm (Slab Method natively parsing intersections seamlessly)
+// -------------------------------------------------------------
+static bool RayIntersectAABB(glm::vec2 start, glm::vec2 dir, float length, const ColliderComponent::AABB& aabb, float& out_t, glm::vec2& out_normal) {
+    float tmin = 0.0f;
+    float tmax = length;
+    glm::vec2 normal(0.0f);
+    
+    // X Axis computation
+    if (std::abs(dir.x) < 1e-6f) {
+        if (start.x < aabb.minX || start.x > aabb.maxX) return false;
+    } else {
+        float invD = 1.0f / dir.x;
+        float t1 = (aabb.minX - start.x) * invD;
+        float t2 = (aabb.maxX - start.x) * invD;
+        float sign = invD < 0.0f ? -1.0f : 1.0f;
+        if (t1 > t2) std::swap(t1, t2);
+        
+        if (t1 > tmin) { tmin = t1; normal = glm::vec2(-sign, 0.0f); }
+        if (t2 < tmax) tmax = t2;
+        if (tmin > tmax) return false;
+    }
+    
+    // Y Axis computation
+    if (std::abs(dir.y) < 1e-6f) {
+        if (start.y < aabb.minY || start.y > aabb.maxY) return false;
+    } else {
+        float invD = 1.0f / dir.y;
+        float t1 = (aabb.minY - start.y) * invD;
+        float t2 = (aabb.maxY - start.y) * invD;
+        float sign = invD < 0.0f ? -1.0f : 1.0f;
+        if (t1 > t2) std::swap(t1, t2);
+        
+        if (t1 > tmin) { tmin = t1; normal = glm::vec2(0.0f, -sign); }
+        if (t2 < tmax) tmax = t2;
+        if (tmin > tmax) return false;
+    }
+    
+    out_t = tmin;
+    out_normal = normal;
+    return true;
+}
+
+bool PhysicsSystem::Raycast(const glm::vec2& start, const glm::vec2& dir, float length, RaycastHit& outHit, ColliderComponent* ignoreCollider, bool hitTriggers) const {
+    outHit.hit = false;
+    outHit.distance = length;
+
+    // Normalizing trajectory implicitly ensuring accurate metrics distances
+    glm::vec2 ndir = glm::normalize(dir);
+
+    // Simplistic loop over all actively tracked objects 
+    // Quadtree optimization could be hooked here specifically later!
+    for (auto* col : m_Colliders) {
+        
+        if (col == ignoreCollider) continue;
+        if (!col->GetOwner() || !col->GetOwner()->IsActive()) continue;
+        if (!hitTriggers && col->IsTrigger()) continue;
+
+        float t;
+        glm::vec2 nRaw;
+        
+        if (RayIntersectAABB(start, ndir, length, col->GetBounds(), t, nRaw)) {
+            if (t < outHit.distance) {
+                outHit.hit = true;
+                outHit.distance = t;
+                outHit.point = start + ndir * t;
+                outHit.normal = nRaw;
+                outHit.collider = col;
+            }
+        }
+    }
+
+    return outHit.hit;
 }

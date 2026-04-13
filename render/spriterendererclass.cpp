@@ -15,6 +15,7 @@ bool SpriteRendererClass::Initialize()
     SetupQuad();
     SetupShader();
     SetupDebugQuad();
+    SetupDebugLine();
     SetupDebugShader();
 
     m_Initialized = true;
@@ -95,6 +96,17 @@ void SpriteRendererClass::DrawDebugRect(const glm::mat4& mvp, const glm::vec3& c
 
     glBindVertexArray(m_DebugVAO);
     glDrawArrays(GL_LINE_LOOP, 0, 4);
+    glBindVertexArray(0);
+}
+
+void SpriteRendererClass::DrawDebugLine(const glm::mat4& mvp, const glm::vec3& color)
+{
+    glUseProgram(m_DebugShader);
+    glUniformMatrix4fv(glGetUniformLocation(m_DebugShader, "u_MVP"), 1, GL_FALSE, &mvp[0][0]);
+    glUniform3f(glGetUniformLocation(m_DebugShader, "u_Color"), color.r, color.g, color.b);
+
+    glBindVertexArray(m_DebugLineVAO);
+    glDrawArrays(GL_LINES, 0, 2);
     glBindVertexArray(0);
 }
 
@@ -194,6 +206,26 @@ void SpriteRendererClass::SetupDebugQuad()
     glBindVertexArray(0);
 }
 
+void SpriteRendererClass::SetupDebugLine()
+{
+    float lineVertices[4] = {
+        0.0f, 0.0f,
+        1.0f, 0.0f
+    };
+
+    glGenVertexArrays(1, &m_DebugLineVAO);
+    glGenBuffers(1, &m_DebugLineVBO);
+
+    glBindVertexArray(m_DebugLineVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_DebugLineVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+}
+
 void SpriteRendererClass::SetupDebugShader()
 {
     const char* vertexSrc = R"(#version 330 core
@@ -234,8 +266,10 @@ void SpriteRendererClass::Shutdown()
     
     if (m_DebugVAO) glDeleteVertexArrays(1, &m_DebugVAO);
     if (m_DebugVBO) glDeleteBuffers(1, &m_DebugVBO);
+    if (m_DebugLineVAO) glDeleteVertexArrays(1, &m_DebugLineVAO);
+    if (m_DebugLineVBO) glDeleteBuffers(1, &m_DebugLineVBO);
     if (m_DebugShader) glDeleteProgram(m_DebugShader);
 
-    m_VAO = m_VBO = m_EBO = m_Shader = m_DebugVAO = m_DebugVBO = m_DebugShader = 0;
+    m_VAO = m_VBO = m_EBO = m_Shader = m_DebugVAO = m_DebugVBO = m_DebugLineVAO = m_DebugLineVBO = m_DebugShader = 0;
 }
 

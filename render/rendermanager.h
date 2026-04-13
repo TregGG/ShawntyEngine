@@ -54,6 +54,7 @@ private:
 
     std::vector<RenderEntry> m_RenderQueue;
     std::vector<DebugRenderEntry> m_DebugQueue;
+    std::vector<DebugRenderEntry> m_DebugLineQueue;
 
     int m_ViewportWidth  = 1;
     int m_ViewportHeight = 1;

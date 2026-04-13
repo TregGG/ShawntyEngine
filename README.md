@@ -102,6 +102,10 @@ framework/
 ├── objects/              # Game object and component system
 │   ├── gameobject.h      # GameObject base class
 │   └── components/       # Built-in components
+├── services/             # Distinct background engine services
+│   └── base/
+│       ├── entityregistry/ # Registry for managing game entities dynamically
+│       └── physics/        # Physics system parsing spatial partitioning and hits
 ├── test/                 # Test games and scenes
 ├── documentation/        # Detailed engine subsystem guides
 └── external/             # Third-party libraries

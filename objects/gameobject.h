@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include "components/component.h"
+#include "../core/entityid.h"
 
 
 struct Transform2D
@@ -27,6 +28,9 @@ public:
 
     bool IsActive() const { return m_Active; }
     void SetActive(bool active) { m_Active = active; }
+
+    Layer GetLayer() const { return m_Layer; }
+    void SetLayer(Layer layer) { m_Layer = layer; }
 
     Transform2D& GetTransform() { return m_Transform; }
     const Transform2D& GetTransform() const { return m_Transform; }
@@ -69,6 +73,7 @@ protected:
     std::vector<std::unique_ptr<Component>> m_Components;
     std::string m_Name;
     bool m_Active = true;
+    Layer m_Layer = Layer::Foreground;
     Transform2D m_Transform;
 
 };

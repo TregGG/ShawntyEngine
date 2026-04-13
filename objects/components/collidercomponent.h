@@ -22,6 +22,9 @@ public:
     // Empty override as physics computes everything dynamically on request
     void Update(float /*deltatime*/) override {}
 
+    uint32_t GetLayerMask() const { return m_LayerMask; }
+    void SetLayerMask(uint32_t mask) { m_LayerMask = mask; }
+
     bool IsTrigger() const { return m_IsTrigger; }
     void SetTrigger(bool trigger) { m_IsTrigger = trigger; }
 
@@ -66,6 +69,7 @@ private:
     glm::vec2 m_LocalSize;
     bool m_IsTrigger;
     bool m_AutoBounds = false;
+    uint32_t m_LayerMask = 0xFFFFFFFF; // Defaults to accepting all collisions
     TriggerCallback m_OnTriggerEnter;
     TriggerCallback m_OnTriggerExit;
 };

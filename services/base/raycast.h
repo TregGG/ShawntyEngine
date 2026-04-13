@@ -16,4 +16,10 @@ struct RaycastHit {
     m_Physics.Raycast(startPos, dir, length, outHit)
 
 #define RAYCAST_IGNORE(startPos, dir, length, outHit, ignoreComp) \
-    m_Physics.Raycast(startPos, dir, length, outHit, ignoreComp)
+    m_Physics.Raycast(startPos, dir, length, outHit, 0xFFFFFFFF, ignoreComp)
+
+#define RAYCAST_MASK(startPos, dir, length, outHit, mask) \
+    m_Physics.Raycast(startPos, dir, length, outHit, mask)
+
+#define RAYCAST_IGNORE_MASK(startPos, dir, length, outHit, ignoreComp, mask) \
+    m_Physics.Raycast(startPos, dir, length, outHit, mask, ignoreComp)

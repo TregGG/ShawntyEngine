@@ -6,6 +6,7 @@
 #include "../core/enginedebug.h"
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 
 
 
@@ -95,7 +96,8 @@ void RenderManager::CollectRenderables()
         m_RenderQueue.push_back({
             mvp,
             r.spriteSheet,
-            r.frameIndex
+            r.frameIndex,
+            r.layer
         });
     }
 }
@@ -103,6 +105,11 @@ void RenderManager::CollectRenderables()
 
 void RenderManager::SubmitRenderables()
 {
+    // Sort descending natively! Background (x) goes in first, UI (0) draws last specifically overwriting all frames on top continuously!
+    std::sort(m_RenderQueue.begin(), m_RenderQueue.end(), [](const RenderEntry& a, const RenderEntry& b) {
+        return static_cast<int>(a.layer) > static_cast<int>(b.layer);
+    });
+
     for (const RenderEntry& entry : m_RenderQueue)
     {
         const SpriteFrame& frame =

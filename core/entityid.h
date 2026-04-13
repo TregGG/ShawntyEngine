@@ -31,3 +31,13 @@ enum class EntityCategory : uint8_t
 
     Count
 };
+
+enum class Layer : uint8_t
+{
+    UI = 0,
+    Player,
+    Foreground,
+    Background,
+    
+    Count
+};

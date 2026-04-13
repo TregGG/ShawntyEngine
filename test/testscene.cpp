@@ -43,6 +43,7 @@ void TestScene::OnEnter()
     m_Registry.Create(EntityCategory::Player, "TestSprite", "TestScene");
     gameObj->GetTransform().position = glm::vec2(0.0f, 0.0f);
     gameObj->GetTransform().size = glm::vec2(2.0f, 2.0f);
+    gameObj->SetLayer(Layer::Player);
 
     ENGINE_LOG("OnEnter: creating AnimatorComponent");
     auto animator = std::make_unique<AnimatorComponent>();
@@ -71,6 +72,7 @@ void TestScene::OnEnter()
     m_Registry.Create(EntityCategory::Environment, "trigger_zone", "TestScene");
     triggerObj->GetTransform().position = glm::vec2(-3.0f, 0.0f);
     triggerObj->GetTransform().size = glm::vec2(1.5f, 1.5f);
+    triggerObj->SetLayer(Layer::UI); // Setting triggers explicitly to isolated UI Layer
 
     auto triggerRenderer = std::make_unique<SpriteRenderer2D>();
     triggerRenderer->SetSpriteSheet(sheet);
@@ -98,6 +100,7 @@ void TestScene::OnEnter()
     m_Registry.Create(EntityCategory::Environment, "trigger_zone_2", "TestScene");
     triggerObj2->GetTransform().position = glm::vec2(0.0f, 3.0f);
     triggerObj2->GetTransform().size = glm::vec2(2.0f, 1.0f);
+    triggerObj2->SetLayer(Layer::UI);
 
     auto triggerRenderer2 = std::make_unique<SpriteRenderer2D>();
     triggerRenderer2->SetSpriteSheet(sheet);
@@ -106,6 +109,8 @@ void TestScene::OnEnter()
 
     auto triggerC2 = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.0f), true);
     triggerC2->SetAutoBounds(true);
+    // Explicitly dropping the Player layer from this trigger's mask!
+    triggerC2->SetLayerMask(~(1 << static_cast<int>(Layer::Player)));
     triggerC2->SetOnTriggerEnter([](ColliderComponent* self, ColliderComponent* other) {
         ENGINE_LOG("entity %s entered the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
     });
@@ -124,6 +129,7 @@ void TestScene::OnEnter()
     m_Registry.Create(EntityCategory::Environment, "static_ref", "TestScene");
     refObj->GetTransform().position = glm::vec2(3.0f, 0.0f);
     refObj->GetTransform().size = glm::vec2(0.5f, 0.5f);
+    refObj->SetLayer(Layer::Background); // Setting to explicitly filter layer for masking logic
 
     auto refSpriteRenderer = std::make_unique<SpriteRenderer2D>();
     refSpriteRenderer->SetSpriteSheet(sheet);
@@ -220,8 +226,12 @@ void TestScene::Update(float deltatime)
         ColliderComponent* playerBounds = m_GameObjects[0]->GetComponent<ColliderComponent>();
         
         static std::string lastHit = "";
-        // Note: We explicitly pass `true` to the 6th argument strictly enabling the ray to detect transparent Triggers!
-        if (m_Physics.Raycast(rayStart, rayDir, rayLen, hit, playerBounds, true)) {
+        
+        // Explicity generating BitMask ignoring `Layer::UI` securely!
+        uint32_t testingMask = ~(1 << static_cast<int>(Layer::UI)); 
+
+        // Masking UI natively, meaning transparent Triggers get completely skipped across the bounds!
+        if (RAYCAST_IGNORE_MASK(rayStart, rayDir, rayLen, hit, playerBounds, testingMask)) {
             // Target Hit = Red Vector projecting exactly onto hit wall!
             m_TestLines.push_back({rayStart, hit.point, glm::vec3(1.0f, 0.0f, 0.0f)});
             

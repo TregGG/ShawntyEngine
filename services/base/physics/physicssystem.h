@@ -53,7 +53,7 @@ public:
     
     // Explicit Ray query
     // Runs mathematical projection natively evaluating overlaps independently across registered nodes
-    bool Raycast(const glm::vec2& start, const glm::vec2& dir, float length, RaycastHit& outHit, ColliderComponent* ignoreCollider = nullptr, bool hitTriggers = false) const;
+    bool Raycast(const glm::vec2& start, const glm::vec2& dir, float length, RaycastHit& outHit, uint32_t layerMask = 0xFFFFFFFF, ColliderComponent* ignoreCollider = nullptr, bool hitTriggers = false) const;
     
     // Trigger separation methods
     bool HasSolidCollision(ColliderComponent* obj) const;

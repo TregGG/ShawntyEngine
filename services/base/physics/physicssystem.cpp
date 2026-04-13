@@ -302,7 +302,7 @@ static bool RayIntersectAABB(glm::vec2 start, glm::vec2 dir, float length, const
     return true;
 }
 
-bool PhysicsSystem::Raycast(const glm::vec2& start, const glm::vec2& dir, float length, RaycastHit& outHit, ColliderComponent* ignoreCollider, bool hitTriggers) const {
+bool PhysicsSystem::Raycast(const glm::vec2& start, const glm::vec2& dir, float length, RaycastHit& outHit, uint32_t layerMask, ColliderComponent* ignoreCollider, bool hitTriggers) const {
     outHit.hit = false;
     outHit.distance = length;
 
@@ -316,6 +316,9 @@ bool PhysicsSystem::Raycast(const glm::vec2& start, const glm::vec2& dir, float 
         if (col == ignoreCollider) continue;
         if (!col->GetOwner() || !col->GetOwner()->IsActive()) continue;
         if (!hitTriggers && col->IsTrigger()) continue;
+
+        uint32_t colLayerBit = 1 << static_cast<int>(col->GetOwner()->GetLayer());
+        if ((layerMask & colLayerBit) == 0) continue;
 
         float t;
         glm::vec2 nRaw;

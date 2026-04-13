@@ -7,7 +7,7 @@ class Scene;
 class Camera;
 #include "spriterendererclass.h"
 
-struct RenderableSprite;
+#include "../core/entityid.h"
 #include "../assets/assetmanager.h"
 
 class RenderManager
@@ -44,6 +44,7 @@ private:
         glm::mat4 mvp;
         const SpriteSheetAsset* sheet;
         int frameIndex;
+        Layer layer;
     };
     
     struct DebugRenderEntry

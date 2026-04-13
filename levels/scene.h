@@ -20,6 +20,7 @@ struct RenderableSprite
     // Provided by Animator
     const SpriteSheetAsset* spriteSheet = nullptr;
     int frameIndex = 0;
+    Layer layer = Layer::Foreground;
 };
 
 struct DebugRect
@@ -68,6 +69,7 @@ public:
             RenderableSprite r;
             r.transform   = obj->GetTransform();
             r.spriteSheet = sprite->GetSpriteSheet();
+            r.layer       = obj->GetLayer();
         
             // Animator overrides static frame if present
             if (const AnimatorComponent* animator =

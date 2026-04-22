@@ -9,6 +9,7 @@
 #include "../objects/components/animator.h"
 #include "../objects/components/spriterenderer2d.h"
 #include "../objects/components/collidercomponent.h"
+#include "../objects/components/rigidbodycomponent.h"
 #include "../services/base/raycast.h"
 #include <GLFW/glfw3.h>
 
@@ -63,6 +64,14 @@ void TestScene::OnEnter()
     playerCollider->SetAutoBounds(true);
     m_Physics.RegisterCollider(playerCollider.get());
     gameObj->AddComponent(std::move(playerCollider));
+
+    ENGINE_LOG("OnEnter: creating RigidBodyComponent");
+    auto playerRb = std::make_unique<RigidBodyComponent>();
+    playerRb->SetType(BodyType::Dynamic);
+    playerRb->SetDrag(10.0f); // Massive damping strictly mirroring tight top-down WASD snapping safely!
+    playerRb->SetUseGravity(false);
+    m_Physics.RegisterRigidBody(playerRb.get());
+    gameObj->AddComponent(std::move(playerRb));
 
     m_GameObjects.push_back(std::move(gameObj));
 
@@ -166,16 +175,16 @@ void TestScene::OnExit()
 void TestScene::Update(float deltatime)
 {
     // Query input if available
-    glm::vec2 moveDir(0.0f);
+    glm::vec2 pushForce(0.0f);
     glm::vec2 cameraDir(0.0f);
 
     if (m_Input)
     {
-        // WASD for object movement
-        if (m_Input->IsKeyDown(GLFW_KEY_W)) moveDir.y += 1.0f;
-        if (m_Input->IsKeyDown(GLFW_KEY_S)) moveDir.y -= 1.0f;
-        if (m_Input->IsKeyDown(GLFW_KEY_A)) moveDir.x -= 1.0f;
-        if (m_Input->IsKeyDown(GLFW_KEY_D)) moveDir.x += 1.0f;
+        // WASD for object movement inherently tracking forces rather than static positioning natively!
+        if (m_Input->IsKeyDown(GLFW_KEY_W)) pushForce.y += 1.0f;
+        if (m_Input->IsKeyDown(GLFW_KEY_S)) pushForce.y -= 1.0f;
+        if (m_Input->IsKeyDown(GLFW_KEY_A)) pushForce.x -= 1.0f;
+        if (m_Input->IsKeyDown(GLFW_KEY_D)) pushForce.x += 1.0f;
 
         // Arrow keys for camera movement
         if (m_Input->IsKeyDown(GLFW_KEY_UP))    cameraDir.y += 1.0f;
@@ -187,16 +196,16 @@ void TestScene::Update(float deltatime)
     // Apply input-driven movement to first GameObject (controllable sprite)
     if (m_GameObjects.size() > 0)
     {
-        glm::vec2 oldPos = m_GameObjects[0]->GetTransform().position;
-        m_GameObjects[0]->GetTransform().position += moveDir * m_MoveSpeed * deltatime;
+        if (glm::length(pushForce) > 0.1f) {
+            pushForce = glm::normalize(pushForce) * 150.0f; // High forces counteracting extreme Damping parameters logically.
+        }
+
+        RigidBodyComponent* rb = m_GameObjects[0]->GetComponent<RigidBodyComponent>();
+        if (rb) {
+            rb->AddForce(pushForce);
+        }
 
         m_Physics.Update(deltatime);
-
-        ColliderComponent* playerCollider = m_GameObjects[0]->GetComponent<ColliderComponent>();
-        if (playerCollider && m_Physics.HasSolidCollision(playerCollider))
-        {
-            m_GameObjects[0]->GetTransform().position = oldPos;
-        }
     }
 
     // Apply input-driven camera movement

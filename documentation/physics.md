@@ -44,23 +44,25 @@ A `CollisionEvent` object is constructed noting any active intersections, and pu
 1. **`OnTriggerEnter`** - Loop over `m_Collisions`. Any intersection mapping entirely missing from `m_PreviousCollisions` must be explicitly new! Run native callbacks on any involved `IsTrigger()` objects!
 2. **`OnTriggerExit`** - Loop over `m_PreviousCollisions`. Any intersection parsing from the past frame but *missing* natively from the current frame indicates the entities broke contact! Safely resolve specific `.GetOnTriggerExit()` lambdas.
 
----
+## 3. Continuous RigidBody Integration & Displacement
 
-## 3. Resolving Rigid Bodies (`HasSolidCollision`)
-To isolate complex behavior, developers structure explicit boundary constraints internally explicitly. Rather than computing bounces mathematically in `PhysicsSystem`, gameplay natively evaluates and prevents bad states cleanly utilizing roll-backs!
+Previously, developers structured explicit boundary constraints internally by rolling back manual positional offsets. With the deployment of our `RigidBodyComponent`, bounding pushback is explicitly resolved mathematically during the physics step!
+
+### `RigidBodyComponent`
+
+The integration mathematically decouples positional changes from explicit `Update()` commands. Instead, objects dictate exactly how they interact with forces natively using physics constants:
 
 ```cpp
-// 1. Snapshot previous legal coordinates safely
-glm::vec2 oldPos = obj->GetTransform().position;
-
-// 2. Adjust velocities and execute movements
-obj->GetTransform().position += velocity * deltaTime;
-
-// 3. Request Engine evaluation across all bodies natively parsing new states!
-m_Physics.Update(deltaTime);
-
-// 4. Force roll-backs specifically only utilizing `HasSolidCollision`, explicitly bypassing trigger intersections!
-if (m_Physics.HasSolidCollision(myCollider)) {
-    obj->GetTransform().position = oldPos;
-}
+auto rb = std::make_unique<RigidBodyComponent>();
+rb->SetType(BodyType::Dynamic);
+rb->SetMass(1.0f);
+rb->SetDrag(10.0f);       // Friction cleanly limits top speed!
+rb->AddForce(pushVector); // Input logically maps to acceleration
 ```
+
+### The Engine Loop
+Inside `PhysicsSystem::Update(dt)`, the system inherently runs through completely interconnected systems natively:
+
+1. **Euler Integration:** The engine iterates strictly pushing forces into `Velocity`, mapping acceleration and bounds natively across `dt`, effectively repositioning the shape completely decoupled from inputs!
+2. **Manifold Mapping:** Rather than simply tracing generic boolean `Intersects`, overlaps precisely track spatial `depth` differences mapping the axis of penetration securely onto an explicit boundary `normal`.
+3. **Displacement Matrix:** Resolves the final state iteratively calculating which structures overlap exactly. Using the manifold properties, it pushes dynamic components out of intersecting boundaries and securely clears out strictly sliding velocity scalars mapped directly across the wall structure, effectively neutralizing clipping natively without explicit state tracking rollbacks!

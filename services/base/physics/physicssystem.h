@@ -7,6 +7,7 @@
 
 // Forward declarations
 class ColliderComponent;
+class RigidBodyComponent;
 class QuadtreeNode;
 
 // ============================
@@ -16,6 +17,8 @@ struct CollisionEvent
 {
     ColliderComponent* a;
     ColliderComponent* b;
+    glm::vec2 normal {0.0f}; // normal from a to b
+    float depth = 0.0f;
 
     bool operator==(const CollisionEvent& other) const {
         return (a == other.a && b == other.b) || (a == other.b && b == other.a);
@@ -41,6 +44,9 @@ public:
     void RegisterCollider(ColliderComponent* collider);
     void UnregisterCollider(ColliderComponent* collider);
 
+    void RegisterRigidBody(RigidBodyComponent* rb);
+    void UnregisterRigidBody(RigidBodyComponent* rb);
+
     // ========================
     // Collision Queries
     // ========================
@@ -65,12 +71,13 @@ public:
 private:
     void CheckCollisions();
     void DispatchEvents();
-    bool Intersects(ColliderComponent* a, ColliderComponent* b);
+    bool CalculateManifold(ColliderComponent* a, ColliderComponent* b, glm::vec2& outNormal, float& outDepth);
 
 private:
 
     // Working set (per frame)
     std::vector<ColliderComponent*> m_Colliders;
+    std::vector<RigidBodyComponent*> m_RigidBodies;
 
     // Collision results
     std::vector<CollisionEvent> m_PreviousCollisions;

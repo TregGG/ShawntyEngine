@@ -2,6 +2,7 @@
 #define ENGINE_CLASS "PhysicsSystem"
 #include "../../../core/enginedebug.h"
 #include "../../../objects/components/collidercomponent.h"
+#include "../../../objects/components/rigidbodycomponent.h"
 #include "../raycast.h"
 #include <glm/geometric.hpp>
 #include <algorithm>
@@ -119,13 +120,73 @@ void PhysicsSystem::Init() {
     ENGINE_LOG("Quadtree initialized for spatial partitioning");
 }
 
-void PhysicsSystem::Update(float /*dt*/) {
+void PhysicsSystem::Update(float dt) {
+    // 1. Integration (Positional progression)
+    const glm::vec2 GRAVITY(0.0f, -9.81f);
+    for (auto rb : m_RigidBodies) {
+        if (!rb->IsEnabled() || !rb->GetOwner()->IsActive()) continue;
+        if (rb->GetType() == BodyType::Static) continue;
+
+        if (rb->GetUseGravity()) {
+            rb->AddForce(GRAVITY * rb->GetGravityScale() * rb->GetMass()); 
+        }
+        glm::vec2 vel = rb->GetVelocity();
+        vel += rb->GetAcceleration() * dt;
+        vel *= (1.0f - rb->GetDrag() * dt);
+        rb->SetVelocity(vel);
+        
+        rb->GetOwner()->GetTransform().position += vel * dt;
+        rb->ClearForces();
+    }
+
+    // 2. Overlap calculations
     CheckCollisions();
     DispatchEvents();
+
+    // 3. Mathematical Displacement (Avoiding intersections continuously)
+    for (const auto& ev : m_Collisions) {
+        if (ev.a->IsTrigger() || ev.b->IsTrigger()) continue;
+        
+        auto rbA = ev.a->GetOwner()->GetComponent<RigidBodyComponent>();
+        auto rbB = ev.b->GetOwner()->GetComponent<RigidBodyComponent>();
+        
+        bool aMovable = rbA && rbA->GetType() == BodyType::Dynamic;
+        bool bMovable = rbB && rbB->GetType() == BodyType::Dynamic;
+        
+        if (!aMovable && !bMovable) continue;
+        
+        // Shift bounds exactly pushing overlapping structs out
+        if (aMovable && !bMovable) {
+            ev.a->GetOwner()->GetTransform().position += ev.normal * ev.depth;
+            // Trim velocity safely dropping jittering outputs smoothly
+            glm::vec2 velA = rbA->GetVelocity();
+            float vDot = glm::dot(velA, ev.normal);
+            if (vDot < 0) rbA->SetVelocity(velA - vDot * ev.normal);
+        } else if (!aMovable && bMovable) { 
+            // Note: normal explicitly points A outward, so we invert testing -normal for B!
+            ev.b->GetOwner()->GetTransform().position -= ev.normal * ev.depth;
+            glm::vec2 velB = rbB->GetVelocity();
+            float vDot = glm::dot(velB, -ev.normal);
+            if (vDot < 0) rbB->SetVelocity(velB - vDot * -ev.normal);
+        } else {
+            // Both dynamic: divide depth natively avoiding clipping limits
+            ev.a->GetOwner()->GetTransform().position += ev.normal * (ev.depth * 0.5f);
+            ev.b->GetOwner()->GetTransform().position -= ev.normal * (ev.depth * 0.5f);
+            
+            glm::vec2 velA = rbA->GetVelocity();
+            float vDotA = glm::dot(velA, ev.normal);
+            if (vDotA < 0) rbA->SetVelocity(velA - vDotA * ev.normal);
+            
+            glm::vec2 velB = rbB->GetVelocity();
+            float vDotB = glm::dot(velB, -ev.normal);
+            if (vDotB < 0) rbB->SetVelocity(velB - vDotB * -ev.normal);
+        }
+    }
 }
 
 void PhysicsSystem::Shutdown() {
     if (m_Quadtree) m_Quadtree->Clear();
+    m_RigidBodies.clear();
     m_Colliders.clear();
     m_Collisions.clear();
     m_PreviousCollisions.clear();
@@ -145,14 +206,40 @@ void PhysicsSystem::UnregisterCollider(ColliderComponent* collider) {
     }
 }
 
-bool PhysicsSystem::Intersects(ColliderComponent* a, ColliderComponent* b) {
+void PhysicsSystem::RegisterRigidBody(RigidBodyComponent* rb) {
+    auto it = std::find(m_RigidBodies.begin(), m_RigidBodies.end(), rb);
+    if (it == m_RigidBodies.end()) {
+        m_RigidBodies.push_back(rb);
+    }
+}
+
+void PhysicsSystem::UnregisterRigidBody(RigidBodyComponent* rb) {
+    auto it = std::find(m_RigidBodies.begin(), m_RigidBodies.end(), rb);
+    if (it != m_RigidBodies.end()) {
+        m_RigidBodies.erase(it);
+    }
+}
+
+bool PhysicsSystem::CalculateManifold(ColliderComponent* a, ColliderComponent* b, glm::vec2& outNormal, float& outDepth) {
     auto boundsA = a->GetBounds();
     auto boundsB = b->GetBounds();
 
-    return !(boundsA.maxX < boundsB.minX || 
-             boundsA.minX > boundsB.maxX || 
-             boundsA.maxY < boundsB.minY || 
-             boundsA.minY > boundsB.maxY);
+    float overlapX = std::min(boundsA.maxX - boundsB.minX, boundsB.maxX - boundsA.minX);
+    if (overlapX <= 0) return false;
+    
+    float overlapY = std::min(boundsA.maxY - boundsB.minY, boundsB.maxY - boundsA.minY);
+    if (overlapY <= 0) return false;
+    
+    if (overlapX < overlapY) {
+        outDepth = overlapX;
+        // Pushes A safely outside logically
+        outNormal = (boundsA.minX < boundsB.minX) ? glm::vec2(-1.0f, 0.0f) : glm::vec2(1.0f, 0.0f);
+    } else {
+        outDepth = overlapY;
+        outNormal = (boundsA.minY < boundsB.minY) ? glm::vec2(0.0f, -1.0f) : glm::vec2(0.0f, 1.0f);
+    }
+
+    return true;
 }
 
 void PhysicsSystem::CheckCollisions() {
@@ -182,8 +269,15 @@ void PhysicsSystem::CheckCollisions() {
         for (size_t j = 0; j < potentialCollisions.size(); ++j) {
             // Memory address ordering technique solves 'duplicate/self' pair handling intrinsically
             if (m_Colliders[i] < potentialCollisions[j]) {
-                if (Intersects(m_Colliders[i], potentialCollisions[j])) {
-                    m_Collisions.push_back({m_Colliders[i], potentialCollisions[j]});
+                glm::vec2 normal;
+                float depth;
+                if (CalculateManifold(m_Colliders[i], potentialCollisions[j], normal, depth)) {
+                    uint32_t layerBitA = 1 << static_cast<int>(m_Colliders[i]->GetOwner()->GetLayer());
+                    uint32_t layerBitB = 1 << static_cast<int>(potentialCollisions[j]->GetOwner()->GetLayer());
+
+                    if ((m_Colliders[i]->GetLayerMask() & layerBitB) != 0 && (potentialCollisions[j]->GetLayerMask() & layerBitA) != 0) {
+                        m_Collisions.push_back({m_Colliders[i], potentialCollisions[j], normal, depth});
+                    }
                 }
             }
         }

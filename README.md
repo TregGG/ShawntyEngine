@@ -1,6 +1,6 @@
-# Framework Engine
+# Shawnty Engine
 
-Welcome to the Framework Engine! This is a lightweight 2D game engine written in C++17. It is designed to be simple, fast, and easy to use. The engine keeps game logic and rendering completely separate, making your game code cleaner and less prone to graphics-related bugs.
+Welcome to the Shawnty Engine! This is a lightweight 2D game engine written in C++17. It is designed to be simple, fast, and easy to use. The engine keeps game logic and rendering completely separate, making your game code cleaner and less prone to graphics-related bugs.
 
 ## Getting Started
 

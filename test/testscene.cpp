@@ -177,6 +177,44 @@ void TestScene::Update(float deltatime)
         if (obj && obj->IsActive())
             obj->Update(deltatime);
     }
+    
+    // SHAPE CAST DEMONSTRATION
+    m_TestLines.clear();
+    m_TestRects.clear();
+    if (m_GameObjects.size() > 0) {
+        glm::vec2 pPos = m_GameObjects[0]->GetTransform().position;
+        
+        // Ignore UI layer AND Player layer so we don't immediately hit ourselves!
+        uint32_t testingMask = ~( (1 << static_cast<int>(Layer::UI)) | (1 << static_cast<int>(Layer::Player)) ); 
+
+        // 1. Box Cast to the right
+        RaycastHit boxHit;
+        glm::vec2 boxDir(1.0f, 0.0f);
+        glm::vec2 boxSize(1.0f, 1.0f);
+        float boxLen = 15.0f;
+        
+        if (BOX_CAST(pPos, pPos + boxDir * boxLen, boxSize, boxHit, testingMask)) {
+            m_TestLines.push_back({pPos, boxHit.point, glm::vec3(1.0f, 0.5f, 0.0f)}); // Orange line
+            m_TestRects.push_back({glm::vec3(boxHit.point, 0.0f), boxSize, glm::vec3(1.0f, 0.5f, 0.0f)}); // Orange box
+        } else {
+            m_TestLines.push_back({pPos, pPos + boxDir * boxLen, glm::vec3(0.0f, 1.0f, 0.0f)});
+            m_TestRects.push_back({glm::vec3(pPos + boxDir * boxLen, 0.0f), boxSize, glm::vec3(0.0f, 1.0f, 0.0f)});
+        }
+
+        // 2. Circle Cast upwards
+        RaycastHit circHit;
+        glm::vec2 circDir(0.0f, 1.0f);
+        float circRadius = 0.5f;
+        float circLen = 10.0f;
+        
+        if (CIRCLE_CAST(pPos, pPos + circDir * circLen, circRadius, circHit, testingMask)) {
+            m_TestLines.push_back({pPos, circHit.point, glm::vec3(0.0f, 0.5f, 1.0f)}); // Blue line
+            m_TestRects.push_back({glm::vec3(circHit.point, 0.0f), glm::vec2(circRadius * 2.0f), glm::vec3(0.0f, 0.5f, 1.0f)}); // Blue square
+        } else {
+            m_TestLines.push_back({pPos, pPos + circDir * circLen, glm::vec3(0.0f, 1.0f, 0.0f)});
+            m_TestRects.push_back({glm::vec3(pPos + circDir * circLen, 0.0f), glm::vec2(circRadius * 2.0f), glm::vec3(0.0f, 1.0f, 0.0f)});
+        }
+    }
 }
 
 void TestScene::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) const
@@ -199,6 +237,11 @@ void TestScene::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) con
             glm::vec3 cColor = col->IsTrigger() ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
             outDebugRects.push_back({pos, size, cColor});
         }
+    }
+    
+    // Append the custom shape cast test rectangles
+    for (const auto& r : m_TestRects) {
+        outDebugRects.push_back(r);
     }
 #endif
 }

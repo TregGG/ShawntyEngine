@@ -33,4 +33,5 @@ private:
     PhysicsSystem m_Physics;
     
     std::vector<DebugLine> m_TestLines;
+    std::vector<DebugRect> m_TestRects;
 };

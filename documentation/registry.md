@@ -1,34 +1,42 @@
 # Entity Registry
 
-The `EntityRegistryService` offers massive decoupling by explicitly removing direct relational dependencies within active classes while keeping robust organizational memory across complex states.
+The `EntityRegistryService` is a global system used to keep track of GameObjects and group them by category. 
 
-## How it works
+When you have hundreds of objects in a scene, searching through all of them just to find the player or all active enemies can be very slow. The registry solves this by sorting objects into buckets automatically.
 
-### Storage
-The engine inherently utilizes continuous cached arrays `std::vector<Slot> m_Slots` scaling globally to handle high-count metadata mapping safely without risking direct memory segmentation.
+## How It Works
 
-When registering:
+### Categories
+Every object can be assigned an `EntityCategory`. 
+
 ```cpp
-uint32_t EntityRegistryService::Create(EntityCategory category, const std::string& name, const std::string& registeredBy)
-{
-    // The engine manages fragmented allocation by natively overriding 
-    // obsolete/marked entities rather than restructuring the whole container
-    if (!m_FreeIndices.empty()) {
-        uint32_t idx = m_FreeIndices.back();
-        // Overrides slot
-        return idx;
-    }
+enum class EntityCategory { 
+    Player, 
+    Enemy, 
+    Projectile, 
+    Environment 
+};
+```
+
+### Registering an Entity
+When you create a new object that you want to be able to find later, you register it with the engine. The system gives you back a unique ID.
+
+```cpp
+// Register a new enemy
+uint32_t enemyId = EntityRegistryService::Create(EntityCategory::Enemy, "Goblin", "SpawnerSystem");
+```
+
+### Finding Entities Quickly
+The main benefit of the registry is quickly fetching all entities of a specific type. Instead of looping through every object in the game, you just ask the registry for the specific bucket you want.
+
+```cpp
+// Get a list of all active enemies instantly
+const auto& enemies = m_Registry.GetByCategory(EntityCategory::Enemy);
+
+for (const auto& enemy : enemies) {
+    // Process enemy logic
 }
 ```
 
-### Bucket Assignment
-Every object is categorically tied directly to an internal structure bucket natively simplifying searches:
-```cpp
-enum class EntityCategory { Player, Enemy, Projectile, Environment };
-
-// Querying specific metadata targets natively without expensive loops:
-const auto& enemies = m_Registry.GetByCategory(EntityCategory::Enemy);
-```
-
-### Application Logic Logging
-Anytime an instance ties natively to an active scene representation, the `EntityRegistryService` implements safe tracking logging details globally natively inside `#ifdef ENGINE_LOG_BOTH` footprints, capturing object names and specific instantiator states cleanly across logs!
+## Memory Management
+Behind the scenes, the registry stores data in flat, continuous arrays (`std::vector`). When an entity is destroyed, the registry doesn't delete the slot and shift everything around (which is slow). Instead, it marks the slot as "free". The next time you create an entity, the registry simply overwrites the old, free slot. This makes creating and destroying entities extremely fast!

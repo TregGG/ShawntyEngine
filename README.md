@@ -1,174 +1,111 @@
 # Framework Engine
 
-A lightweight 2D game engine written in C++17 with a strictly decoupled architecture, meaning gameplay logic safely manages state without interacting directly with OpenGL rasterization pipelines.
+Welcome to the Framework Engine! This is a lightweight 2D game engine written in C++17. It is designed to be simple, fast, and easy to use. The engine keeps game logic and rendering completely separate, making your game code cleaner and less prone to graphics-related bugs.
 
 ## Getting Started
 
 ### Prerequisites
 
-You need a C++17 compatible compiler seamlessly integrated with OpenGL/GLFW development libraries.
+You need a C++17 compatible compiler and standard OpenGL/GLFW libraries installed.
+
+**On Ubuntu/Debian:**
 ```bash
 sudo apt-get install build-essential libglfw3-dev libgl1-mesa-dev pkg-config
 ```
 
-### Build & Compiler Options
-The engine compiles highly parallelized out of the box using recursive directory scans. We natively support varying console logging macros mapped dynamically to your build targets:
+### Building the Engine
+You can compile the engine using `make`.
 
 ```bash
-# Compiles everything seamlessly in multi-threaded mode (using `-j(nproc)` scaling under the hood).
+# Compile in parallel (fastest)
 make
 
-# Execute the engine (Requires `bin/` folder)
+# Run the compiled engine
 ./bin/framework
 ```
 
-**Custom Macros:**
-- `make BUILD=debug` (default) — Emits highly detailed engine logging identically to both standard console streams *and* a local `logs.txt` file setup (`ENGINE_LOG_BOTH`).
-- `make BUILD=console` — Optimizes logging stream strictly forcing `ENGINE_LOG_CONSOLE` behavior.
-- `make BUILD=file` — Discards standard std logs and writes silently tracking outputs to local file contexts.
-- `make BUILD=release` — Completely trims the compilation removing ALL macro footprints for standard deployment.
+**Build Options:**
+- `make BUILD=debug` (default): Compiles with extra logging to help you find bugs. Logs are printed to the console and saved to `logs.txt`.
+- `make BUILD=console`: Logs only to the console.
+- `make BUILD=file`: Logs only to `logs.txt`.
+- `make BUILD=release`: Compiles without any logging for maximum performance. Use this when you are ready to publish your game!
 
-**Tools:**
-- `make clean` natively discards all cached `.o` intermediate references safely prior to new rebuilds.
+**Cleaning up:**
+If you ever want to rebuild everything from scratch, run `make clean` first.
 
-## Creating a Game
+## Creating Your First Game
 
-Starting a game revolves fundamentally around overriding Engine instances and wrapping your behaviors logically within `Component` chunks.
+Making a game involves extending the `Game` and `Scene` classes, and creating `GameObjects`.
 
-1. **Implement the Root Engine Loop:**
+1. **Set up the Game Loop:**
+The `Game` class handles your main lifecycle hooks (init, update, render).
 ```cpp
-class MyGame : public Game
-{
+class MyGame : public Game {
 public:
     bool OnInit() override;
     void OnInput(const Input& input) override;
     void OnUpdate(float deltaTime) override;
-    void OnRender() override;   // Offloads queries to specific Renderer
+    void OnRender() override;
     void OnShutdown() override;
 };
 ```
 
-2. **Establish a Playing Field (`Scene`):**
+2. **Create a Scene:**
+A `Scene` is where all your game objects live (like a specific level or menu screen).
 ```cpp
-class MyScene : public Scene
-{
+class MyLevel : public Scene {
 public:
-    void OnEnter() override;
-    void OnExit() override;
-    void Update(float deltatime) override;
+    MyLevel(AssetManager* assets) : Scene(assets) {}
+
+    void OnEnter() override {
+        // Create objects when the scene loads
+        auto player = std::make_unique<GameObject>("Player");
+        player->GetTransform().position = glm::vec2(100.0f, 100.0f);
+        m_GameObjects.push_back(std::move(player));
+    }
+    
+    void OnExit() override {}
+    void Update(float deltatime) override {
+        // Update components
+        for(auto& obj : m_GameObjects) {
+            obj->Update(deltatime);
+        }
+    }
 };
 ```
 
-3. **Deploy Physical Actors:**
+3. **Start the Engine:**
+In your `main.cpp`, initialize the engine with your game and run it!
 ```cpp
-auto player = std::make_unique<GameObject>("Player");
-player->AddComponent(std::make_unique<SpriteRenderer2D>());
-player->AddComponent(std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.0f)));
+int main() {
+    Engine engine;
+    MyGame game;
+
+    if (!engine.Initialize(&game)) {
+        return -1;
+    }
+    
+    engine.Run();
+    engine.Shutdown();
+    return 0;
+}
 ```
-
-4. **Integrate your Boot System** (`main.cpp`):
-```cpp
-Engine engine;
-MyGame game;
-
-if (!engine.Initialize(&game)) return -1;
-engine.Run();
-engine.Shutdown();
-```
-
-## Project Structure
-
-```
-framework/
-├── main.cpp              # Entry point
-├── makefile              # Build configuration
-├── core/                 # Engine core systems
-│   ├── engine.*          # Main engine loop
-│   ├── game.h            # Game interface
-│   ├── system.*          # GLFW window/context management
-│   ├── input.*           # Input handling
-│   └── timer.*           # Frame timing
-├── render/               # Rendering subsystem
-│   ├── rendermanager.*   # High-level render orchestration
-│   ├── spriterendererclass.* # Sprite batch rendering
-│   ├── camera.*          # 2D camera
-│   └── openglclass.*     # Legacy OpenGL wrapper
-├── assets/               # Asset loading and management
-│   ├── assetmanager.*    # Asset loading API
-│   └── assetdatastruct.h # Asset data structures
-├── levels/               # Scene system
-│   ├── scene.h           # Scene interface
-│   └── scenemanager.*    # Scene lifecycle management
-├── objects/              # Game object and component system
-│   ├── gameobject.h      # GameObject base class
-│   └── components/       # Built-in components
-├── services/             # Distinct background engine services
-│   └── base/
-│       ├── entityregistry/ # Registry for managing game entities dynamically
-│       └── physics/        # Physics system parsing spatial partitioning and hits
-├── test/                 # Test games and scenes
-├── documentation/        # Detailed engine subsystem guides
-└── external/             # Third-party libraries
-    ├── glad/             # OpenGL loader
-    └── glm/              # Math library
-```
-
-## Runtime Flow
-
-1. **Initialization** — `Engine::Initialize()` creates subsystems (`System`, `Timer`, `Input`) and calls `Game::OnInit()`
-2. **Main Loop** — `Engine::Run()` executes:
-   - Poll GLFW events
-   - Process input
-   - Call `Game::OnInput()` → `Game::OnUpdate()` → `Game::OnRender()`
-   - Render via `RenderManager` → `SpriteRendererClass`
-3. **Shutdown** — `Engine::Shutdown()` tears down subsystems and calls `Game::OnShutdown()`
-
-## Logging
-
-The engine has a built-in logger in `core/logger.*` with debug macros in `core/enginedebug.h`.
-
-- In `ENGINE_RELEASE`, `ENGINE_LOG`, `ENGINE_WARN`, and `ENGINE_ERROR` are disabled.
-- In `ENGINE_DEBUG`, logging is enabled and defaults to both console and file (`logs.txt`) via `ENGINE_LOG_BOTH` in `core/engineconfig.h`.
-- `Engine::Initialize()` selects output mode (`Console`, `File`, or `Both`), and `Engine::Shutdown()` closes the logger.
-
-Quick usage:
-
-```cpp
-#define ENGINE_CLASS "RenderManager"
-#include "core/enginedebug.h"
-
-ENGINE_LOG("Render queue size: %zu", m_RenderQueue.size());
-ENGINE_WARN("Sprite sheet missing for object: %s", objectId.c_str());
-ENGINE_ERROR("Shader compile failed");
-```
-
-Log format:
-
-`[HH:MM:SS][LEVEL][Thread <id>][CLASS][Function:Line] message`
-
-## Testing
-
-The engine supports both unit and integration testing:
-
-- **Unit tests** — Mock render systems and test gameplay logic in isolation
-- **Integration tests** — Use test harnesses in `test/` that run `Engine` for N frames
-- **Headless CI** — Run under `xvfb-run` or EGL/OSMesa for headless rendering
 
 ## Documentation
 
-For deep structural breakdowns explaining our Quadtrees, slot registries, and renderer pipelines, see the [Documentation Module](documentation/):
-- **[Physics Architecture](documentation/physics.md)**
-- **[Rendering Pipeline](documentation/rendering.md)**
-- **[Entity Registry System](documentation/registry.md)**
-- **[Components & Layouts](documentation/components.md)**
+Want to learn more? Check out the detailed guides in the `documentation/` folder:
 
-
-
+- **[Entity-Component System](documentation/components.md)**: How to make GameObjects and custom Behaviors.
+- **[Physics & Collisions](documentation/physics.md)**: How bounding boxes, rigid bodies, and collisions work.
+- **[Rendering Pipeline](documentation/rendering.md)**: How sprites and graphics are drawn.
+- **[Entity Registry](documentation/registry.md)**: Grouping and finding game objects easily.
+- **[Scene Management](documentation/scene.md)**: How levels and game screens work.
+- **[Asset Manager](documentation/assetmanager.md)**: Loading textures and animations.
+- **[Logging System](documentation/logging.md)**: How to track bugs and print messages.
 
 ## Contributing
 
 Contributions are welcome! Please ensure code follows the existing patterns:
-- Member variables use `m_` prefix
-- No OpenGL calls in gameplay code
-- Components must implement `Update(float deltaTime)`
-- Use `std::unique_ptr` for ownership
+- Member variables use `m_` prefix.
+- No OpenGL calls in gameplay code (use the RenderManager).
+- Use `std::unique_ptr` to manage object ownership safely.

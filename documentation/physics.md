@@ -1,68 +1,62 @@
-# Physics System Architecture
+# Physics & Collisions
 
-The `PhysicsSystem` drives bounding box collisions natively through an explicitly decoupled `Service` architecture. It computes geometry limits completely isolated from Gameplay dependencies, operating transparently alongside visual abstractions.
+The engine handles physics efficiently by separating collision detection (hitboxes) from physics responses (movement and bouncing). 
 
-## Core Component Interface
+## 1. Colliders (Hitboxes)
 
-### `ColliderComponent` Features
-The logic evaluates strictly against `ColliderComponent` structures. It evaluates the exact `AABB` dimensions exclusively on query calls, ensuring it doesn't incur constant framerate update costs:
+To make an object interact with the physics system, you must give it a `ColliderComponent`. This creates an invisible, un-rotated rectangle (AABB) around the object.
 
 ```cpp
-class ColliderComponent : public Component {
-    // Re-evaluates world boundaries efficiently querying `GetTransform()` offsets solely when polled!
-    AABB GetBounds() const;
-    
-    // Explicit behavioral flags dictate dynamic callbacks or strict blocks
-    bool IsTrigger() const;
-};
+// Create a collider box starting at offset (0,0) with a size of 10x10 pixels
+auto collider = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(10.0f));
+
+// Automatically scale the hitbox to match the object's visual size
+collider->SetAutoBounds(true); 
+
+player->AddComponent(std::move(collider));
 ```
 
-When building game states, you instantiate and explicitly inform the native engine loops:
+### Triggers vs. Solid Walls
+By default, colliders are "solid." However, you can mark a collider as a **Trigger**. Triggers don't stop movement; instead, they act like sensors (e.g., a finish line, or a coin you can pick up).
+
 ```cpp
-auto collider = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.0f));
-m_Physics.RegisterCollider(collider.get());
+collider->SetTrigger(true); // Now objects can pass right through it
 ```
 
----
+### Handling Collision Events
+When two colliders overlap, the physics system generates an event. You can read these events to run custom logic, like taking damage when touching an enemy. 
+The system detects two specific moments:
+1. **OnTriggerEnter:** The exact frame two objects *start* touching.
+2. **OnTriggerExit:** The exact frame two objects *stop* touching.
 
-## 1. Spatial Partitioning Check
-Instead of natively querying every bounding structure against each other ($O(n^2)$), the backend slices layouts into localized boundaries using a **Quadtree** system.
+## 2. RigidBodies (Movement & Forces)
 
-### Insertion
-At the very beginning of the `m_Physics.Update(deltatime)` frame:
-- The previous cache map completely destructs.
-- `QuadtreeNode` bounds branch radially dividing active space into NW, NE, SW, and SE grids based on active object clusters.
-- All valid instances dynamically shift down into the deepest local branch capable of housing them, severely lowering native overlap computations.
+If you want an object to move smoothly using physics (gravity, friction, acceleration), add a `RigidBodyComponent`. 
 
----
-
-## 2. Event Dispatching & Trigger State Tracking
-During the query phase, the exact overlap configurations hit a complex state-diffing system to parse behaviors natively correctly firing event queues!
-
-A `CollisionEvent` object is constructed noting any active intersections, and pushed onto `m_Collisions`. Then, our `DispatchEvents()` runs a differential comparison:
-
-1. **`OnTriggerEnter`** - Loop over `m_Collisions`. Any intersection mapping entirely missing from `m_PreviousCollisions` must be explicitly new! Run native callbacks on any involved `IsTrigger()` objects!
-2. **`OnTriggerExit`** - Loop over `m_PreviousCollisions`. Any intersection parsing from the past frame but *missing* natively from the current frame indicates the entities broke contact! Safely resolve specific `.GetOnTriggerExit()` lambdas.
-
-## 3. Continuous RigidBody Integration & Displacement
-
-Previously, developers structured explicit boundary constraints internally by rolling back manual positional offsets. With the deployment of our `RigidBodyComponent`, bounding pushback is explicitly resolved mathematically during the physics step!
-
-### `RigidBodyComponent`
-
-The integration mathematically decouples positional changes from explicit `Update()` commands. Instead, objects dictate exactly how they interact with forces natively using physics constants:
+The RigidBody handles the math for you. Instead of moving the object's position directly, you apply forces to the RigidBody, and the engine updates the position automatically.
 
 ```cpp
 auto rb = std::make_unique<RigidBodyComponent>();
-rb->SetType(BodyType::Dynamic);
+rb->SetType(BodyType::Dynamic); // A dynamic body moves. A static body stays still.
 rb->SetMass(1.0f);
-rb->SetDrag(10.0f);       // Friction cleanly limits top speed!
-rb->AddForce(pushVector); // Input logically maps to acceleration
+rb->SetDrag(10.0f);             // Drag acts like friction, slowing the object down over time
+
+player->AddComponent(std::move(rb));
 ```
 
-### The Engine Loop
-Inside `PhysicsSystem::Update(dt)`, the system inherently runs through completely interconnected systems natively:
+### Moving a RigidBody
+To move the object, you push it by applying a force:
 
-1. **Euler Integration:** The engine iterates strictly pushing forces into `Velocity`, mapping acceleration and bounds natively across `dt`, effectively repositioning the shape completely decoupled from inputs!
-2. **Manifold Mapping:** Rather than simply tracing generic boolean `Intersects`, overlaps precisely track spatial `depth` differences mapping the axis of penetration securely onto an explicit boundary `normal`.
-3. **Displacement Matrix:** Resolves the final state iteratively calculating which structures overlap exactly. Using the manifold properties, it pushes dynamic components out of intersecting boundaries and securely clears out strictly sliding velocity scalars mapped directly across the wall structure, effectively neutralizing clipping natively without explicit state tracking rollbacks!
+```cpp
+// Inside your custom component's Update() method:
+if (Input::IsKeyDown(KEY_RIGHT)) {
+    // Push the player to the right
+    m_Owner->GetComponent<RigidBodyComponent>()->AddForce(glm::vec2(50.0f, 0.0f));
+}
+```
+
+### Automatic Push-Out (Displacement)
+If a dynamic RigidBody hits a solid Collider (like a wall), the engine automatically calculates exactly how far it penetrated the wall and instantly pushes it back out. This prevents objects from clipping through walls, meaning you never have to write manual code to stop players from walking through terrain!
+
+## Under the Hood: Spatial Partitioning (Quadtree)
+Checking if every object is touching every other object is very slow. To keep the engine running fast, the physics system uses a **Quadtree**. This divides the game world into a grid of smaller sectors. The engine only checks for collisions between objects that are in the same sector, significantly boosting performance.

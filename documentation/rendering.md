@@ -1,38 +1,35 @@
 # Rendering Pipeline
 
-The engine maintains a rigid division between Gameplay Code and actual API implementation bounds. No `GameObject` directly manages a Shader.
+The engine separates your game's logic from the actual graphics code (OpenGL). This means you don't need to write custom shaders or OpenGL commands inside your GameObjects.
 
-## Setup Structure
-All graphics pipelines channel directly through the global `RenderManager`. It acts as the abstraction layer, iterating loaded contexts independently drawing natively executed graphics implementations like `SpriteRendererClass`.
+## How to Draw Something
 
-### 1. Building Renderables
-During a frame process, `RenderManager::Render()` dynamically executes `CollectRenderables()`. Instead of managing pointer logic, this calls `Scene::BuildRenderables(outRenderables);` which caches flattened output data. 
-```cpp
-// De-structures massive complex hierarchy graphs into raw render components
-struct RenderableSprite {
-    Transform2D transform;
-    const SpriteSheetAsset* spriteSheet = nullptr;
-    int frameIndex = 0;
-};
-```
-
-### 2. Matrix Overlap
-Once extracted, `.SubmitRenderables()` calculates complex MVP matrix scales applying orthogonal screen limits, scaling to precise `RenderEntry` blocks and executing `.DrawSprite()`!
-
-## Debug Rendering (`ENGINE_DEBUG`)
-If executing in development profiles, a secondary query hook executes identically parallel to the base sprite layer fetching explicitly invisible logic layouts (Like `ColliderComponents`).
+To draw an image on the screen, all you need to do is attach a `SpriteRenderer2D` component to a GameObject and give it a Sprite Sheet.
 
 ```cpp
-void TestScene::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) const {
-#ifdef ENGINE_DEBUG
-    outDebugRects.clear();
-    for (const auto& obj : m_GameObjects) {
-        if (auto col = objPtr->GetComponent<ColliderComponent>()) {
-            // Parses specific logic boundaries translating visually to glowing visual neon layouts
-            outDebugRects.push_back({pos, size, glm::vec3(0.0f, 1.0f, 0.0f)});
-        }
-    }
-#endif
-}
+// 1. Create a GameObject
+auto player = std::make_unique<GameObject>("Player");
+
+// 2. Add a SpriteRenderer
+auto spriteRenderer = std::make_unique<SpriteRenderer2D>();
+
+// 3. Tell it which image to draw (loaded via AssetManager)
+spriteRenderer->SetSpriteSheet(m_Assets->GetSpriteSheet("PlayerTexture"));
+
+player->AddComponent(std::move(spriteRenderer));
 ```
-This safely binds data into a localized `m_DebugVAO`/`VBO` utilizing pure explicit GPU `GL_LINE_LOOP` operations. Without interfering with `Game` logic, the engine safely isolates raw openGL drawing.
+That's it! The engine will automatically draw the image at the exact position and rotation defined by the `GameObject`'s `Transform2D`.
+
+## How the Engine Renders (Under the Hood)
+
+You don't need to understand this to make a game, but here is what happens behind the scenes every frame:
+
+1. **Collection**: The `Scene` loops through every active `GameObject`. If an object has a `SpriteRenderer2D`, the scene grabs its position, image, and current animation frame, and packages this data into a simple list of `RenderableSprite` structures.
+2. **Batching**: The `RenderManager` takes this list of simple structures. It calculates the final math (matrices) required to draw them relative to the camera.
+3. **Execution**: The `SpriteRendererClass` takes the math and talks directly to your graphics card (via OpenGL) to draw the pixels on the screen.
+
+## Debug Rendering
+
+When building your game, it is often helpful to see invisible objects like physics hitboxes. If you compile the engine in `debug` mode (`make BUILD=debug`), the engine will automatically draw bright green outlines around all `ColliderComponent` hitboxes!
+
+This is handled securely through a parallel debug-drawing system, meaning the debug lines will completely disappear when you compile your final game in `release` mode, costing zero performance.

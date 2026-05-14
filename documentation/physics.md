@@ -64,5 +64,38 @@ if (Input::IsKeyDown(KEY_RIGHT)) {
 ### Automatic Push-Out (Displacement)
 If a dynamic RigidBody hits a solid Collider (like a wall), the engine automatically calculates exactly how far it penetrated the wall and instantly pushes it back out. This prevents objects from clipping through walls, meaning you never have to write manual code to stop players from walking through terrain!
 
+## 3. Raycasting & Shape Casting
+
+The physics engine provides tools for checking what exists along a path. This is essential for line-of-sight checks, bullets, or thick laser beams.
+
+### Raycasts
+A raycast shoots an invisible line from a `start` point in a specific `direction` for a given `length`. It returns a `RaycastHit` struct containing the exact point and surface normal of the first object it hits.
+
+```cpp
+RaycastHit hit;
+if (RAYCAST(startPos, direction, length, hit)) {
+    // We hit something!
+    ENGINE_LOG("Hit: %s", hit.collider->GetOwner()->GetName().c_str());
+}
+```
+
+### Shape Casts (Sweeps)
+Instead of a thin line, you can sweep an entire 2D shape (a Circle or a Box) from a `start` point to an `end` point. The shapes are strictly **centered around the line** you provide, meaning the center of the shape travels exactly from your `start` point to your `end` point.
+
+```cpp
+RaycastHit hit;
+uint32_t layerMask = 0xFFFFFFFF; // Target all layers
+
+// Sweeps a box of size (10x10) centered along the line from start to end
+if (BOX_CAST(start, end, glm::vec2(10.0f, 10.0f), hit, layerMask)) {
+    // hit.point is mathematically computed as the EXACT contact point on the surface!
+}
+
+// Sweeps a circle with a radius of 5.0 centered along the line from start to end
+if (CIRCLE_CAST(start, end, 5.0f, hit, layerMask)) {
+    // Perfect for testing thick projectiles or player sweeps!
+}
+```
+
 ## Under the Hood: Spatial Partitioning (Quadtree)
 Checking if every object is touching every other object is very slow. To keep the engine running fast, the physics system uses a **Quadtree**. This divides the game world into a grid of smaller sectors. The engine only checks for collisions between objects that are in the same sector, significantly boosting performance.

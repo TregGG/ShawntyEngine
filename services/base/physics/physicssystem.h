@@ -61,6 +61,10 @@ public:
     // Runs mathematical projection natively evaluating overlaps independently across registered nodes
     bool Raycast(const glm::vec2& start, const glm::vec2& dir, float length, RaycastHit& outHit, uint32_t layerMask = 0xFFFFFFFF, ColliderComponent* ignoreCollider = nullptr, bool hitTriggers = false) const;
     
+    // Shape Casts (Swept Volumes)
+    bool CircleCast(const glm::vec2& start, const glm::vec2& end, float radius, RaycastHit& outHit, uint32_t layerMask = 0xFFFFFFFF, ColliderComponent* ignoreCollider = nullptr, bool hitTriggers = false) const;
+    bool BoxCast(const glm::vec2& start, const glm::vec2& end, const glm::vec2& size, RaycastHit& outHit, uint32_t layerMask = 0xFFFFFFFF, ColliderComponent* ignoreCollider = nullptr, bool hitTriggers = false) const;
+    
     // Trigger separation methods
     bool HasSolidCollision(ColliderComponent* obj) const;
     std::vector<ColliderComponent*> GetOverlappingTriggers(ColliderComponent* obj) const;

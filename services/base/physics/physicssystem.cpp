@@ -445,3 +445,165 @@ bool PhysicsSystem::Raycast(const glm::vec2& start, const glm::vec2& dir, float 
 
     return outHit.hit;
 }
+
+bool PhysicsSystem::BoxCast(const glm::vec2& start, const glm::vec2& end, const glm::vec2& size, RaycastHit& outHit, uint32_t layerMask, ColliderComponent* ignoreCollider, bool hitTriggers) const {
+    outHit.hit = false;
+    glm::vec2 diff = end - start;
+    float length = glm::length(diff);
+    if (length < 1e-6f) return false;
+    
+    glm::vec2 ndir = diff / length;
+    outHit.distance = length;
+
+    for (auto* col : m_Colliders) {
+        if (col == ignoreCollider) continue;
+        if (!col->GetOwner() || !col->GetOwner()->IsActive()) continue;
+        if (!hitTriggers && col->IsTrigger()) continue;
+
+        uint32_t colLayerBit = 1 << static_cast<int>(col->GetOwner()->GetLayer());
+        if ((layerMask & colLayerBit) == 0) continue;
+
+        // Expand bounds by box half extents (Minkowski Sum)
+        ColliderComponent::AABB bounds = col->GetBounds();
+        bounds.minX -= size.x * 0.5f;
+        bounds.maxX += size.x * 0.5f;
+        bounds.minY -= size.y * 0.5f;
+        bounds.maxY += size.y * 0.5f;
+
+        // Check if start is inside expanded bounds
+        if (start.x >= bounds.minX && start.x <= bounds.maxX &&
+            start.y >= bounds.minY && start.y <= bounds.maxY) {
+            outHit.hit = true;
+            outHit.distance = 0.0f;
+            outHit.point = start;
+            outHit.normal = glm::vec2(0.0f, 1.0f);
+            outHit.collider = col;
+            continue;
+        }
+
+        float t;
+        glm::vec2 nRaw;
+        if (RayIntersectAABB(start, ndir, length, bounds, t, nRaw)) {
+            if (t < outHit.distance) {
+                outHit.hit = true;
+                outHit.distance = t;
+                // Calculate actual surface contact point rather than the center of the box
+                glm::vec2 boxCenter = start + ndir * t;
+                outHit.point = boxCenter - glm::vec2(nRaw.x * size.x * 0.5f, nRaw.y * size.y * 0.5f);
+                outHit.normal = nRaw;
+                outHit.collider = col;
+            }
+        }
+    }
+    return outHit.hit;
+}
+
+bool PhysicsSystem::CircleCast(const glm::vec2& start, const glm::vec2& end, float radius, RaycastHit& outHit, uint32_t layerMask, ColliderComponent* ignoreCollider, bool hitTriggers) const {
+    outHit.hit = false;
+    glm::vec2 diff = end - start;
+    float length = glm::length(diff);
+    if (length < 1e-6f) return false;
+    
+    glm::vec2 ndir = diff / length;
+    outHit.distance = length;
+
+    for (auto* col : m_Colliders) {
+        if (col == ignoreCollider) continue;
+        if (!col->GetOwner() || !col->GetOwner()->IsActive()) continue;
+        if (!hitTriggers && col->IsTrigger()) continue;
+
+        uint32_t colLayerBit = 1 << static_cast<int>(col->GetOwner()->GetLayer());
+        if ((layerMask & colLayerBit) == 0) continue;
+
+        ColliderComponent::AABB b = col->GetBounds();
+        
+        // Distance from start to AABB
+        float dx = std::max(0.0f, std::max(b.minX - start.x, start.x - b.maxX));
+        float dy = std::max(0.0f, std::max(b.minY - start.y, start.y - b.maxY));
+        if (dx*dx + dy*dy <= radius*radius) {
+            outHit.hit = true;
+            outHit.distance = 0.0f;
+            outHit.point = start;
+            outHit.normal = glm::vec2(0.0f, 1.0f);
+            outHit.collider = col;
+            continue;
+        }
+
+        float closestT = outHit.distance;
+        bool gotHit = false;
+        glm::vec2 hitNormal(0.0f);
+
+        auto checkT = [&](float t, glm::vec2 n) {
+            if (t >= 0.0f && t < closestT) {
+                closestT = t;
+                hitNormal = n;
+                gotHit = true;
+            }
+        };
+
+        // 4 Edges (shifted outward by radius)
+        float tEdge;
+        if (ndir.y < 0.0f) {
+            tEdge = (b.maxY + radius - start.y) / ndir.y;
+            if (tEdge >= 0.0f) {
+                float px = start.x + ndir.x * tEdge;
+                if (px >= b.minX && px <= b.maxX) checkT(tEdge, glm::vec2(0.0f, 1.0f));
+            }
+        }
+        if (ndir.y > 0.0f) {
+            tEdge = (b.minY - radius - start.y) / ndir.y;
+            if (tEdge >= 0.0f) {
+                float px = start.x + ndir.x * tEdge;
+                if (px >= b.minX && px <= b.maxX) checkT(tEdge, glm::vec2(0.0f, -1.0f));
+            }
+        }
+        if (ndir.x > 0.0f) {
+            tEdge = (b.minX - radius - start.x) / ndir.x;
+            if (tEdge >= 0.0f) {
+                float py = start.y + ndir.y * tEdge;
+                if (py >= b.minY && py <= b.maxY) checkT(tEdge, glm::vec2(-1.0f, 0.0f));
+            }
+        }
+        if (ndir.x < 0.0f) {
+            tEdge = (b.maxX + radius - start.x) / ndir.x;
+            if (tEdge >= 0.0f) {
+                float py = start.y + ndir.y * tEdge;
+                if (py >= b.minY && py <= b.maxY) checkT(tEdge, glm::vec2(1.0f, 0.0f));
+            }
+        }
+
+        // 4 Corner Circles
+        glm::vec2 corners[4] = {
+            glm::vec2(b.minX, b.minY),
+            glm::vec2(b.maxX, b.minY),
+            glm::vec2(b.minX, b.maxY),
+            glm::vec2(b.maxX, b.maxY)
+        };
+        
+        for (int i = 0; i < 4; ++i) {
+            glm::vec2 m = start - corners[i];
+            float B = glm::dot(m, ndir);
+            float C = glm::dot(m, m) - radius * radius;
+            if (C > 0.0f && B > 0.0f) continue;
+            float discr = B * B - C;
+            if (discr >= 0.0f) {
+                float tCirc = -B - std::sqrt(discr);
+                if (tCirc >= 0.0f) {
+                    glm::vec2 nCirc = glm::normalize(start + ndir * tCirc - corners[i]);
+                    checkT(tCirc, nCirc);
+                }
+            }
+        }
+
+        if (gotHit) {
+            outHit.hit = true;
+            outHit.distance = closestT;
+            // Return exact surface contact point instead of circle center
+            glm::vec2 circleCenter = start + ndir * closestT;
+            outHit.point = circleCenter - hitNormal * radius;
+            outHit.normal = hitNormal;
+            outHit.collider = col;
+        }
+    }
+    return outHit.hit;
+}

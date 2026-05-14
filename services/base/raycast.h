@@ -23,3 +23,9 @@ struct RaycastHit {
 
 #define RAYCAST_IGNORE_MASK(startPos, dir, length, outHit, ignoreComp, mask) \
     m_Physics.Raycast(startPos, dir, length, outHit, mask, ignoreComp)
+
+#define CIRCLE_CAST(start, end, radius, out, ignore_layer) \
+    m_Physics.CircleCast(start, end, radius, out, ignore_layer)
+
+#define BOX_CAST(start, end, size, out, ignore_layer) \
+    m_Physics.BoxCast(start, end, size, out, ignore_layer)

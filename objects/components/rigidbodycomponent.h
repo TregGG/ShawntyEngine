@@ -39,8 +39,11 @@ public:
 
     void ClearForces() { m_Acceleration = glm::vec2(0.0f); }
 
+    float GetElasticity() const { return m_Elasticity; }
+    void SetElasticity(float elasticity) { m_Elasticity = elasticity; }
+
 private:
-    BodyType m_Type = BodyType::Dynamic;
+    BodyType m_Type = BodyType::Static;
     glm::vec2 m_Velocity { 0.0f };
     glm::vec2 m_Acceleration { 0.0f };
     
@@ -49,4 +52,5 @@ private:
     float m_Drag = 0.0f; // Linear damping basically
     float m_GravityScale = 1.0f;
     bool m_UseGravity = false; // Default off for top-down, let user turn on explicitly
+    float m_Elasticity = 0.0f; // 0.0 = no bounce, 1.0 = perfect bounce
 };

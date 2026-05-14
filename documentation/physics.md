@@ -37,7 +37,13 @@ The RigidBody handles the math for you. Instead of moving the object's position 
 
 ```cpp
 auto rb = std::make_unique<RigidBodyComponent>();
-rb->SetType(BodyType::Dynamic); // A dynamic body moves. A static body stays still.
+
+// Set the body type to dictate how it moves:
+// - BodyType::Static (Default): Acts like a wall. Cannot be moved by forces or collisions.
+// - BodyType::Kinematic: Can be moved manually by code (setting velocity), but ignores physics forces and bounce.
+// - BodyType::Dynamic: Fully simulated. Pushed by forces, gravity, and bounces off other objects.
+rb->SetType(BodyType::Dynamic); 
+
 rb->SetMass(1.0f);
 rb->SetDrag(10.0f);             // Drag acts like friction, slowing the object down over time
 

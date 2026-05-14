@@ -24,141 +24,89 @@ void TestScene::OnEnter()
         return;
     }
 
-    ENGINE_LOG("OnEnter: getting sprite sheet and animation set");
-    // Get sprite sheet and animation set for "testobj"
-    const SpriteSheetAsset* sheet = nullptr;
-    const AnimationSetAsset* animSet = nullptr;
-    try {
-        sheet = m_Assets->GetSpriteSheet("testobj");
-        ENGINE_LOG("OnEnter: got sprite sheet");
-        animSet = m_Assets->GetAnimationSet("testobj");
-        ENGINE_LOG("OnEnter: got animation set");
-    } catch (const std::exception& e) {
-        ENGINE_ERROR("OnEnter: failed to load assets for 'testobj': %s", e.what());
-        return;
-    }
+    const SpriteSheetAsset* sheet = m_Assets->GetSpriteSheet("testobj");
+    const AnimationSetAsset* animSet = m_Assets->GetAnimationSet("testobj");
 
-    ENGINE_LOG("OnEnter: creating GameObject");
-    // Create a GameObject and add AnimatorComponent and SpriteRenderer2D
-    auto gameObj = std::make_unique<GameObject>("TestSprite");
-    m_Registry.Create(EntityCategory::Player, "TestSprite", "TestScene");
-    gameObj->GetTransform().position = glm::vec2(0.0f, 0.0f);
-    gameObj->GetTransform().size = glm::vec2(2.0f, 2.0f);
-    gameObj->SetLayer(Layer::Player);
+    // 1. Create Player
+    auto playerObj = std::make_unique<GameObject>("Player");
+    m_Registry.Create(EntityCategory::Player, "Player", "TestScene");
+    playerObj->GetTransform().position = glm::vec2(0.0f, 5.0f);
+    playerObj->GetTransform().size = glm::vec2(1.0f, 1.0f);
+    playerObj->SetLayer(Layer::Player);
 
-    ENGINE_LOG("OnEnter: creating AnimatorComponent");
-    auto animator = std::make_unique<AnimatorComponent>();
-    animator->BindAnimationSet(animSet, sheet);
-    ENGINE_LOG("OnEnter: animator bound, playing idle");
-    animator->Play("idle", true);
-    ENGINE_LOG("OnEnter: animator playing");
-    gameObj->AddComponent(std::move(animator));
+    auto pRenderer = std::make_unique<SpriteRenderer2D>();
+    pRenderer->SetSpriteSheet(sheet);
+    pRenderer->SetFrameIndex(0);
+    playerObj->AddComponent(std::move(pRenderer));
 
-    ENGINE_LOG("OnEnter: creating SpriteRenderer2D");
-    auto spriteRenderer = std::make_unique<SpriteRenderer2D>();
-    spriteRenderer->SetSpriteSheet(sheet);
-    spriteRenderer->SetFrameIndex(0);
-    gameObj->AddComponent(std::move(spriteRenderer));
+    auto pCollider = std::make_unique<ColliderComponent>();
+    pCollider->SetAutoBounds(true);
+    m_Physics.RegisterCollider(pCollider.get());
+    playerObj->AddComponent(std::move(pCollider));
 
-    auto playerCollider = std::make_unique<ColliderComponent>();
-    playerCollider->SetAutoBounds(true);
-    m_Physics.RegisterCollider(playerCollider.get());
-    gameObj->AddComponent(std::move(playerCollider));
+    auto pRb = std::make_unique<RigidBodyComponent>();
+    pRb->SetType(BodyType::Dynamic);
+    pRb->SetDrag(2.0f); // Slight drag for air control
+    pRb->SetUseGravity(true);
+    pRb->SetGravityScale(2.0f); // Fall faster
+    m_Physics.RegisterRigidBody(pRb.get());
+    playerObj->AddComponent(std::move(pRb));
 
-    ENGINE_LOG("OnEnter: creating RigidBodyComponent");
-    auto playerRb = std::make_unique<RigidBodyComponent>();
-    playerRb->SetType(BodyType::Dynamic);
-    playerRb->SetDrag(10.0f); // Massive damping strictly mirroring tight top-down WASD snapping safely!
-    playerRb->SetUseGravity(false);
-    m_Physics.RegisterRigidBody(playerRb.get());
-    gameObj->AddComponent(std::move(playerRb));
+    m_GameObjects.push_back(std::move(playerObj));
 
-    m_GameObjects.push_back(std::move(gameObj));
+    // 2. Create Ground
+    auto groundObj = std::make_unique<GameObject>("Ground");
+    m_Registry.Create(EntityCategory::Environment, "Ground", "TestScene");
+    groundObj->GetTransform().position = glm::vec2(0.0f, -3.0f);
+    groundObj->GetTransform().size = glm::vec2(15.0f, 1.0f);
+    groundObj->SetLayer(Layer::Background);
 
-    // Create trigger zone object
-    ENGINE_LOG("OnEnter: creating trigger object");
-    auto triggerObj = std::make_unique<GameObject>("trigger_zone");
-    m_Registry.Create(EntityCategory::Environment, "trigger_zone", "TestScene");
-    triggerObj->GetTransform().position = glm::vec2(-3.0f, 0.0f);
-    triggerObj->GetTransform().size = glm::vec2(1.5f, 1.5f);
-    triggerObj->SetLayer(Layer::UI); // Setting triggers explicitly to isolated UI Layer
+    auto gRenderer = std::make_unique<SpriteRenderer2D>();
+    gRenderer->SetSpriteSheet(sheet);
+    gRenderer->SetFrameIndex(0);
+    groundObj->AddComponent(std::move(gRenderer));
 
-    auto triggerRenderer = std::make_unique<SpriteRenderer2D>();
-    triggerRenderer->SetSpriteSheet(sheet);
-    triggerRenderer->SetFrameIndex(0); 
-    triggerObj->AddComponent(std::move(triggerRenderer));
+    auto gCollider = std::make_unique<ColliderComponent>();
+    gCollider->SetAutoBounds(true);
+    m_Physics.RegisterCollider(gCollider.get());
+    groundObj->AddComponent(std::move(gCollider));
 
-    // 'true' explicitly maps this specifically to a trigger bounds!
-    auto triggerC = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.0f), true);
-    triggerC->SetAutoBounds(true);
-    triggerC->SetOnTriggerEnter([](ColliderComponent* self, ColliderComponent* other) {
-        ENGINE_LOG("entity %s entered the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
-    });
-    triggerC->SetOnTriggerExit([](ColliderComponent* self, ColliderComponent* other) {
-        ENGINE_LOG("entity %s exited the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
-    });
-    
-    m_Physics.RegisterCollider(triggerC.get());
-    triggerObj->AddComponent(std::move(triggerC));
+    auto gRb = std::make_unique<RigidBodyComponent>();
+    gRb->SetType(BodyType::Static);
+    gRb->SetElasticity(0.0f);
+    m_Physics.RegisterRigidBody(gRb.get());
+    groundObj->AddComponent(std::move(gRb));
 
-    m_GameObjects.push_back(std::move(triggerObj));
+    m_GameObjects.push_back(std::move(groundObj));
 
-    // Create secondary trigger zone
-    ENGINE_LOG("OnEnter: creating second trigger object");
-    auto triggerObj2 = std::make_unique<GameObject>("trigger_zone_2");
-    m_Registry.Create(EntityCategory::Environment, "trigger_zone_2", "TestScene");
-    triggerObj2->GetTransform().position = glm::vec2(0.0f, 3.0f);
-    triggerObj2->GetTransform().size = glm::vec2(2.0f, 1.0f);
-    triggerObj2->SetLayer(Layer::UI);
+    // 3. Create Trampoline
+    auto trampObj = std::make_unique<GameObject>("Trampoline");
+    m_Registry.Create(EntityCategory::Environment, "Trampoline", "TestScene");
+    trampObj->GetTransform().position = glm::vec2(0.0f, -1.0f);
+    trampObj->GetTransform().size = glm::vec2(3.0f, 0.5f);
+    trampObj->SetLayer(Layer::Foreground);
 
-    auto triggerRenderer2 = std::make_unique<SpriteRenderer2D>();
-    triggerRenderer2->SetSpriteSheet(sheet);
-    triggerRenderer2->SetFrameIndex(0); 
-    triggerObj2->AddComponent(std::move(triggerRenderer2));
+    auto tRenderer = std::make_unique<SpriteRenderer2D>();
+    tRenderer->SetSpriteSheet(sheet);
+    tRenderer->SetFrameIndex(0);
+    trampObj->AddComponent(std::move(tRenderer));
 
-    auto triggerC2 = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(1.0f), true);
-    triggerC2->SetAutoBounds(true);
-    // Explicitly dropping the Player layer from this trigger's mask!
-    triggerC2->SetLayerMask(~(1 << static_cast<int>(Layer::Player)));
-    triggerC2->SetOnTriggerEnter([](ColliderComponent* self, ColliderComponent* other) {
-        ENGINE_LOG("entity %s entered the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
-    });
-    triggerC2->SetOnTriggerExit([](ColliderComponent* self, ColliderComponent* other) {
-        ENGINE_LOG("entity %s exited the area of %s", other->GetOwner()->GetName().c_str(), self->GetOwner()->GetName().c_str());
-    });
-    
-    m_Physics.RegisterCollider(triggerC2.get());
-    triggerObj2->AddComponent(std::move(triggerC2));
+    auto tCollider = std::make_unique<ColliderComponent>();
+    tCollider->SetAutoBounds(true);
+    m_Physics.RegisterCollider(tCollider.get());
+    trampObj->AddComponent(std::move(tCollider));
 
-    m_GameObjects.push_back(std::move(triggerObj2));
+    auto tRb = std::make_unique<RigidBodyComponent>();
+    tRb->SetType(BodyType::Static);
+    tRb->SetElasticity(2.5f); // Super bouncy!
+    m_Physics.RegisterRigidBody(tRb.get());
+    trampObj->AddComponent(std::move(tRb));
 
-    // Create second reference object (static, no animation)
-    ENGINE_LOG("OnEnter: creating reference object");
-    auto refObj = std::make_unique<GameObject>("static_ref");
-    m_Registry.Create(EntityCategory::Environment, "static_ref", "TestScene");
-    refObj->GetTransform().position = glm::vec2(3.0f, 0.0f);
-    refObj->GetTransform().size = glm::vec2(0.5f, 0.5f);
-    refObj->SetLayer(Layer::Background); // Setting to explicitly filter layer for masking logic
-
-    auto refSpriteRenderer = std::make_unique<SpriteRenderer2D>();
-    refSpriteRenderer->SetSpriteSheet(sheet);
-    refSpriteRenderer->SetFrameIndex(0);  // Static frame
-    refObj->AddComponent(std::move(refSpriteRenderer));
-
-    auto envCollider = std::make_unique<ColliderComponent>();
-    envCollider->SetAutoBounds(true);
-    m_Physics.RegisterCollider(envCollider.get());
-    refObj->AddComponent(std::move(envCollider));
-
-    m_GameObjects.push_back(std::move(refObj));
-    ENGINE_LOG("OnEnter: created reference object at (3.0, 0.0)");
-
+    m_GameObjects.push_back(std::move(trampObj));
 
     // Set a reasonable view
-    m_Camera.SetScale(1.0f);
+    m_Camera.SetScale(2.0f);
     m_Camera.SetCameraPosition(0.0f, 0.0f);
-
-    // std::cout << "TestScene: entered and created 1 GameObject with Animator\n";
 }
 
 void TestScene::OnExit()
@@ -180,11 +128,23 @@ void TestScene::Update(float deltatime)
 
     if (m_Input)
     {
-        // WASD for object movement inherently tracking forces rather than static positioning natively!
-        if (m_Input->IsKeyDown(GLFW_KEY_W)) pushForce.y += 1.0f;
-        if (m_Input->IsKeyDown(GLFW_KEY_S)) pushForce.y -= 1.0f;
+        // A/D for lateral movement
         if (m_Input->IsKeyDown(GLFW_KEY_A)) pushForce.x -= 1.0f;
         if (m_Input->IsKeyDown(GLFW_KEY_D)) pushForce.x += 1.0f;
+        
+        static bool spacePressed = false;
+        if (m_Input->IsKeyDown(GLFW_KEY_SPACE)) {
+            if (!spacePressed) {
+                // Jump!
+                if (m_GameObjects.size() > 0) {
+                    RigidBodyComponent* rb = m_GameObjects[0]->GetComponent<RigidBodyComponent>();
+                    if (rb) rb->SetVelocity(glm::vec2(rb->GetVelocity().x, 15.0f));
+                }
+                spacePressed = true;
+            }
+        } else {
+            spacePressed = false;
+        }
 
         // Arrow keys for camera movement
         if (m_Input->IsKeyDown(GLFW_KEY_UP))    cameraDir.y += 1.0f;
@@ -196,13 +156,9 @@ void TestScene::Update(float deltatime)
     // Apply input-driven movement to first GameObject (controllable sprite)
     if (m_GameObjects.size() > 0)
     {
-        if (glm::length(pushForce) > 0.1f) {
-            pushForce = glm::normalize(pushForce) * 150.0f; // High forces counteracting extreme Damping parameters logically.
-        }
-
         RigidBodyComponent* rb = m_GameObjects[0]->GetComponent<RigidBodyComponent>();
         if (rb) {
-            rb->AddForce(pushForce);
+            rb->AddForce(pushForce * 50.0f);
         }
 
         m_Physics.Update(deltatime);
@@ -220,41 +176,6 @@ void TestScene::Update(float deltatime)
     {
         if (obj && obj->IsActive())
             obj->Update(deltatime);
-    }
-    
-    // RAYCAST DEMONSTRATION
-    // Shoots a laser directly horizontally/upwards dynamically mapped off user input axes or standard up vector
-    m_TestLines.clear();
-    if (m_GameObjects.size() > 0) {
-        RaycastHit hit;
-        glm::vec2 rayStart = m_GameObjects[0]->GetTransform().position;
-        // Shoots a laser directly right explicitly as requested!
-        glm::vec2 rayDir = glm::vec2(1.0f, 0.0f); 
-        float rayLen = 50.0f;
-        
-        ColliderComponent* playerBounds = m_GameObjects[0]->GetComponent<ColliderComponent>();
-        
-        static std::string lastHit = "";
-        
-        // Explicity generating BitMask ignoring `Layer::UI` securely!
-        uint32_t testingMask = ~(1 << static_cast<int>(Layer::UI)); 
-
-        // Masking UI natively, meaning transparent Triggers get completely skipped across the bounds!
-        if (RAYCAST_IGNORE_MASK(rayStart, rayDir, rayLen, hit, playerBounds, testingMask)) {
-            // Target Hit = Red Vector projecting exactly onto hit wall!
-            m_TestLines.push_back({rayStart, hit.point, glm::vec3(1.0f, 0.0f, 0.0f)});
-            
-            // Console properly outputting name of touched component owner
-            std::string currentHit = hit.collider->GetOwner()->GetName();
-            if (lastHit != currentHit) {
-                ENGINE_LOG("Raycast just hit: %s", currentHit.c_str());
-                lastHit = currentHit;
-            }
-        } else {
-            lastHit = ""; // Clears the state safely when we hit empty space!
-            // Target Missed = Continuous scaling Green Vector mappings!
-            m_TestLines.push_back({rayStart, rayStart + rayDir * rayLen, glm::vec3(0.0f, 1.0f, 0.0f)});
-        }
     }
 }
 

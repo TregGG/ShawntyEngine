@@ -155,32 +155,47 @@ void PhysicsSystem::Update(float dt) {
         
         if (!aMovable && !bMovable) continue;
         
-        // Shift bounds exactly pushing overlapping structs out
+        // Positional Displacement
         if (aMovable && !bMovable) {
             ev.a->GetOwner()->GetTransform().position += ev.normal * ev.depth;
-            // Trim velocity safely dropping jittering outputs smoothly
-            glm::vec2 velA = rbA->GetVelocity();
-            float vDot = glm::dot(velA, ev.normal);
-            if (vDot < 0) rbA->SetVelocity(velA - vDot * ev.normal);
         } else if (!aMovable && bMovable) { 
             // Note: normal explicitly points A outward, so we invert testing -normal for B!
             ev.b->GetOwner()->GetTransform().position -= ev.normal * ev.depth;
-            glm::vec2 velB = rbB->GetVelocity();
-            float vDot = glm::dot(velB, -ev.normal);
-            if (vDot < 0) rbB->SetVelocity(velB - vDot * -ev.normal);
         } else {
             // Both dynamic: divide depth natively avoiding clipping limits
             ev.a->GetOwner()->GetTransform().position += ev.normal * (ev.depth * 0.5f);
             ev.b->GetOwner()->GetTransform().position -= ev.normal * (ev.depth * 0.5f);
-            
-            glm::vec2 velA = rbA->GetVelocity();
-            float vDotA = glm::dot(velA, ev.normal);
-            if (vDotA < 0) rbA->SetVelocity(velA - vDotA * ev.normal);
-            
-            glm::vec2 velB = rbB->GetVelocity();
-            float vDotB = glm::dot(velB, -ev.normal);
-            if (vDotB < 0) rbB->SetVelocity(velB - vDotB * -ev.normal);
         }
+
+        // Velocity Resolution (Elasticity)
+        glm::vec2 velA = aMovable ? rbA->GetVelocity() : glm::vec2(0.0f);
+        glm::vec2 velB = bMovable ? rbB->GetVelocity() : glm::vec2(0.0f);
+
+        // Relative velocity (A relative to B)
+        glm::vec2 rv = velA - velB;
+        float vDot = glm::dot(rv, ev.normal);
+
+        // If they are moving apart, do nothing
+        if (vDot >= 0) continue;
+
+        // Calculate combined elasticity (choose the highest bounce)
+        float eA = rbA ? rbA->GetElasticity() : 0.0f;
+        float eB = rbB ? rbB->GetElasticity() : 0.0f;
+        float e = std::max(eA, eB);
+
+        // Calculate inverse mass sum
+        float invMassA = aMovable ? rbA->GetInverseMass() : 0.0f;
+        float invMassB = bMovable ? rbB->GetInverseMass() : 0.0f;
+        float invMassSum = invMassA + invMassB;
+
+        if (invMassSum == 0.0f) continue; // Should not happen if aMovable or bMovable is true
+
+        // Calculate impulse scalar
+        float j = -(1.0f + e) * vDot / invMassSum;
+        glm::vec2 impulse = j * ev.normal;
+
+        if (aMovable) rbA->SetVelocity(velA + impulse * invMassA);
+        if (bMovable) rbB->SetVelocity(velB - impulse * invMassB);
     }
 }
 

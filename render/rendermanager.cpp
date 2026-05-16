@@ -67,37 +67,49 @@ void RenderManager::Render()
 
 void RenderManager::CollectRenderables()
 {
-   std::vector<RenderableSprite> renderables;
-    m_Scene->BuildRenderables(renderables);   
+    std::vector<EntityID> renderables = m_Scene->registry.ViewTransformAndSprite();   
     const glm::mat4& vp = m_Camera->GetViewProjection();
 
-    for (const RenderableSprite& r : renderables)
+    for (EntityID e : renderables)
     {
-        if (!r.spriteSheet)
+        const auto& transform = m_Scene->registry.GetComponent<TransformComponent>(e);
+        const auto& sprite = m_Scene->registry.GetComponent<SpriteComponent2D>(e);
+
+        if (!sprite.spriteSheet)
             continue;
 
-        if (r.frameIndex < 0 ||
-            r.frameIndex >= static_cast<int>(r.spriteSheet->frames.size()))
+        int frameIndex = sprite.frameIndex;
+
+        // Animator overrides static frame if present
+        if (m_Scene->registry.HasComponent<AnimatorComponent>(e)) {
+            const auto& animator = m_Scene->registry.GetComponent<AnimatorComponent>(e);
+            frameIndex = animator.GetFrameIndex();
+        }
+
+        if (frameIndex < 0 ||
+            frameIndex >= static_cast<int>(sprite.spriteSheet->frames.size()))
             continue;
 
-        // Build model matrix (hidden from gameplay)
+        // Note: For parents and children, the absolute world position should be computed.
+        // For now, we assume transform.position is absolute world position, which should be
+        // updated by the physics or transform system.
         glm::mat4 model = glm::translate(glm::mat4(1.0f),
-                                         glm::vec3(r.transform.position, 0.0f));
+                                         glm::vec3(transform.position, 0.0f));
 
         model = glm::rotate(model,
-                            r.transform.rotation,
+                            transform.rotation,
                             glm::vec3(0, 0, 1));
 
         model = glm::scale(model,
-                           glm::vec3(r.transform.size, 1.0f));
+                           glm::vec3(transform.size, 1.0f));
 
         glm::mat4 mvp = vp * model;
 
         m_RenderQueue.push_back({
             mvp,
-            r.spriteSheet,
-            r.frameIndex,
-            r.layer
+            sprite.spriteSheet,
+            frameIndex,
+            sprite.layer
         });
     }
 }

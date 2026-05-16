@@ -15,8 +15,9 @@
 
 void TestScene::OnEnter()
 {
-    m_Registry.Init();
+    registry.Init();
     m_Physics.Init();
+    m_Physics.BindRegistry(&registry);
 
     if (!m_Assets)
     {
@@ -28,80 +29,114 @@ void TestScene::OnEnter()
     const AnimationSetAsset* animSet = m_Assets->GetAnimationSet("testobj");
 
     // 1. Create Player
-    auto playerObj = std::make_unique<GameObject>("Player");
-    m_Registry.Create(EntityCategory::Player, "Player", "TestScene");
-    playerObj->GetTransform().position = glm::vec2(0.0f, 5.0f);
-    playerObj->GetTransform().size = glm::vec2(1.0f, 1.0f);
-    playerObj->SetLayer(Layer::Player);
+    auto playerObj = std::make_unique<GameObject>(this, "Player");
+    EntityID pID = playerObj->GetID();
 
-    auto pRenderer = std::make_unique<SpriteRenderer2D>();
-    pRenderer->SetSpriteSheet(sheet);
-    pRenderer->SetFrameIndex(0);
-    playerObj->AddComponent(std::move(pRenderer));
+    TransformComponent pt;
+    pt.position = glm::vec2(0.0f, 5.0f);
+    pt.size = glm::vec2(1.0f, 1.0f);
+    registry.AddComponent<TransformComponent>(pID, pt);
 
-    auto pCollider = std::make_unique<ColliderComponent>();
-    pCollider->SetAutoBounds(true);
-    m_Physics.RegisterCollider(pCollider.get());
-    playerObj->AddComponent(std::move(pCollider));
+    SpriteComponent2D ps;
+    ps.spriteSheet = sheet;
+    ps.frameIndex = 0;
+    ps.layer = Layer::Player;
+    registry.AddComponent<SpriteComponent2D>(pID, ps);
 
-    auto pRb = std::make_unique<RigidBodyComponent>();
-    pRb->SetType(BodyType::Dynamic);
-    pRb->SetDrag(2.0f); // Slight drag for air control
-    pRb->SetUseGravity(true);
-    pRb->SetGravityScale(2.0f); // Fall faster
-    m_Physics.RegisterRigidBody(pRb.get());
-    playerObj->AddComponent(std::move(pRb));
+    ColliderComponent pc;
+    pc.SetAutoBounds(true);
+    registry.AddComponent<ColliderComponent>(pID, pc);
+
+    RigidBodyComponent prb;
+    prb.SetType(BodyType::Dynamic);
+    prb.SetDrag(2.0f); // Slight drag for air control
+    prb.SetUseGravity(true);
+    prb.SetGravityScale(2.0f); // Fall faster
+    registry.AddComponent<RigidBodyComponent>(pID, prb);
+
+    // 1b. Create Weapon (Child of Player)
+    auto weaponObj = std::make_unique<GameObject>(this, "Weapon");
+    EntityID wID = weaponObj->GetID();
+
+    TransformComponent wt;
+    wt.localPosition = glm::vec2(1.0f, 0.0f); // Offset to the right of the player
+    wt.position = pt.position + wt.localPosition; // Initial world pos
+    wt.size = glm::vec2(0.5f, 0.5f);
+    registry.AddComponent<TransformComponent>(wID, wt);
+
+    SpriteComponent2D ws;
+    ws.spriteSheet = sheet;
+    ws.frameIndex = 0;
+    ws.layer = Layer::Player;
+    registry.AddComponent<SpriteComponent2D>(wID, ws);
+
+    ColliderComponent wc;
+    wc.SetAutoBounds(true);
+    wc.SetTrigger(true); // Weapon acts as a trigger/hitbox
+    registry.AddComponent<ColliderComponent>(wID, wc);
+
+    RelationshipComponent rel;
+    rel.parent = pID;
+    registry.AddComponent<RelationshipComponent>(wID, rel);
+
+    // Update Player relationship
+    RelationshipComponent pRel;
+    pRel.children.push_back(wID);
+    registry.AddComponent<RelationshipComponent>(pID, pRel);
 
     m_GameObjects.push_back(std::move(playerObj));
+    m_GameObjects.push_back(std::move(weaponObj));
 
     // 2. Create Ground
-    auto groundObj = std::make_unique<GameObject>("Ground");
-    m_Registry.Create(EntityCategory::Environment, "Ground", "TestScene");
-    groundObj->GetTransform().position = glm::vec2(0.0f, -3.0f);
-    groundObj->GetTransform().size = glm::vec2(15.0f, 1.0f);
-    groundObj->SetLayer(Layer::Background);
+    auto groundObj = std::make_unique<GameObject>(this, "Ground");
+    EntityID gID = groundObj->GetID();
 
-    auto gRenderer = std::make_unique<SpriteRenderer2D>();
-    gRenderer->SetSpriteSheet(sheet);
-    gRenderer->SetFrameIndex(0);
-    groundObj->AddComponent(std::move(gRenderer));
+    TransformComponent gt;
+    gt.position = glm::vec2(0.0f, -3.0f);
+    gt.size = glm::vec2(15.0f, 1.0f);
+    registry.AddComponent<TransformComponent>(gID, gt);
 
-    auto gCollider = std::make_unique<ColliderComponent>();
-    gCollider->SetAutoBounds(true);
-    m_Physics.RegisterCollider(gCollider.get());
-    groundObj->AddComponent(std::move(gCollider));
+    SpriteComponent2D gs;
+    gs.spriteSheet = sheet;
+    gs.frameIndex = 0;
+    gs.layer = Layer::Background;
+    registry.AddComponent<SpriteComponent2D>(gID, gs);
 
-    auto gRb = std::make_unique<RigidBodyComponent>();
-    gRb->SetType(BodyType::Static);
-    gRb->SetElasticity(0.0f);
-    m_Physics.RegisterRigidBody(gRb.get());
-    groundObj->AddComponent(std::move(gRb));
+    ColliderComponent gc;
+    gc.SetAutoBounds(true);
+    registry.AddComponent<ColliderComponent>(gID, gc);
+
+    RigidBodyComponent grb;
+    grb.SetType(BodyType::Static);
+    grb.SetElasticity(0.0f);
+    registry.AddComponent<RigidBodyComponent>(gID, grb);
 
     m_GameObjects.push_back(std::move(groundObj));
 
     // 3. Create Trampoline
-    auto trampObj = std::make_unique<GameObject>("Trampoline");
-    m_Registry.Create(EntityCategory::Environment, "Trampoline", "TestScene");
-    trampObj->GetTransform().position = glm::vec2(0.0f, -1.0f);
-    trampObj->GetTransform().size = glm::vec2(3.0f, 0.5f);
-    trampObj->SetLayer(Layer::Foreground);
+    auto trampObj = std::make_unique<GameObject>(this, "Trampoline");
+    EntityID tID = trampObj->GetID();
 
-    auto tRenderer = std::make_unique<SpriteRenderer2D>();
-    tRenderer->SetSpriteSheet(sheet);
-    tRenderer->SetFrameIndex(0);
-    trampObj->AddComponent(std::move(tRenderer));
+    TransformComponent tt;
+    tt.position = glm::vec2(0.0f, -1.0f);
+    tt.size = glm::vec2(3.0f, 0.5f);
+    registry.AddComponent<TransformComponent>(tID, tt);
 
-    auto tCollider = std::make_unique<ColliderComponent>();
-    tCollider->SetAutoBounds(true);
-    m_Physics.RegisterCollider(tCollider.get());
-    trampObj->AddComponent(std::move(tCollider));
+    SpriteComponent2D ts;
+    ts.spriteSheet = sheet;
+    ts.frameIndex = 0;
+    ts.layer = Layer::Foreground;
+    registry.AddComponent<SpriteComponent2D>(tID, ts);
 
-    auto tRb = std::make_unique<RigidBodyComponent>();
-    tRb->SetType(BodyType::Static);
-    tRb->SetElasticity(2.5f); // Super bouncy!
-    m_Physics.RegisterRigidBody(tRb.get());
-    trampObj->AddComponent(std::move(tRb));
+    ColliderComponent tc;
+    tc.SetAutoBounds(true);
+    registry.AddComponent<ColliderComponent>(tID, tc);
 
+    RigidBodyComponent trb;
+    trb.SetType(BodyType::Static);
+    trb.SetElasticity(2.5f); // Super bouncy!
+    registry.AddComponent<RigidBodyComponent>(tID, trb);
+    
     m_GameObjects.push_back(std::move(trampObj));
 
     // Set a reasonable view
@@ -112,7 +147,7 @@ void TestScene::OnEnter()
 void TestScene::OnExit()
 {
     m_Physics.Shutdown();
-    m_Registry.Shutdown();
+    registry.Shutdown();
 }
 
 // void TestScene::SetInput(const Input& input)
@@ -126,19 +161,22 @@ void TestScene::Update(float deltatime)
     glm::vec2 pushForce(0.0f);
     glm::vec2 cameraDir(0.0f);
 
+    EntityID playerEntity = 0;
+    if (m_GameObjects.size() > 0) playerEntity = m_GameObjects[0]->GetID();
+
     if (m_Input)
     {
         // A/D for lateral movement
-        if (m_Input->IsKeyDown(GLFW_KEY_A)) pushForce.x -= 1.0f;
-        if (m_Input->IsKeyDown(GLFW_KEY_D)) pushForce.x += 1.0f;
+        if (m_Input->IsKeyDown(GLFW_KEY_A)) { pushForce.x -= 1.0f; }
+        if (m_Input->IsKeyDown(GLFW_KEY_D)) { pushForce.x += 1.0f; }
         
         static bool spacePressed = false;
         if (m_Input->IsKeyDown(GLFW_KEY_SPACE)) {
             if (!spacePressed) {
                 // Jump!
-                if (m_GameObjects.size() > 0) {
-                    RigidBodyComponent* rb = m_GameObjects[0]->GetComponent<RigidBodyComponent>();
-                    if (rb) rb->SetVelocity(glm::vec2(rb->GetVelocity().x, 15.0f));
+                if (playerEntity != 0 && registry.HasComponent<RigidBodyComponent>(playerEntity)) {
+                    auto& rb = registry.GetComponent<RigidBodyComponent>(playerEntity);
+                    rb.SetVelocity(glm::vec2(rb.GetVelocity().x, 15.0f));
                 }
                 spacePressed = true;
             }
@@ -154,15 +192,13 @@ void TestScene::Update(float deltatime)
     }
 
     // Apply input-driven movement to first GameObject (controllable sprite)
-    if (m_GameObjects.size() > 0)
+    if (playerEntity != 0 && registry.HasComponent<RigidBodyComponent>(playerEntity))
     {
-        RigidBodyComponent* rb = m_GameObjects[0]->GetComponent<RigidBodyComponent>();
-        if (rb) {
-            rb->AddForce(pushForce * 50.0f);
-        }
-
-        m_Physics.Update(deltatime);
+        auto& rb = registry.GetComponent<RigidBodyComponent>(playerEntity);
+        rb.AddForce(pushForce * 50.0f);
     }
+
+    m_Physics.Update(deltatime);
 
     // Apply input-driven camera movement
     glm::vec2 camPos = m_Camera.GetCameraPosition();
@@ -171,18 +207,30 @@ void TestScene::Update(float deltatime)
         camPos.y + cameraDir.y * m_MoveSpeed * deltatime
     );
 
-    // Update all game objects
-    for (auto& obj : m_GameObjects)
-    {
-        if (obj && obj->IsActive())
-            obj->Update(deltatime);
+    // Animators Update
+    for (EntityID e : registry.ViewAnimators()) {
+        auto& animator = registry.GetComponent<AnimatorComponent>(e);
+        if (animator.IsActive()) {
+            animator.Update(deltatime);
+        }
     }
     
+    // Transform Hierarchy Update (rudimentary transform system)
+    for (EntityID e : registry.ViewRelationships()) {
+        const auto& rel = registry.GetComponent<RelationshipComponent>(e);
+        if (rel.parent != 0) {
+            if (registry.HasComponent<TransformComponent>(rel.parent) && registry.HasComponent<TransformComponent>(e)) {
+                auto& parentTrans = registry.GetComponent<TransformComponent>(rel.parent);
+                auto& childTrans = registry.GetComponent<TransformComponent>(e);
+                childTrans.position = parentTrans.position + childTrans.localPosition;
+            }
+        }
+    }
     // SHAPE CAST DEMONSTRATION
     m_TestLines.clear();
     m_TestRects.clear();
-    if (m_GameObjects.size() > 0) {
-        glm::vec2 pPos = m_GameObjects[0]->GetTransform().position;
+    if (playerEntity != 0 && registry.HasComponent<TransformComponent>(playerEntity)) {
+        glm::vec2 pPos = registry.GetComponent<TransformComponent>(playerEntity).position;
         
         // Ignore UI layer AND Player layer so we don't immediately hit ourselves!
         uint32_t testingMask = ~( (1 << static_cast<int>(Layer::UI)) | (1 << static_cast<int>(Layer::Player)) ); 
@@ -221,22 +269,18 @@ void TestScene::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) con
 {
 #ifdef ENGINE_DEBUG
     outDebugRects.clear();
-    for (const auto& obj : m_GameObjects) 
+    for (EntityID e : registry.ViewPhysicsObjects()) 
     {
-        if (!obj || !obj->IsActive()) continue;
+        const auto& col = registry.GetComponent<ColliderComponent>(e);
+        const auto& trans = registry.GetComponent<TransformComponent>(e);
         
-        // Temporarily bypassing const to pull the active component ptr mapping dynamically 
-        auto* objPtr = const_cast<GameObject*>(obj.get());
-        if (auto col = objPtr->GetComponent<ColliderComponent>()) 
-        {
-            auto b = col->GetBounds();
-            glm::vec2 size(b.maxX - b.minX, b.maxY - b.minY);
-            glm::vec3 pos(b.minX + size.x * 0.5f, b.minY + size.y * 0.5f, 0.0f);
-            
-            // Render triggers as RED instead of yellow
-            glm::vec3 cColor = col->IsTrigger() ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
-            outDebugRects.push_back({pos, size, cColor});
-        }
+        auto b = col.GetBounds(trans);
+        glm::vec2 size(b.maxX - b.minX, b.maxY - b.minY);
+        glm::vec3 pos(b.minX + size.x * 0.5f, b.minY + size.y * 0.5f, 0.0f);
+        
+        // Render triggers as RED instead of yellow
+        glm::vec3 cColor = col.IsTrigger() ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+        outDebugRects.push_back({pos, size, cColor});
     }
     
     // Append the custom shape cast test rectangles

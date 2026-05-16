@@ -132,4 +132,51 @@ void EntityRegistryService::Shutdown()
     m_FreeList.clear();
     m_PendingDestroy.clear();
     m_CategoryBuckets.clear();
+    
+    m_Transforms.clear();
+    m_Sprites.clear();
+    m_Relationships.clear();
+    m_Colliders.clear();
+    m_RigidBodies.clear();
+    m_Animators.clear();
+}
+
+std::vector<EntityID> EntityRegistryService::ViewTransformAndSprite() const
+{
+    std::vector<EntityID> result;
+    for (const auto& [entity, transform] : m_Transforms) {
+        if (m_Sprites.find(entity) != m_Sprites.end()) {
+            result.push_back(entity);
+        }
+    }
+    return result;
+}
+
+std::vector<EntityID> EntityRegistryService::ViewPhysicsObjects() const
+{
+    std::vector<EntityID> result;
+    for (const auto& [entity, collider] : m_Colliders) {
+        if (m_Transforms.find(entity) != m_Transforms.end()) {
+            result.push_back(entity);
+        }
+    }
+    return result;
+}
+
+std::vector<EntityID> EntityRegistryService::ViewAnimators() const
+{
+    std::vector<EntityID> result;
+    for (const auto& [entity, animator] : m_Animators) {
+        result.push_back(entity);
+    }
+    return result;
+}
+
+std::vector<EntityID> EntityRegistryService::ViewRelationships() const
+{
+    std::vector<EntityID> result;
+    for (const auto& [entity, rel] : m_Relationships) {
+        result.push_back(entity);
+    }
+    return result;
 }

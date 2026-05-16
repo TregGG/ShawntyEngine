@@ -3,8 +3,9 @@
 #include "../gameobject.h"
 #include <glm/vec2.hpp>
 #include <functional>
+#include "components.h"
 
-class ColliderComponent : public Component
+class ColliderComponent
 {
 public:
     struct AABB {
@@ -12,15 +13,13 @@ public:
         float maxX, maxY;
     };
     
-    using TriggerCallback = std::function<void(ColliderComponent* self, ColliderComponent* other)>;
+    // We pass the EntityID of the other entity involved in the collision.
+    using TriggerCallback = std::function<void(EntityID self, EntityID other)>;
 
     ColliderComponent(const glm::vec2& localOffset = glm::vec2(0.0f), 
                       const glm::vec2& localSize = glm::vec2(1.0f),
                       bool isTrigger = false)
         : m_LocalOffset(localOffset), m_LocalSize(localSize), m_IsTrigger(isTrigger) {}
-
-    // Empty override as physics computes everything dynamically on request
-    void Update(float /*deltatime*/) override {}
 
     uint32_t GetLayerMask() const { return m_LayerMask; }
     void SetLayerMask(uint32_t mask) { m_LayerMask = mask; }
@@ -37,30 +36,28 @@ public:
     void SetOnTriggerExit(TriggerCallback callback) { m_OnTriggerExit = std::move(callback); }
     const TriggerCallback& GetOnTriggerExit() const { return m_OnTriggerExit; }
 
-    // Dynamic AABB calculation based on parent transform
-    AABB GetBounds() const {
+    // Dynamic AABB calculation based on given transform
+    AABB GetBounds(const TransformComponent& transform) const {
         AABB bounds = {0.0f, 0.0f, 0.0f, 0.0f};
-        if (m_Owner) {
-            const auto& transform = m_Owner->GetTransform();
-            
-            float worldX = transform.position.x;
-            float worldY = transform.position.y;
-            float worldW = transform.size.x;
-            float worldH = transform.size.y;
+        
+        float worldX = transform.position.x;
+        float worldY = transform.position.y;
+        float worldW = transform.size.x;
+        float worldH = transform.size.y;
 
-            if (!m_AutoBounds) {
-                worldX += m_LocalOffset.x;
-                worldY += m_LocalOffset.y;
-                worldW *= m_LocalSize.x;
-                worldH *= m_LocalSize.y;
-            }
-
-            // Assuming position is the center of the object
-            bounds.minX = worldX - (worldW * 0.5f);
-            bounds.maxX = worldX + (worldW * 0.5f);
-            bounds.minY = worldY - (worldH * 0.5f);
-            bounds.maxY = worldY + (worldH * 0.5f);
+        if (!m_AutoBounds) {
+            worldX += m_LocalOffset.x;
+            worldY += m_LocalOffset.y;
+            worldW *= m_LocalSize.x;
+            worldH *= m_LocalSize.y;
         }
+
+        // Assuming position is the center of the object
+        bounds.minX = worldX - (worldW * 0.5f);
+        bounds.maxX = worldX + (worldW * 0.5f);
+        bounds.minY = worldY - (worldH * 0.5f);
+        bounds.maxY = worldY + (worldH * 0.5f);
+        
         return bounds;
     }
 

@@ -8,12 +8,10 @@ enum class BodyType {
     Dynamic
 };
 
-class RigidBodyComponent : public Component {
+class RigidBodyComponent {
 public:
     RigidBodyComponent();
     virtual ~RigidBodyComponent() = default;
-
-    void Update(float /*dt*/) override {}
 
     BodyType GetType() const { return m_Type; }
     void SetType(BodyType type) { m_Type = type; }

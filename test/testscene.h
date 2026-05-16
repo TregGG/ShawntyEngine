@@ -29,7 +29,6 @@ private:
 
     // std::vector<std::unique_ptr<GameObject>> m_GameObjects;
     float m_MoveSpeed = 5.0f;
-    EntityRegistryService m_Registry;
     PhysicsSystem m_Physics;
     
     std::vector<DebugLine> m_TestLines;

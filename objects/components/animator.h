@@ -8,7 +8,7 @@ struct AnimationSetAsset;
 struct AnimationClip;
 struct SpriteSheetAsset;
 
-class AnimatorComponent : public Component
+class AnimatorComponent
 {
 public:
     AnimatorComponent() = default;
@@ -24,6 +24,7 @@ public:
 
     bool HasAnimation(const std::string& clipName) const;
     bool IsPlaying() const { return m_Playing; }
+    bool IsActive() const { return m_Active; }
 
     void SetSpeed(float speed) { m_Speed = speed; }
 
@@ -32,7 +33,7 @@ public:
     const SpriteSheetAsset* GetSpriteSheet() const;
 
     // ---------- Component ----------
-    void Update(float deltaTime) override;
+    void Update(float deltaTime);
 
 private:
     // Bound assets (non-owning)
@@ -48,4 +49,5 @@ private:
     float  m_Speed        = 1.0f;
     float  m_TimeInFrame  = 0.0f;
     size_t m_ClipFrameIdx = 0;
+    bool   m_Active       = true;
 };

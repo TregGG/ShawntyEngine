@@ -58,18 +58,27 @@ public:
     MyLevel(AssetManager* assets) : Scene(assets) {}
 
     void OnEnter() override {
-        // Create objects when the scene loads
-        auto player = std::make_unique<GameObject>("Player");
-        player->GetTransform().position = glm::vec2(100.0f, 100.0f);
+        registry.Init();
+
+        // Create player when the scene loads
+        auto player = std::make_unique<GameObject>(this, "Player");
+        EntityID pID = player->GetID();
+
+        TransformComponent pt;
+        pt.position = glm::vec2(100.0f, 100.0f);
+        pt.size = glm::vec2(1.0f, 1.0f);
+        registry.AddComponent<TransformComponent>(pID, pt);
+
         m_GameObjects.push_back(std::move(player));
     }
     
-    void OnExit() override {}
+    void OnExit() override {
+        registry.Shutdown();
+    }
+    
     void Update(float deltatime) override {
-        // Update components
-        for(auto& obj : m_GameObjects) {
-            obj->Update(deltatime);
-        }
+        // Run physics and updates
+        m_Physics.Update(deltatime);
     }
 };
 ```

@@ -1,35 +1,44 @@
 # Rendering Pipeline
 
-The engine separates your game's logic from the actual graphics code (OpenGL). This means you don't need to write custom shaders or OpenGL commands inside your GameObjects.
+The engine separates gameplay logic from rendering pipelines (OpenGL). Game systems configure rendering by registering rendering components into the registry, bypassing custom draw functions inside entity loops.
 
-## How to Draw Something
+---
 
-To draw an image on the screen, all you need to do is attach a `SpriteRenderer2D` component to a GameObject and give it a Sprite Sheet.
+## 1. Registering renderable elements
+
+To display a sprite on the screen, attach a `TransformComponent` and a `SpriteComponent2D` to your entity.
 
 ```cpp
-// 1. Create a GameObject
-auto player = std::make_unique<GameObject>("Player");
+// 1. Configure transform position & scale
+TransformComponent pt;
+pt.position = glm::vec2(0.0f, 0.0f);
+pt.size = glm::vec2(1.0f, 1.0f);
+scene->registry.AddComponent<TransformComponent>(pID, pt);
 
-// 2. Add a SpriteRenderer
-auto spriteRenderer = std::make_unique<SpriteRenderer2D>();
-
-// 3. Tell it which image to draw (loaded via AssetManager)
-spriteRenderer->SetSpriteSheet(m_Assets->GetSpriteSheet("PlayerTexture"));
-
-player->AddComponent(std::move(spriteRenderer));
+// 2. Configure sprite sheet and rendering properties
+SpriteComponent2D ps;
+ps.spriteSheet = m_Assets->GetSpriteSheet("PlayerTexture");
+ps.frameIndex = 0;
+ps.layer = Layer::Player; // Specifies layer sorting (UI, Player, Foreground, Background)
+scene->registry.AddComponent<SpriteComponent2D>(pID, ps);
 ```
-That's it! The engine will automatically draw the image at the exact position and rotation defined by the `GameObject`'s `Transform2D`.
 
-## How the Engine Renders (Under the Hood)
+---
 
-You don't need to understand this to make a game, but here is what happens behind the scenes every frame:
+## 2. Rendering Step (Under the Hood)
+Every frame, the `RenderManager` renders the scene using three clean phases:
 
-1. **Collection**: The `Scene` loops through every active `GameObject`. If an object has a `SpriteRenderer2D`, the scene grabs its position, image, and current animation frame, and packages this data into a simple list of `RenderableSprite` structures.
-2. **Batching**: The `RenderManager` takes this list of simple structures. It calculates the final math (matrices) required to draw them relative to the camera.
-3. **Execution**: The `SpriteRendererClass` takes the math and talks directly to your graphics card (via OpenGL) to draw the pixels on the screen.
+1. **Collection**: The manager calls `registry.ViewTransformAndSprite()` to fetch all active renderable entities. It extracts `TransformComponent` and `SpriteComponent2D` parameters, resolves animation frame overrides from `AnimatorComponent` (if present), and constructs model-view-projection (MVP) matrices.
+2. **Layer Sorting**: The render entries are sorted by their `layer` value:
+   ```cpp
+   std::sort(m_RenderQueue.begin(), m_RenderQueue.end(), [](const RenderEntry& a, const RenderEntry& b) {
+       return static_cast<int>(a.layer) > static_cast<int>(b.layer);
+   });
+   ```
+   *Background sprites are drawn first; UI sprites are drawn last on top of everything.*
+3. **Execution**: The sorted batch is passed to the shader program and drawn via OpenGL calls.
 
-## Debug Rendering
+---
 
-When building your game, it is often helpful to see invisible objects like physics hitboxes. If you compile the engine in `debug` mode (`make BUILD=debug`), the engine will automatically draw bright green outlines around all `ColliderComponent` hitboxes!
-
-This is handled securely through a parallel debug-drawing system, meaning the debug lines will completely disappear when you compile your final game in `release` mode, costing zero performance.
+## 3. Debug Rendering
+When compiling in debug mode (`make BUILD=debug`), the `RenderManager` queries active colliders and cast sweeps to draw green wireframe boxes and lines on top of the scene. These calls are completely removed in release builds to eliminate overhead.

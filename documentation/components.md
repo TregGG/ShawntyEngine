@@ -1,52 +1,96 @@
-# GameObjects & Components
+# Entities & Components (ECS)
 
-The engine uses an **Entity-Component System (ECS)**. This design makes it incredibly easy to add new features to your game without writing complex and hard-to-maintain inheritance trees.
+The engine uses a **Data-Oriented Entity-Component System (ECS)**. In this architecture, game objects are split from their data to maximize CPU cache locality, prevent memory leaks, and bypass virtual function call overheads.
+
+---
 
 ## 1. `GameObject` (The Entity)
-A `GameObject` is essentially an empty container that represents a single entity in your game world (like a player, a bullet, or a wall). By default, it only has a name, an active state, and a **Transform2D** (which holds its position, rotation, and scale).
+A `GameObject` is a lightweight container representing a single entity in the game world. It is a thin factory wrapper holding:
+- A 64-bit `EntityID` (generated via the Scene's registry)
+- A pointer to the parent `Scene`
+
+When created, it registers itself inside the Scene's central `EntityRegistryService`.
 
 ```cpp
-// Create a new GameObject named "Player"
-auto player = std::make_unique<GameObject>("Player");
-
-// Move the player to coordinates (100, 50)
-player->GetTransform().position = glm::vec2(100.0f, 50.0f);
+// Create a new GameObject wrapper
+auto player = std::make_unique<GameObject>(scene, "Player");
+EntityID pID = player->GetID();
 ```
 
-## 2. `Component` (The Behavior)
-A `Component` is a reusable script or behavior that you attach to a `GameObject`. A `GameObject` does nothing on its own until you give it components!
+---
 
-For example, to make the player visible and give it collision, you add a rendering component and a physics component:
+## 2. Components (Pure Data)
+Components in the engine are Plain Old Data (POD) structures. They do **not** inherit from a base `Component` class and do **not** store pointer references to their owner entity. Instead, they are stored in flat, contiguous memory pools inside the central `EntityRegistryService` and are associated with entities by their `EntityID`.
+
+### Built-in Components:
+* **`TransformComponent`**: Position (`position`), scale/size (`size`), local position (`localPosition` for nested hierarchies), and rotation (`rotation`).
+* **`SpriteComponent2D`**: Sprite sheet asset pointer (`spriteSheet`), frame index (`frameIndex`), and rendering layer (`layer`).
+* **`AnimatorComponent`**: Manages play state and updates active sprite sheet animation frames.
+* **`ColliderComponent`**: Creates a bounding box (AABB) for spatial partitioning and collision tests.
+* **`RigidBodyComponent`**: Mass, drag, velocity, elasticity, and gravity settings.
+* **`RelationshipComponent`**: Defines parent-child relationships for nested coordinate hierarchies (e.g. Weapon tracking a Player).
+
+---
+
+## 3. Interacting with the Registry
+You use the `registry` (found on your `Scene` class) to add, query, check, or remove component data.
+
+### Adding Components:
 ```cpp
-player->AddComponent(std::make_unique<SpriteRenderer2D>());
-player->AddComponent(std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(10.0f)));
+TransformComponent pt;
+pt.position = glm::vec2(0.0f, 5.0f);
+pt.size = glm::vec2(1.0f, 1.0f);
+scene->registry.AddComponent<TransformComponent>(pID, pt);
 ```
 
-### Writing Your Own Component
-Creating custom logic is as simple as creating a new class that inherits from `Component` and overriding the `Update` method. 
+### Retrieving & Mutating Components:
+```cpp
+// Check if an entity has a component
+if (scene->registry.HasComponent<RigidBodyComponent>(pID)) {
+    // Fetch and mutate the component
+    auto& rb = scene->registry.GetComponent<RigidBodyComponent>(pID);
+    rb.SetVelocity(glm::vec2(0.0f, 15.0f)); // Jump!
+}
+```
 
-Here is an example of a simple component that moves an object continuously to the right:
+### Removing Components:
+```cpp
+scene->registry.RemoveComponent<ColliderComponent>(pID);
+```
+
+---
+
+## 4. Custom Wrappers (e.g., `TestPlayer`)
+To write custom logic for complex entities, create a wrapper class inheriting from `GameObject`. It handles registering its own component data upon construction and provides hooks for handling input and updates.
 
 ```cpp
-class MoveRightComponent : public Component {
+// Header
+class TestPlayer : public GameObject {
+private:
+    const Input* m_Input = nullptr;
 public:
-    void Update(float deltatime) override {
-        // m_Owner is a built-in pointer to the GameObject this component is attached to.
-        // We use it to get the object's transform and modify its position.
-        
-        float speed = 50.0f;
-        m_Owner->GetTransform().position.x += speed * deltatime;
-    }
+    TestPlayer(Scene* scene, const std::string& name, const SpriteSheetAsset* sheet);
+    void PassInput(const Input* input) { m_Input = input; }
+    void Update(float deltaTime);
 };
 
-// Now you can attach it to any GameObject!
-player->AddComponent(std::make_unique<MoveRightComponent>());
+// Source Constructor
+TestPlayer::TestPlayer(Scene* scene, const std::string& name, const SpriteSheetAsset* sheet)
+    : GameObject(scene, name)
+{
+    // Register Transform, Sprite, Collider, RigidBody...
+    TransformComponent pt;
+    pt.position = glm::vec2(0.0f, 5.0f);
+    scene->registry.AddComponent<TransformComponent>(m_ID, pt);
+    
+    // Create children...
+}
+
+// Source Update
+void TestPlayer::Update(float deltaTime) {
+    if (m_Input && m_Input->IsKeyDown(GLFW_KEY_A)) {
+        auto& rb = m_Scene->registry.GetComponent<RigidBodyComponent>(m_ID);
+        rb.AddForce(glm::vec2(-50.0f, 0.0f));
+    }
+}
 ```
-
-## Built-In Engine Components
-The engine comes with several essential components right out of the box:
-
-* **`SpriteRenderer2D`**: Draws an image (sprite) to the screen. 
-* **`AnimatorComponent`**: Plays animations by rapidly switching between frames in a Sprite Sheet.
-* **`ColliderComponent`**: Creates an invisible "hitbox" around the object so the physics system can detect when it bumps into other things.
-* **`RigidBodyComponent`**: Adds physics properties like mass, velocity, and friction. Used alongside a `ColliderComponent` to make objects push each other and react to gravity or forces.

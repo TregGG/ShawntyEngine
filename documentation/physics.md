@@ -1,101 +1,90 @@
 # Physics & Collisions
 
-The engine handles physics efficiently by separating collision detection (hitboxes) from physics responses (movement and bouncing). 
+The engine separates collision detection (bounding boxes and triggers) from physics simulation (movement, acceleration, and bouncing) using registry components.
+
+---
 
 ## 1. Colliders (Hitboxes)
-
-To make an object interact with the physics system, you must give it a `ColliderComponent`. This creates an invisible, un-rotated rectangle (AABB) around the object.
+To make an entity interact with the physics system, attach a `ColliderComponent` using the registry. This defines an axis-aligned bounding box (AABB) around the entity.
 
 ```cpp
-// Create a collider box starting at offset (0,0) with a size of 10x10 pixels
-auto collider = std::make_unique<ColliderComponent>(glm::vec2(0.0f), glm::vec2(10.0f));
-
-// Automatically scale the hitbox to match the object's visual size
-collider->SetAutoBounds(true); 
-
-player->AddComponent(std::move(collider));
+ColliderComponent pc;
+pc.SetAutoBounds(true); // Automatically scales hitbox to match the sprite's size
+scene->registry.AddComponent<ColliderComponent>(pID, pc);
 ```
 
-### Triggers vs. Solid Walls
-By default, colliders are "solid." However, you can mark a collider as a **Trigger**. Triggers don't stop movement; instead, they act like sensors (e.g., a finish line, or a coin you can pick up).
-
+### Triggers vs. Solid Colliders
+By default, colliders are solid and displace other objects. Marking a collider as a trigger turns it into a sensor:
 ```cpp
-collider->SetTrigger(true); // Now objects can pass right through it
+pc.SetTrigger(true); // Objects pass right through it
 ```
 
-### Handling Collision Events
-When two colliders overlap, the physics system generates an event. You can read these events to run custom logic, like taking damage when touching an enemy. 
-The system detects two specific moments:
-1. **OnTriggerEnter:** The exact frame two objects *start* touching.
-2. **OnTriggerExit:** The exact frame two objects *stop* touching.
-
-## 2. RigidBodies (Movement & Forces)
-
-If you want an object to move smoothly using physics (gravity, friction, acceleration), add a `RigidBodyComponent`. 
-
-The RigidBody handles the math for you. Instead of moving the object's position directly, you apply forces to the RigidBody, and the engine updates the position automatically.
-
+### Handling Trigger Events
+Triggers notify registered listeners on collision using OnTriggerEnter and OnTriggerExit events:
 ```cpp
-auto rb = std::make_unique<RigidBodyComponent>();
-
-// Set the body type to dictate how it moves:
-// - BodyType::Static (Default): Acts like a wall. Cannot be moved by forces or collisions.
-// - BodyType::Kinematic: Can be moved manually by code (setting velocity), but ignores physics forces and bounce.
-// - BodyType::Dynamic: Fully simulated. Pushed by forces, gravity, and bounces off other objects.
-rb->SetType(BodyType::Dynamic); 
-
-rb->SetMass(1.0f);
-rb->SetDrag(10.0f);             // Drag acts like friction, slowing the object down over time
-
-player->AddComponent(std::move(rb));
+pc.SetOnTriggerEnter([scene](EntityID self, EntityID other) {
+    std::string_view selfName = scene->registry.GetName(self);
+    std::string_view otherName = scene->registry.GetName(other);
+    ENGINE_LOG("'%s' collided with '%s'", std::string(selfName).c_str(), std::string(otherName).c_str());
+});
 ```
 
-### Moving a RigidBody
-To move the object, you push it by applying a force:
+---
+
+## 2. RigidBodies (Forces & Movement)
+Adding a `RigidBodyComponent` to an entity enables physics updates (gravity, velocity, drag, elasticity) inside the `PhysicsSystem`.
 
 ```cpp
-// Inside your custom component's Update() method:
-if (Input::IsKeyDown(KEY_RIGHT)) {
-    // Push the player to the right
-    m_Owner->GetComponent<RigidBodyComponent>()->AddForce(glm::vec2(50.0f, 0.0f));
+RigidBodyComponent prb;
+prb.SetType(BodyType::Dynamic); // Dynamic (simulated), Static (walls/ground), or Kinematic (manual velocity)
+prb.SetMass(1.0f);
+prb.SetDrag(2.0f); // Damping coefficient slowing velocity
+prb.SetUseGravity(true);
+prb.SetGravityScale(2.0f);
+scene->registry.AddComponent<RigidBodyComponent>(pID, prb);
+```
+
+### Applying Forces
+Instead of manually updating positions, apply force vectors to the RigidBody component:
+```cpp
+if (m_Input->IsKeyDown(GLFW_KEY_D)) {
+    auto& rb = scene->registry.GetComponent<RigidBodyComponent>(pID);
+    rb.AddForce(glm::vec2(50.0f, 0.0f));
 }
 ```
 
-### Automatic Push-Out (Displacement)
-If a dynamic RigidBody hits a solid Collider (like a wall), the engine automatically calculates exactly how far it penetrated the wall and instantly pushes it back out. This prevents objects from clipping through walls, meaning you never have to write manual code to stop players from walking through terrain!
+---
 
 ## 3. Raycasting & Shape Casting
-
-The physics engine provides tools for checking what exists along a path. This is essential for line-of-sight checks, bullets, or thick laser beams.
+The `PhysicsSystem` can test what entities intersect lines or shapes swept along a path.
 
 ### Raycasts
-A raycast shoots an invisible line from a `start` point in a specific `direction` for a given `length`. It returns a `RaycastHit` struct containing the exact point and surface normal of the first object it hits.
-
+Shoots a ray of given length in a direction and returns a `RaycastHit` struct containing the point of collision and the `EntityID` of the object hit.
 ```cpp
 RaycastHit hit;
-if (RAYCAST(startPos, direction, length, hit)) {
-    // We hit something!
-    ENGINE_LOG("Hit: %s", hit.collider->GetOwner()->GetName().c_str());
+glm::vec2 start = transform.position;
+glm::vec2 direction(1.0f, 0.0f);
+float length = 15.0f;
+
+if (RAYCAST(start, direction, length, hit)) {
+    std::string_view hitName = scene->registry.GetName(hit.entity);
+    ENGINE_LOG("Ray hit object: %s", std::string(hitName).c_str());
 }
 ```
 
-### Shape Casts (Sweeps)
-Instead of a thin line, you can sweep an entire 2D shape (a Circle or a Box) from a `start` point to an `end` point. The shapes are strictly **centered around the line** you provide, meaning the center of the shape travels exactly from your `start` point to your `end` point.
-
+### Shape Sweeps
+Sweeps a Box or Circle shape centered along the path from `start` to `end` coordinates.
 ```cpp
 RaycastHit hit;
-uint32_t layerMask = 0xFFFFFFFF; // Target all layers
+uint32_t layerMask = 0xFFFFFFFF;
 
-// Sweeps a box of size (10x10) centered along the line from start to end
-if (BOX_CAST(start, end, glm::vec2(10.0f, 10.0f), hit, layerMask)) {
-    // hit.point is mathematically computed as the EXACT contact point on the surface!
+// Sweep a 1.0x1.0 box
+if (BOX_CAST(start, end, glm::vec2(1.0f), hit, layerMask)) {
+    // hit.point represents the surface point of contact
 }
 
-// Sweeps a circle with a radius of 5.0 centered along the line from start to end
-if (CIRCLE_CAST(start, end, 5.0f, hit, layerMask)) {
-    // Perfect for testing thick projectiles or player sweeps!
+// Sweep a circle with a radius of 0.5
+if (CIRCLE_CAST(start, end, 0.5f, hit, layerMask)) {
+    ...
 }
 ```
-
-## Under the Hood: Spatial Partitioning (Quadtree)
-Checking if every object is touching every other object is very slow. To keep the engine running fast, the physics system uses a **Quadtree**. This divides the game world into a grid of smaller sectors. The engine only checks for collisions between objects that are in the same sector, significantly boosting performance.

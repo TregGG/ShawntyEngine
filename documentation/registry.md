@@ -1,42 +1,63 @@
-# Entity Registry
+# Entity Registry Service
 
-The `EntityRegistryService` is a global system used to keep track of GameObjects and group them by category. 
+The `EntityRegistryService` is the central "Data Bucket" of the ECS architecture. Instead of heavy objects owning allocations, the registry maintains flat memory pools (`std::unordered_map`) for each component type.
 
-When you have hundreds of objects in a scene, searching through all of them just to find the player or all active enemies can be very slow. The registry solves this by sorting objects into buckets automatically.
+---
 
-## How It Works
+## 1. Creating and Destroying Entities
+Entities are represented as simple 64-bit unsigned integers (`EntityID`):
+- **Lower 32-bits**: Slots vector index
+- **Upper 32-bits**: Entity generation (protects against stale reference access)
+- **ID 0** is reserved as the sentinel `Invalid` entity.
 
-### Categories
-Every object can be assigned an `EntityCategory`. 
-
+### Creation:
 ```cpp
-enum class EntityCategory { 
-    Player, 
-    Enemy, 
-    Projectile, 
-    Environment 
-};
+// Created via the Scene context or directly on the registry
+EntityID pID = scene->CreateEntity(EntityCategory::Player, "Player");
 ```
 
-### Registering an Entity
-When you create a new object that you want to be able to find later, you register it with the engine. The system gives you back a unique ID.
-
+### Destruction:
+Entities are destroyed by calling `Destroy`. Their slots are queued in a pending list and recycled in the next update cycle:
 ```cpp
-// Register a new enemy
-uint32_t enemyId = EntityRegistryService::Create(EntityCategory::Enemy, "Goblin", "SpawnerSystem");
+scene->registry.Destroy(entityID);
 ```
 
-### Finding Entities Quickly
-The main benefit of the registry is quickly fetching all entities of a specific type. Instead of looping through every object in the game, you just ask the registry for the specific bucket you want.
+---
+
+## 2. Component Pools
+Each component type is allocated inside its own continuous hash map pool inside `EntityRegistryService`:
+```cpp
+std::unordered_map<EntityID, TransformComponent> m_Transforms;
+std::unordered_map<EntityID, SpriteComponent2D> m_Sprites;
+std::unordered_map<EntityID, RelationshipComponent> m_Relationships;
+std::unordered_map<EntityID, ColliderComponent> m_Colliders;
+std::unordered_map<EntityID, RigidBodyComponent> m_RigidBodies;
+std::unordered_map<EntityID, AnimatorComponent> m_Animators;
+```
+
+---
+
+## 3. Template-based APIs
+You can query or modify component data using clean, template-based interfaces resolved at compile-time:
+
+- `AddComponent<T>(EntityID e, const T& comp)`
+- `GetComponent<T>(EntityID e)`
+- `HasComponent<T>(EntityID e)`
+- `RemoveComponent<T>(EntityID e)`
 
 ```cpp
-// Get a list of all active enemies instantly
-const auto& enemies = m_Registry.GetByCategory(EntityCategory::Enemy);
-
-for (const auto& enemy : enemies) {
-    // Process enemy logic
+if (registry.HasComponent<TransformComponent>(entity)) {
+    auto& trans = registry.GetComponent<TransformComponent>(entity);
+    trans.position += glm::vec2(1.0f, 0.0f);
 }
 ```
 
-## Memory Management
-Behind the scenes, the registry stores data in flat, continuous arrays (`std::vector`). When an entity is destroyed, the registry doesn't delete the slot and shift everything around (which is slow). Instead, it marks the slot as "free". The next time you create an entity, the registry simply overwrites the old, free slot. This makes creating and destroying entities extremely fast!
+---
+
+## 4. Query Views
+Systems iterate procedurally over components of interest by querying specific views. Views return pre-filtered lists of matching entity IDs:
+
+* **`ViewTransformAndSprite()`**: Returns entities possessing both a `TransformComponent` and a `SpriteComponent2D` (used by the `RenderManager`).
+* **`ViewPhysicsObjects()`**: Returns entities possessing both a `TransformComponent` and a `ColliderComponent` (used by the `PhysicsSystem`).
+* **`ViewAnimators()`**: Returns entities possessing an `AnimatorComponent`.
+* **`ViewRelationships()`**: Returns entities with parent-child hierarchies defined via a `RelationshipComponent`.

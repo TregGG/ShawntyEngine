@@ -12,6 +12,7 @@
 #include "../objects/components/rigidbodycomponent.h"
 #include "../services/base/raycast.h"
 #include <GLFW/glfw3.h>
+#include "testplayer.h"
 
 void TestScene::OnEnter()
 {
@@ -28,64 +29,9 @@ void TestScene::OnEnter()
     const SpriteSheetAsset* sheet = m_Assets->GetSpriteSheet("testobj");
     const AnimationSetAsset* animSet = m_Assets->GetAnimationSet("testobj");
 
-    // 1. Create Player
-    auto playerObj = std::make_unique<GameObject>(this, "Player");
-    EntityID pID = playerObj->GetID();
-
-    TransformComponent pt;
-    pt.position = glm::vec2(0.0f, 5.0f);
-    pt.size = glm::vec2(1.0f, 1.0f);
-    registry.AddComponent<TransformComponent>(pID, pt);
-
-    SpriteComponent2D ps;
-    ps.spriteSheet = sheet;
-    ps.frameIndex = 0;
-    ps.layer = Layer::Player;
-    registry.AddComponent<SpriteComponent2D>(pID, ps);
-
-    ColliderComponent pc;
-    pc.SetAutoBounds(true);
-    registry.AddComponent<ColliderComponent>(pID, pc);
-
-    RigidBodyComponent prb;
-    prb.SetType(BodyType::Dynamic);
-    prb.SetDrag(2.0f); // Slight drag for air control
-    prb.SetUseGravity(true);
-    prb.SetGravityScale(2.0f); // Fall faster
-    registry.AddComponent<RigidBodyComponent>(pID, prb);
-
-    // 1b. Create Weapon (Child of Player)
-    auto weaponObj = std::make_unique<GameObject>(this, "Weapon");
-    EntityID wID = weaponObj->GetID();
-
-    TransformComponent wt;
-    wt.localPosition = glm::vec2(1.0f, 0.0f); // Offset to the right of the player
-    wt.position = pt.position + wt.localPosition; // Initial world pos
-    wt.size = glm::vec2(0.5f, 0.5f);
-    registry.AddComponent<TransformComponent>(wID, wt);
-
-    SpriteComponent2D ws;
-    ws.spriteSheet = sheet;
-    ws.frameIndex = 0;
-    ws.layer = Layer::Player;
-    registry.AddComponent<SpriteComponent2D>(wID, ws);
-
-    ColliderComponent wc;
-    wc.SetAutoBounds(true);
-    wc.SetTrigger(true); // Weapon acts as a trigger/hitbox
-    registry.AddComponent<ColliderComponent>(wID, wc);
-
-    RelationshipComponent rel;
-    rel.parent = pID;
-    registry.AddComponent<RelationshipComponent>(wID, rel);
-
-    // Update Player relationship
-    RelationshipComponent pRel;
-    pRel.children.push_back(wID);
-    registry.AddComponent<RelationshipComponent>(pID, pRel);
-
+    // 1. Create Player (internally constructs the Player & Weapon hierarchy)
+    auto playerObj = std::make_unique<TestPlayer>(this, "Player", sheet);
     m_GameObjects.push_back(std::move(playerObj));
-    m_GameObjects.push_back(std::move(weaponObj));
 
     // 2. Create Ground
     auto groundObj = std::make_unique<GameObject>(this, "Ground");
@@ -166,24 +112,6 @@ void TestScene::Update(float deltatime)
 
     if (m_Input)
     {
-        // A/D for lateral movement
-        if (m_Input->IsKeyDown(GLFW_KEY_A)) { pushForce.x -= 1.0f; }
-        if (m_Input->IsKeyDown(GLFW_KEY_D)) { pushForce.x += 1.0f; }
-        
-        static bool spacePressed = false;
-        if (m_Input->IsKeyDown(GLFW_KEY_SPACE)) {
-            if (!spacePressed) {
-                // Jump!
-                if (playerEntity != 0 && registry.HasComponent<RigidBodyComponent>(playerEntity)) {
-                    auto& rb = registry.GetComponent<RigidBodyComponent>(playerEntity);
-                    rb.SetVelocity(glm::vec2(rb.GetVelocity().x, 15.0f));
-                }
-                spacePressed = true;
-            }
-        } else {
-            spacePressed = false;
-        }
-
         // Arrow keys for camera movement
         if (m_Input->IsKeyDown(GLFW_KEY_UP))    cameraDir.y += 1.0f;
         if (m_Input->IsKeyDown(GLFW_KEY_DOWN))  cameraDir.y -= 1.0f;
@@ -191,11 +119,12 @@ void TestScene::Update(float deltatime)
         if (m_Input->IsKeyDown(GLFW_KEY_RIGHT)) cameraDir.x += 1.0f;
     }
 
-    // Apply input-driven movement to first GameObject (controllable sprite)
-    if (playerEntity != 0 && registry.HasComponent<RigidBodyComponent>(playerEntity))
-    {
-        auto& rb = registry.GetComponent<RigidBodyComponent>(playerEntity);
-        rb.AddForce(pushForce * 50.0f);
+    // Pass input to player and update it
+    if (!m_GameObjects.empty()) {
+        if (auto* player = dynamic_cast<TestPlayer*>(m_GameObjects[0].get())) {
+            player->PassInput(m_Input);
+            player->Update(deltatime);
+        }
     }
 
     m_Physics.Update(deltatime);

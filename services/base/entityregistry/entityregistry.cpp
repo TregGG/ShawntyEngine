@@ -6,6 +6,15 @@
 void EntityRegistryService::Init()
 {
     m_CategoryBuckets.resize(static_cast<size_t>(EntityCategory::Count));
+
+    // Reserve index 0 as invalid/sentinel slot
+    Slot invalidSlot;
+    invalidSlot.generation = 0;
+    invalidSlot.alive = false;
+    invalidSlot.category = EntityCategory::Environment;
+    invalidSlot.name = "Invalid";
+    invalidSlot.registeredBy = "System";
+    m_Slots.push_back(invalidSlot);
 }
 
 EntityID EntityRegistryService::Create(EntityCategory category, std::string_view name, std::string_view registeredBy)

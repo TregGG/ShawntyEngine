@@ -31,6 +31,12 @@ public:
     // Category queries
     EntityCategory GetCategory(EntityID entity) const;
 
+    std::string_view GetName(EntityID entity) const {
+        std::uint32_t index = EntityIndex(entity);
+        if (index >= m_Slots.size()) return "Unknown";
+        return m_Slots[index].name;
+    }
+
     const std::vector<std::uint32_t>& GetEntities(EntityCategory category) const;
 
     // --- Component Adders ---

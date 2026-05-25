@@ -32,7 +32,7 @@ public:
         return m_FrameIndex;
     }
 
-    void Update(float deltatime) override
+    void Update(float /*deltatime*/) override
     {
         // SpriteRenderer2D is passive; Animator drives frame updates
     }

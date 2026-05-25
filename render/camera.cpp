@@ -63,7 +63,7 @@ void Camera::RecalculateMatrix()
 }
 
 
-const float Camera::GetScale() const
+float Camera::GetScale() const
 {
     return m_Scale;
 }

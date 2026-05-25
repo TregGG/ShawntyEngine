@@ -10,7 +10,12 @@ You need a C++17 compatible compiler and standard OpenGL/GLFW libraries installe
 
 **On Ubuntu/Debian:**
 ```bash
-sudo apt-get install build-essential libglfw3-dev libgl1-mesa-dev pkg-config
+sudo apt-get install build-essential libglfw3-dev libgl1-mesa-dev pkg-config libfreetype6-dev
+```
+
+**On Arch Linux (using pacman):**
+```bash
+sudo pacman -S base-devel glfw-x11 freetype2
 ```
 
 ### Building the Engine

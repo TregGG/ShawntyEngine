@@ -11,6 +11,7 @@
 #include "../../../objects/components/collidercomponent.h"
 #include "../../../objects/components/rigidbodycomponent.h"
 #include "../../../objects/components/animator.h"
+#include "../../../objects/ui/uiobject.h"
 
 class EntityRegistryService : public Service
 {
@@ -21,6 +22,9 @@ public:
     void Init() override ;
     void Update(float dt) override;
     void Shutdown() override;
+
+    void AddUIElement(std::unique_ptr<UIObject> element);
+    const std::vector<std::unique_ptr<UIObject>>& GetUIElements() const;
 
     // Create entity with category
     EntityID Create(EntityCategory category, std::string_view name, std::string_view registeredBy);
@@ -116,6 +120,7 @@ private:
     };
 
     std::vector<Slot> m_Slots;
+    std::vector<std::unique_ptr<UIObject>> m_UIElements;
 
     // Reuse destroyed slots
     std::vector<std::uint32_t> m_FreeList;

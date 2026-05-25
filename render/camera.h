@@ -19,8 +19,10 @@ public:
 
     const glm::mat4& GetViewProjection() const;
 
-    const float GetScale() const ;
     void SetScale(float scale);
+    float GetScale() const ;
+
+    // Frustum retrieval
 private:
     void RecalculateMatrix();
 

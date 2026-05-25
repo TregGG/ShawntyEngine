@@ -1,4 +1,6 @@
 #include "entityregistry.h"
+#include "../../../objects/ui/uiobject.h"
+#include <algorithm>
 
 #define ENGINE_CLASS "EntityRegistryService"
 #include "../../../core/enginedebug.h"
@@ -107,7 +109,7 @@ EntityRegistryService::GetEntities(EntityCategory category) const
     return m_CategoryBuckets[(size_t)category];
 }
 
-void EntityRegistryService::Update(float /*dt*/)
+void EntityRegistryService::Update(float dt)
 {
     for (std::uint32_t index : m_PendingDestroy)
     {
@@ -128,26 +130,47 @@ void EntityRegistryService::Update(float /*dt*/)
 
         slot.alive = false;
         slot.generation++; // invalidate old IDs
-
-        m_FreeList.push_back(index);
     }
-
+    
+    // Remove destroyed entities
+    for(auto e : m_PendingDestroy)
+    {
+        RemoveComponent<TransformComponent>(e);
+        RemoveComponent<SpriteComponent2D>(e);
+        RemoveComponent<RelationshipComponent>(e);
+        RemoveComponent<ColliderComponent>(e);
+        RemoveComponent<RigidBodyComponent>(e);
+        RemoveComponent<AnimatorComponent>(e);
+        m_FreeList.push_back(e);
+    }
     m_PendingDestroy.clear();
+    
+    for (auto& ui : m_UIElements) {
+        ui->Update(dt);
+    }
 }
 
 void EntityRegistryService::Shutdown()
 {
-    m_Slots.clear();
-    m_FreeList.clear();
-    m_PendingDestroy.clear();
-    m_CategoryBuckets.clear();
-    
+    m_UIElements.clear();
     m_Transforms.clear();
     m_Sprites.clear();
     m_Relationships.clear();
     m_Colliders.clear();
     m_RigidBodies.clear();
     m_Animators.clear();
+    m_Slots.clear();
+    m_FreeList.clear();
+    m_PendingDestroy.clear();
+    m_CategoryBuckets.clear();
+}
+
+void EntityRegistryService::AddUIElement(std::unique_ptr<UIObject> element) {
+    m_UIElements.push_back(std::move(element));
+}
+
+const std::vector<std::unique_ptr<UIObject>>& EntityRegistryService::GetUIElements() const {
+    return m_UIElements;
 }
 
 std::vector<EntityID> EntityRegistryService::ViewTransformAndSprite() const

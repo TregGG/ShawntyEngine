@@ -7,7 +7,8 @@ enum class InputEventType
 {
     Key,
     MouseButton,
-    MouseMove
+    MouseMove,
+    Char
 };
 struct RawInputEvent
 {
@@ -17,6 +18,7 @@ struct RawInputEvent
 
     double mouseX;
     double mouseY;
+    unsigned int codepoint;
 };
 
 class System

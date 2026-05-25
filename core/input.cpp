@@ -1,5 +1,6 @@
 #include "input.h"
 #include <GLFW/glfw3.h>
+#include "../services/base/eventservice.h"
 
 Input::Input()
 {
@@ -19,7 +20,7 @@ void Input::BeginFrame()
     m_PrevMouseY = m_MouseY;
 }
 
-void Input::ProcessEvents(const std::vector<RawInputEvent>& events)
+void Input::ProcessEvents(const std::vector<RawInputEvent>& events, EventService* eventService)
 {
     for (const RawInputEvent& event : events)
     {
@@ -34,6 +35,11 @@ void Input::ProcessEvents(const std::vector<RawInputEvent>& events)
                     m_CurrentKeys[event.key] = true;
                 else if (event.action == GLFW_RELEASE)
                     m_CurrentKeys[event.key] = false;
+                
+                if (eventService) {
+                    KeyEvent ke(event.action == GLFW_PRESS ? EventType::KeyPressed : EventType::KeyReleased, event.key);
+                    eventService->Publish(ke);
+                }
                 break;
             }
 
@@ -46,6 +52,11 @@ void Input::ProcessEvents(const std::vector<RawInputEvent>& events)
                     m_CurrentMouseButtons[event.key] = true;
                 else if (event.action == GLFW_RELEASE)
                     m_CurrentMouseButtons[event.key] = false;
+
+                if (eventService) {
+                    MouseEvent me(event.action == GLFW_PRESS ? EventType::MousePressed : EventType::MouseReleased, event.key, m_MouseX, m_MouseY);
+                    eventService->Publish(me);
+                }
                 break;
             }
 
@@ -53,6 +64,20 @@ void Input::ProcessEvents(const std::vector<RawInputEvent>& events)
             {
                 m_MouseX = event.mouseX;
                 m_MouseY = event.mouseY;
+                
+                if (eventService) {
+                    MouseEvent me(EventType::MouseMoved, -1, m_MouseX, m_MouseY);
+                    eventService->Publish(me);
+                }
+                break;
+            }
+            
+            case InputEventType::Char:
+            {
+                if (eventService) {
+                    CharEvent ce(event.codepoint);
+                    eventService->Publish(ce);
+                }
                 break;
             }
         }

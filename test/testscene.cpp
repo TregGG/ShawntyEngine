@@ -85,6 +85,57 @@ void TestScene::OnEnter()
     
     m_GameObjects.push_back(std::move(trampObj));
 
+    // 4. Create UI
+    if (m_FontEngine) {
+        // UI Panel Background
+        auto panel = std::make_unique<UIPanel>(this, "MainPanel");
+        panel->Position = glm::vec2(50.0f, 50.0f);
+        panel->Size = glm::vec2(300.0f, 200.0f);
+        panel->BackgroundColor = glm::vec4(0.2f, 0.2f, 0.2f, 0.8f);
+
+        // UI Text
+        auto text = std::make_unique<UIText>(this, "TitleText", m_FontEngine);
+        text->Position = glm::vec2(20.0f, 20.0f);
+        text->Text = "Shawnty Engine UI";
+        text->TextColor = glm::vec3(1.0f, 0.8f, 0.0f); // Gold
+        panel->AddChild(std::move(text));
+
+        // UI Button
+        auto btn = std::make_unique<UIButton>(this, "TestButton", m_EventService);
+        btn->Position = glm::vec2(20.0f, 70.0f);
+        btn->Size = glm::vec2(150.0f, 40.0f);
+        
+        auto btnText = std::make_unique<UIText>(this, "BtnText", m_FontEngine);
+        btnText->Position = glm::vec2(0.0f, 0.0f);
+        btnText->Size = btn->Size; // Fill button size for centering
+        btnText->HorizontalAlign = TextAlignment::Center;
+        btnText->VerticalAlign = VerticalAlignment::Middle;
+        btnText->Text = "Click Me";
+        btnText->TextColor = glm::vec3(1.0f);
+        btn->AddChild(std::move(btnText));
+
+        // UI Input Field
+        auto inputF = std::make_unique<UIInputField>(this, "TestInput", m_EventService, m_FontEngine);
+        inputF->Position = glm::vec2(20.0f, 130.0f);
+        inputF->Size = glm::vec2(250.0f, 40.0f);
+        
+        UIText* rawInputText = inputF->GetTextElement();
+        rawInputText->Size = inputF->Size;
+        rawInputText->HorizontalAlign = TextAlignment::Left;
+        rawInputText->VerticalAlign = VerticalAlignment::Middle;
+        rawInputText->Position = glm::vec2(5.0f, 0.0f); // Slight left padding
+
+        // Capture input field in button callback
+        btn->OnClickCallback = [inputPtr = inputF.get()]() {
+            ENGINE_LOG("Button Clicked! Input Field Text: %s", inputPtr->GetTextElement()->Text.c_str());
+        };
+
+        panel->AddChild(std::move(btn));
+        panel->AddChild(std::move(inputF));
+
+        registry.AddUIElement(std::move(panel));
+    }
+
     // Set a reasonable view
     m_Camera.SetScale(2.0f);
     m_Camera.SetCameraPosition(0.0f, 0.0f);

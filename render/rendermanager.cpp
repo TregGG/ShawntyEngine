@@ -1,5 +1,6 @@
 #include "rendermanager.h"
 #include "spriterendererclass.h"
+#include "../objects/ui/uiobject.h"
 #include<glad/glad.h>
 #include "../levels/scene.h"
 #define ENGINE_CLASS "RenderManager"
@@ -30,6 +31,9 @@ void RenderManager::OnScreenChange(int width, int height)
 {
     if (!m_Camera || height == 0)
         return;
+
+    m_ViewportWidth = width;
+    m_ViewportHeight = height;
 
     float aspect = static_cast<float>(width) / static_cast<float>(height);
 
@@ -63,6 +67,8 @@ void RenderManager::Render()
 
     SubmitRenderables();
     SubmitDebugRenderables();
+    
+    RenderUI();
 }
 
 void RenderManager::CollectRenderables()
@@ -183,6 +189,19 @@ void RenderManager::SubmitDebugRenderables()
         m_SpriteRenderer.DrawDebugLine(entry.mvp, entry.color);
     }
 #endif
+}
+
+void RenderManager::RenderUI()
+{
+    if (!m_Scene || m_ViewportWidth == 0 || m_ViewportHeight == 0) return;
+    
+    // Top-left is 0,0, bottom-right is width,height
+    glm::mat4 projection = glm::ortho(0.0f, (float)m_ViewportWidth, (float)m_ViewportHeight, 0.0f, -1.0f, 1.0f);
+    
+    const auto& uiElements = m_Scene->registry.GetUIElements();
+    for (const auto& ui : uiElements) {
+        ui->Render(projection);
+    }
 }
 
 void RenderManager::EndFrame()

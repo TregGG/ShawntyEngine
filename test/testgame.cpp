@@ -98,8 +98,12 @@ bool TestGame::OnInit()
 		return false;
 	}
 
-    ENGINE_LOG("RenderManager initialized, creating TestScene");
-	m_TestScene = new TestScene(&m_AssetManager);
+    ENGINE_LOG("RenderManager initialized, creating FontEngine");
+    m_FontEngine.Init();
+    m_FontEngine.LoadFont("assets/comic.ttf", 24);
+
+    ENGINE_LOG("FontEngine initialized, creating TestScene");
+	m_TestScene = new TestScene(&m_AssetManager, m_EventService, &m_FontEngine);
 
 	m_SceneManager.SetInitialScene(m_TestScene);
 	m_RenderManager.BindScene(m_TestScene);
@@ -140,6 +144,7 @@ void TestGame::OnShutdown()
     }
 
 	m_AssetManager.Shutdown();
+    m_FontEngine.Shutdown();
     ENGINE_LOG("Shutdown");
 }
 

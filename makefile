@@ -49,7 +49,8 @@ OBJS := $(patsubst %,$(OBJ_DIR)/%,$(OBJS))
 # --------------------------------------------------
 
 BASE_FLAGS := -std=c++17 -Wall -Wextra -g \
-              -Icore -Ilevels -Iexternal/glad/include -Iexternal/glm
+              -Icore -Ilevels -Iexternal/glad/include -Iexternal/glm \
+              $(shell pkg-config --cflags freetype2)
 
 ifeq ($(BUILD),console)
 CXXFLAGS := $(BASE_FLAGS) -DENGINE_DEBUG -DENGINE_LOG_CONSOLE
@@ -61,7 +62,7 @@ else
 CXXFLAGS := $(BASE_FLAGS) -DENGINE_DEBUG -DENGINE_LOG_BOTH
 endif
 
-LDFLAGS := $(shell pkg-config --cflags --libs glfw3) -lGL
+LDFLAGS := $(shell pkg-config --cflags --libs glfw3 freetype2) -lGL
 
 # --------------------------------------------------
 # Default target

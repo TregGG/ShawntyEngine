@@ -109,15 +109,15 @@ void TestPlayer::Update(float deltaTime)
         }
 
         // Log input values occasionally for diagnostics
-        static int frameCounter = 0;
-        if (++frameCounter % 60 == 0) {
-            ENGINE_LOG("Diag Player - m_Input: %p | A: %d | D: %d | Space: %d | pushForce.x: %.2f", 
-                m_Input,
-                m_Input->IsKeyDown(GLFW_KEY_A),
-                m_Input->IsKeyDown(GLFW_KEY_D),
-                m_Input->IsKeyDown(GLFW_KEY_SPACE),
-                pushForce.x);
-        }
+        // static int frameCounter = 0;
+        // if (++frameCounter % 60 == 0) {
+        //     ENGINE_LOG("Diag Player - m_Input: %p | A: %d | D: %d | Space: %d | pushForce.x: %.2f", 
+        //         m_Input,
+        //         m_Input->IsKeyDown(GLFW_KEY_A),
+        //         m_Input->IsKeyDown(GLFW_KEY_D),
+        //         m_Input->IsKeyDown(GLFW_KEY_SPACE),
+        //         pushForce.x);
+        // }
     }
 
     // Apply input-driven movement to Player

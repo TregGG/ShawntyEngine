@@ -173,42 +173,64 @@ const std::vector<std::unique_ptr<UIObject>>& EntityRegistryService::GetUIElemen
     return m_UIElements;
 }
 
-std::vector<EntityID> EntityRegistryService::ViewTransformAndSprite() const
+void EntityRegistryService::RebuildViews() const
 {
-    std::vector<EntityID> result;
-    for (const auto& [entity, transform] : m_Transforms) {
-        if (m_Sprites.find(entity) != m_Sprites.end()) {
-            result.push_back(entity);
+    if (!m_ViewsDirty) return;
+
+    m_CachedTransformSprite.clear();
+    m_CachedPhysics.clear();
+    m_CachedAnimators.clear();
+    m_CachedRelationships.clear();
+
+    const auto& activeTransforms = m_Transforms.GetActiveList();
+    const auto& activeSprites = m_Sprites.GetActiveList();
+    const auto& activeColliders = m_Colliders.GetActiveList();
+    const auto& activeAnimators = m_Animators.GetActiveList();
+    const auto& activeRels = m_Relationships.GetActiveList();
+
+    for (size_t i = 0; i < m_Slots.size(); ++i) {
+        if (!m_Slots[i].alive) continue;
+        
+        EntityID e = MakeEntityID(i, m_Slots[i].generation);
+        bool hasTrans = i < activeTransforms.size() && activeTransforms[i];
+
+        if (hasTrans && i < activeSprites.size() && activeSprites[i]) {
+            m_CachedTransformSprite.push_back(e);
+        }
+        if (hasTrans && i < activeColliders.size() && activeColliders[i]) {
+            m_CachedPhysics.push_back(e);
+        }
+        if (i < activeAnimators.size() && activeAnimators[i]) {
+            m_CachedAnimators.push_back(e);
+        }
+        if (i < activeRels.size() && activeRels[i]) {
+            m_CachedRelationships.push_back(e);
         }
     }
-    return result;
+
+    m_ViewsDirty = false;
 }
 
-std::vector<EntityID> EntityRegistryService::ViewPhysicsObjects() const
+const std::vector<EntityID>& EntityRegistryService::ViewTransformAndSprite() const
 {
-    std::vector<EntityID> result;
-    for (const auto& [entity, collider] : m_Colliders) {
-        if (m_Transforms.find(entity) != m_Transforms.end()) {
-            result.push_back(entity);
-        }
-    }
-    return result;
+    RebuildViews();
+    return m_CachedTransformSprite;
 }
 
-std::vector<EntityID> EntityRegistryService::ViewAnimators() const
+const std::vector<EntityID>& EntityRegistryService::ViewPhysicsObjects() const
 {
-    std::vector<EntityID> result;
-    for (const auto& [entity, animator] : m_Animators) {
-        result.push_back(entity);
-    }
-    return result;
+    RebuildViews();
+    return m_CachedPhysics;
 }
 
-std::vector<EntityID> EntityRegistryService::ViewRelationships() const
+const std::vector<EntityID>& EntityRegistryService::ViewAnimators() const
 {
-    std::vector<EntityID> result;
-    for (const auto& [entity, rel] : m_Relationships) {
-        result.push_back(entity);
-    }
-    return result;
+    RebuildViews();
+    return m_CachedAnimators;
+}
+
+const std::vector<EntityID>& EntityRegistryService::ViewRelationships() const
+{
+    RebuildViews();
+    return m_CachedRelationships;
 }

@@ -40,8 +40,9 @@ public:
     AABB GetBounds(const TransformComponent& transform) const {
         AABB bounds = {0.0f, 0.0f, 0.0f, 0.0f};
         
-        float worldX = transform.position.x;
-        float worldY = transform.position.y;
+        glm::vec2 worldPos = transform.GetWorldPosition();
+        float worldX = worldPos.x;
+        float worldY = worldPos.y;
         float worldW = transform.size.x;
         float worldH = transform.size.y;
 

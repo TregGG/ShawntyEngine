@@ -98,9 +98,9 @@ void RenderManager::CollectRenderables()
 
         // Note: For parents and children, the absolute world position should be computed.
         // For now, we assume transform.position is absolute world position, which should be
-        // updated by the physics or transform system.
-        glm::mat4 model = glm::translate(glm::mat4(1.0f),
-                                         glm::vec3(transform.position, 0.0f));
+        // scaled appropriately (this might need to be multiplied by PPT later).
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), 
+                                         glm::vec3(transform.GetWorldPosition(), 0.0f));
 
         model = glm::rotate(model,
                             transform.rotation,

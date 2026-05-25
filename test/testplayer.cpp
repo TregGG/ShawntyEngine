@@ -71,6 +71,9 @@ TestPlayer::TestPlayer(Scene* scene, const std::string& name, const SpriteSheetA
     RelationshipComponent rel;
     rel.parent = pID;
     scene->registry.AddComponent<RelationshipComponent>(m_WeaponID, rel);
+    
+    scene->registry.GetComponent<TransformComponent>(m_WeaponID).parentTransform = 
+        &scene->registry.GetComponent<TransformComponent>(pID);
 
     // Update Player relationship
     RelationshipComponent pRel;

@@ -17,7 +17,6 @@ protected:
 public:
     virtual ~GameObject() = default;
     
-    // Will be defined in a cpp or after Scene is fully declared
     GameObject(Scene* scene, const std::string& name);
 
     EntityID GetID() const { return m_ID; }

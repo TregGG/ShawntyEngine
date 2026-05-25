@@ -196,16 +196,7 @@ void TestScene::Update(float deltatime)
     }
     
     // Transform Hierarchy Update (rudimentary transform system)
-    for (EntityID e : registry.ViewRelationships()) {
-        const auto& rel = registry.GetComponent<RelationshipComponent>(e);
-        if (rel.parent != 0) {
-            if (registry.HasComponent<TransformComponent>(rel.parent) && registry.HasComponent<TransformComponent>(e)) {
-                auto& parentTrans = registry.GetComponent<TransformComponent>(rel.parent);
-                auto& childTrans = registry.GetComponent<TransformComponent>(e);
-                childTrans.position = parentTrans.position + childTrans.localPosition;
-            }
-        }
-    }
+    // Manual transform update loop removed! The engine computes this automatically on the fly via GetWorldPosition()
     // SHAPE CAST DEMONSTRATION
     m_TestLines.clear();
     m_TestRects.clear();

@@ -46,8 +46,20 @@ struct ServerCommandPacket {
     char command[128]; // e.g. "load_scene levels/level1"
 };
 
-// The ServerUpdate and StateSync packets will just send a PacketHeader,
-// followed immediately by a uint32_t count, and then an array of EntityTransformData structs.
+// The ServerUpdate packets send a PacketHeader, count, and array of EntityVelocityData structs.
+struct EntityVelocityData {
+    uint32_t entityID;
+    float vx;
+    float vy;
+};
+
+// The StateSync packets send a PacketHeader, count, and array of EntityPositionData structs.
+struct EntityPositionData {
+    uint32_t entityID;
+    float x;
+    float y;
+};
+
 struct EntityTransformData {
     uint32_t entityID;
     float x, y, z;

@@ -51,9 +51,28 @@ private:
     
     std::map<ENetPeer*, EntityID> m_PeerToEntity; // For server: Peer -> Player Entity
     std::map<uint32_t, EntityID> m_ServerToLocalEntity; // For client: ServerEntityID -> Local Dummy Entity
-    std::map<EntityID, glm::vec2> m_TargetPositions; // For client: EntityID -> Target Position for interpolation
     uint32_t m_MyServerPlayerID = 0;
     EntityID m_MyLocalPlayerID = 0;
+    
+    struct ClientState {
+        glm::vec2 position;
+        glm::vec2 velocity;
+    };
+    
+    float m_TimeAccumulator = 0.0f;
+    uint32_t m_ServerTick = 0;
+    uint32_t m_ClientTick = 0;
+    uint32_t m_LatencyOffsetTicks = 5;
+    std::map<ENetPeer*, std::map<uint32_t, uint16_t>> m_BufferedPeerInputs; // peer -> (tick -> inputMask)
+    std::map<ENetPeer*, uint16_t> m_LastExecutedInputs; // peer -> last inputMask
+    
+    std::map<uint32_t, ClientState> m_ClientStateHistory;
+    std::map<uint32_t, uint16_t> m_ClientInputHistory;
+    bool m_SpaceWasPressed = false;
+    
+    void ApplyInput(EntityID entID, uint16_t inputMask);
+    glm::vec2 ProjectPlayerState(EntityID entID, ENetPeer* peer, uint32_t startTick, int numTicks);
+    void SimulateServerTick();
     
     std::vector<DebugLine> m_TestLines;
     std::vector<DebugRect> m_TestRects;

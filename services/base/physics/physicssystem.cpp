@@ -168,7 +168,6 @@ void PhysicsSystem::Update(float dt) {
     for (const auto& ev : m_Collisions) {
         auto& colA = m_Registry->GetComponent<ColliderComponent>(ev.a);
         auto& colB = m_Registry->GetComponent<ColliderComponent>(ev.b);
-        
         if (colA.IsTrigger() || colB.IsTrigger()) continue;
         
         bool hasRbA = m_Registry->HasComponent<RigidBodyComponent>(ev.a);
@@ -177,22 +176,25 @@ void PhysicsSystem::Update(float dt) {
         RigidBodyComponent* rbA = hasRbA ? &m_Registry->GetComponent<RigidBodyComponent>(ev.a) : nullptr;
         RigidBodyComponent* rbB = hasRbB ? &m_Registry->GetComponent<RigidBodyComponent>(ev.b) : nullptr;
         
+        bool aDisplaceable = rbA && (rbA->GetType() == BodyType::Dynamic || rbA->GetType() == BodyType::Kinematic);
+        bool bDisplaceable = rbB && (rbB->GetType() == BodyType::Dynamic || rbB->GetType() == BodyType::Kinematic);
+        
         bool aMovable = rbA && rbA->GetType() == BodyType::Dynamic;
         bool bMovable = rbB && rbB->GetType() == BodyType::Dynamic;
         
-        if (!aMovable && !bMovable) continue;
+        if (!aDisplaceable && !bDisplaceable) continue;
         
         auto& transA = m_Registry->GetComponent<TransformComponent>(ev.a);
         auto& transB = m_Registry->GetComponent<TransformComponent>(ev.b);
 
         // Positional Displacement
-        if (aMovable && !bMovable) {
+        if (aDisplaceable && !bDisplaceable) {
             transA.position += ev.normal * ev.depth;
-        } else if (!aMovable && bMovable) { 
+        } else if (!aDisplaceable && bDisplaceable) { 
             // Note: normal explicitly points A outward, so we invert testing -normal for B!
             transB.position -= ev.normal * ev.depth;
         } else {
-            // Both dynamic: divide depth natively avoiding clipping limits
+            // Both displaceable: divide depth natively avoiding clipping limits
             transA.position += ev.normal * (ev.depth * 0.5f);
             transB.position -= ev.normal * (ev.depth * 0.5f);
         }

@@ -65,6 +65,7 @@ public:
 
     void AddUIElement(std::unique_ptr<UIObject> element);
     const std::vector<std::unique_ptr<UIObject>>& GetUIElements() const;
+    void ClearUIElements() { m_UIElements.clear(); }
 
     // Create entity with category
     EntityID Create(EntityCategory category, std::string_view name, std::string_view registeredBy);

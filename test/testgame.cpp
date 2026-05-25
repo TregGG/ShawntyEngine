@@ -4,8 +4,9 @@
 #include "../core/engine.h"
 #include "../core/input.h"
 #include "../assets/assetmanager.h"
-#define ENGINE_CLASS "TestGame"
 #include "../core/enginedebug.h"
+#include "../services/networkservice.h"
+#include "../services/networkcontrol.h"
 
 #include <string>
 #include <filesystem>
@@ -85,28 +86,36 @@ bool TestGame::OnInit()
 	}
 
     ENGINE_LOG("Assets written, initializing AssetManager");
-	if (!m_AssetManager.Initialize(compiledRoot))
+    bool isServer = (m_NetService && m_NetService->GetMode() == NetworkMode::Server);
+	if (!m_AssetManager.Initialize(compiledRoot, isServer))
 	{
         ENGINE_ERROR("AssetManager failed to initialize");
 		return false;
 	}
 
-    ENGINE_LOG("AssetManager initialized, initializing RenderManager");
-	if (!m_RenderManager.Initialize())
-	{
-        ENGINE_ERROR("RenderManager failed to initialize");
-		return false;
-	}
+    if (!isServer) {
+        ENGINE_LOG("AssetManager initialized, initializing RenderManager");
+        if (!m_RenderManager.Initialize())
+        {
+            ENGINE_ERROR("RenderManager failed to initialize");
+            return false;
+        }
 
-    ENGINE_LOG("RenderManager initialized, creating FontEngine");
-    m_FontEngine.Init();
-    m_FontEngine.LoadFont("assets/comic.ttf", 24);
+        ENGINE_LOG("RenderManager initialized, creating FontEngine");
+        m_FontEngine.Init();
+        m_FontEngine.LoadFont("assets/comic.ttf", 24);
+    } else {
+        ENGINE_LOG("Server mode: skipping RenderManager and FontEngine initialization");
+    }
 
     ENGINE_LOG("FontEngine initialized, creating TestScene");
-	m_TestScene = new TestScene(&m_AssetManager, m_EventService, &m_FontEngine);
+	m_TestScene = new TestScene(&m_AssetManager, m_EventService, &m_FontEngine, m_NetService);
 
 	m_SceneManager.SetInitialScene(m_TestScene);
-	m_RenderManager.BindScene(m_TestScene);
+    
+    if (!isServer) {
+	    m_RenderManager.BindScene(m_TestScene);
+    }
 
     ENGINE_LOG("OnInit completed");
 	return true;
@@ -119,6 +128,23 @@ void TestGame::OnInput(const Input& input)
 	{
 		m_TestScene->SetInput(input);
 	}
+    
+    // Networking tests
+    if (m_NetService && m_NetControl) {
+        if (input.IsKeyPressed(GLFW_KEY_C)) {
+            if (m_NetService->GetMode() == NetworkMode::Offline) {
+                m_NetService->Connect("127.0.0.1", 7777);
+            }
+        }
+        if (input.IsKeyPressed(GLFW_KEY_H)) {
+            if (m_NetService->GetMode() == NetworkMode::Offline) {
+                m_NetService->Host(7777);
+            }
+        }
+        if (input.IsKeyPressed(GLFW_KEY_M)) {
+            m_NetControl->ProcessCommandString("/kick player");
+        }
+    }
 }
 
 void TestGame::OnUpdate(float deltaTime)
@@ -135,7 +161,11 @@ void TestGame::OnRender()
 
 void TestGame::OnShutdown()
 {   
-    m_RenderManager.Shutdown();
+    bool isServer = (m_NetService && m_NetService->GetMode() == NetworkMode::Server);
+    
+    if (!isServer) {
+        m_RenderManager.Shutdown();
+    }
     m_SceneManager.Shutdown();
     if (m_TestScene)
     {
@@ -144,7 +174,10 @@ void TestGame::OnShutdown()
     }
 
 	m_AssetManager.Shutdown();
-    m_FontEngine.Shutdown();
+    
+    if (!isServer) {
+        m_FontEngine.Shutdown();
+    }
     ENGINE_LOG("Shutdown");
 }
 

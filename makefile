@@ -34,6 +34,7 @@ rwildcard=$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(su
 
 SRCS := main.cpp \
         external/glad/src/glad.c \
+        $(wildcard external/enet/*.c) \
         $(call rwildcard,core levels render assets objects test services,*.cpp)
 
 # --------------------------------------------------
@@ -49,7 +50,7 @@ OBJS := $(patsubst %,$(OBJ_DIR)/%,$(OBJS))
 # --------------------------------------------------
 
 BASE_FLAGS := -std=c++17 -Wall -Wextra -g \
-              -Icore -Ilevels -Iexternal/glad/include -Iexternal/glm \
+              -Icore -Ilevels -Iexternal/glad/include -Iexternal/glm -Iexternal/enet/include \
               $(shell pkg-config --cflags freetype2)
 
 ifeq ($(BUILD),console)

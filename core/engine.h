@@ -7,6 +7,8 @@ class Timer;
 class Input;
 class OpenGLClass;
 class EventService;
+class NetworkService;
+class NetworkControl;
 
 class Engine
 {
@@ -14,7 +16,7 @@ public:
     Engine();
     ~Engine();
 
-    bool Initialize(Game* game);
+    bool Initialize(Game* game, bool isServer = false);
     void Run();
     void Shutdown();
 
@@ -29,6 +31,9 @@ private:
     Timer* m_Timer;
     Input* m_Input;
     EventService* m_EventService;
+    NetworkService* m_NetworkService = nullptr;
+    NetworkControl* m_NetworkControl = nullptr;
+    bool m_IsServer = false;
     //Not owned by engine
     Game* m_Game;
     OpenGLClass* m_OpenGL=nullptr;

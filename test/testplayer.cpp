@@ -58,11 +58,8 @@ TestPlayer::TestPlayer(Scene* scene, const std::string& name, const SpriteSheetA
     
     // Set custom trigger callback to log details when hitting anything
     wc.SetOnTriggerEnter([scene](EntityID self, EntityID other) {
-        std::string_view selfName = scene->registry.GetName(self);
-        std::string_view otherName = scene->registry.GetName(other);
-        ENGINE_LOG("Trigger Encounter - Self: '%s' (%lu) collided with Target: '%s' (%lu)",
-            std::string(selfName).c_str(), self,
-            std::string(otherName).c_str(), other);
+        // Disabled trigger logging to reduce spam
+        (void)self; (void)other;
     });
     
     scene->registry.AddComponent<ColliderComponent>(m_WeaponID, wc);

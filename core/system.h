@@ -27,7 +27,7 @@ public:
     System();
     ~System();
 
-    bool Initialize(int width,int height,const char* title);
+    bool Initialize(int width,int height,const char* title, bool headless = false);
 
     void PollEvents();
 

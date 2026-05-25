@@ -45,8 +45,9 @@ static bool LoadTGA(const std::string& filepath,
 // ------------------------------------------------------------
 // AssetManager lifecycle
 // ------------------------------------------------------------
-bool AssetManager::Initialize(const std::string& compiledAssetRoot)
+bool AssetManager::Initialize(const std::string& compiledAssetRoot, bool headless)
 {
+    m_Headless = headless;
     fs::path root(compiledAssetRoot);
 
     // ---------- 1. Load Textures (.tga → GPU) ----------
@@ -142,28 +143,32 @@ bool AssetManager::LoadTexture(const AssetID& id,
     TextureGPU gpuTex;
     gpuTex.width  = width;
     gpuTex.height = height;
+    
+    if (!m_Headless) {
+        glGenTextures(1, &gpuTex.handle);
+        glBindTexture(GL_TEXTURE_2D, gpuTex.handle);
 
-    glGenTextures(1, &gpuTex.handle);
-    glBindTexture(GL_TEXTURE_2D, gpuTex.handle);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
 
-    GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
+        glTexImage2D(GL_TEXTURE_2D,
+                     0,
+                     format,
+                     width,
+                     height,
+                     0,
+                     format,
+                     GL_UNSIGNED_BYTE,
+                     pixels.data());
 
-    glTexImage2D(GL_TEXTURE_2D,
-                 0,
-                 format,
-                 width,
-                 height,
-                 0,
-                 format,
-                 GL_UNSIGNED_BYTE,
-                 pixels.data());
-
-    glBindTexture(GL_TEXTURE_2D, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    } else {
+        gpuTex.handle = 0; // Dummy handle
+    }
 
     m_textures[id] = gpuTex;
     return true;

@@ -105,8 +105,16 @@ public:
 
     std::vector<EntityID>& Retrieve(std::vector<EntityID>& returnObjects, EntityID colliderEntity, EntityRegistryService* reg) {
         int index = GetIndex(colliderEntity, reg);
-        if (index != -1 && !isLeaf) {
-            children[index]->Retrieve(returnObjects, colliderEntity, reg);
+        if (!isLeaf) {
+            if (index != -1) {
+                children[index]->Retrieve(returnObjects, colliderEntity, reg);
+            } else {
+                for (int i = 0; i < 4; ++i) {
+                    if (children[i]) {
+                        children[i]->Retrieve(returnObjects, colliderEntity, reg);
+                    }
+                }
+            }
         }
         returnObjects.insert(returnObjects.end(), colliders.begin(), colliders.end());
         return returnObjects;

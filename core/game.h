@@ -12,6 +12,8 @@ class Scene;
 #include "../render/fontengine.h"
 
 class EventService;
+class NetworkService;
+class NetworkControl;
 
 class Game
 {
@@ -28,6 +30,7 @@ public:
     void OnResize(int width, int height) {m_RenderManager.OnScreenChange(width, height);}
     void SetScene(Scene* scene) {m_SceneManager.SetActiveScene(scene);m_RenderManager.BindScene(scene);}
     void SetEventService(EventService* es) { m_EventService = es; }
+    void SetNetworkServices(NetworkService* ns, NetworkControl* nc) { m_NetService = ns; m_NetControl = nc; }
 
 protected:
     SceneManager m_SceneManager;
@@ -35,6 +38,8 @@ protected:
     AssetManager m_AssetManager;
     FontEngine m_FontEngine;
     EventService* m_EventService = nullptr;
+    NetworkService* m_NetService = nullptr;
+    NetworkControl* m_NetControl = nullptr;
 };
 
 

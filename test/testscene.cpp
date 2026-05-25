@@ -11,7 +11,9 @@
 #include "../objects/components/collidercomponent.h"
 #include "../objects/components/rigidbodycomponent.h"
 #include "../services/base/raycast.h"
+#include "../services/networkservice.h"
 #include <GLFW/glfw3.h>
+#include <algorithm>
 #include "testplayer.h"
 
 void TestScene::OnEnter()
@@ -29,9 +31,7 @@ void TestScene::OnEnter()
     const SpriteSheetAsset* sheet = m_Assets->GetSpriteSheet("testobj");
     const AnimationSetAsset* animSet = m_Assets->GetAnimationSet("testobj");
 
-    // 1. Create Player (internally constructs the Player & Weapon hierarchy)
-    auto playerObj = std::make_unique<TestPlayer>(this, "Player", sheet);
-    m_GameObjects.push_back(std::move(playerObj));
+    // 1. Player spawning removed until connected.
 
     // 2. Create Ground
     auto groundObj = std::make_unique<GameObject>(this, "Ground");
@@ -86,54 +86,109 @@ void TestScene::OnEnter()
     m_GameObjects.push_back(std::move(trampObj));
 
     // 4. Create UI
-    if (m_FontEngine) {
+    bool isServer = (m_NetService && m_NetService->GetMode() == NetworkMode::Server);
+    if (m_FontEngine && !isServer) {
         // UI Panel Background
         auto panel = std::make_unique<UIPanel>(this, "MainPanel");
         panel->Position = glm::vec2(50.0f, 50.0f);
-        panel->Size = glm::vec2(300.0f, 200.0f);
+        panel->Size = glm::vec2(300.0f, 250.0f);
         panel->BackgroundColor = glm::vec4(0.2f, 0.2f, 0.2f, 0.8f);
 
         // UI Text
         auto text = std::make_unique<UIText>(this, "TitleText", m_FontEngine);
-        text->Position = glm::vec2(20.0f, 20.0f);
-        text->Text = "Shawnty Engine UI";
+        text->Position = glm::vec2(20.0f, 10.0f);
+        text->Text = "Multiplayer Test";
         text->TextColor = glm::vec3(1.0f, 0.8f, 0.0f); // Gold
         panel->AddChild(std::move(text));
 
-        // UI Button
-        auto btn = std::make_unique<UIButton>(this, "TestButton", m_EventService);
-        btn->Position = glm::vec2(20.0f, 70.0f);
-        btn->Size = glm::vec2(150.0f, 40.0f);
-        
-        auto btnText = std::make_unique<UIText>(this, "BtnText", m_FontEngine);
-        btnText->Position = glm::vec2(0.0f, 0.0f);
-        btnText->Size = btn->Size; // Fill button size for centering
-        btnText->HorizontalAlign = TextAlignment::Center;
-        btnText->VerticalAlign = VerticalAlignment::Middle;
-        btnText->Text = "Click Me";
-        btnText->TextColor = glm::vec3(1.0f);
-        btn->AddChild(std::move(btnText));
-
-        // UI Input Field
-        auto inputF = std::make_unique<UIInputField>(this, "TestInput", m_EventService, m_FontEngine);
-        inputF->Position = glm::vec2(20.0f, 130.0f);
+        // IP Input Field
+        auto inputF = std::make_unique<UIInputField>(this, "IPInput", m_EventService, m_FontEngine);
+        inputF->Position = glm::vec2(20.0f, 60.0f);
         inputF->Size = glm::vec2(250.0f, 40.0f);
         
         UIText* rawInputText = inputF->GetTextElement();
         rawInputText->Size = inputF->Size;
         rawInputText->HorizontalAlign = TextAlignment::Left;
         rawInputText->VerticalAlign = VerticalAlignment::Middle;
-        rawInputText->Position = glm::vec2(5.0f, 0.0f); // Slight left padding
+        rawInputText->Position = glm::vec2(5.0f, 0.0f);
+        rawInputText->Text = "127.0.0.1"; // Default IP
 
-        // Capture input field in button callback
-        btn->OnClickCallback = [inputPtr = inputF.get()]() {
-            ENGINE_LOG("Button Clicked! Input Field Text: %s", inputPtr->GetTextElement()->Text.c_str());
+        // Host Button
+        auto hostBtn = std::make_unique<UIButton>(this, "HostButton", m_EventService);
+        hostBtn->Position = glm::vec2(20.0f, 120.0f);
+        hostBtn->Size = glm::vec2(120.0f, 40.0f);
+        
+        auto hostText = std::make_unique<UIText>(this, "HostBtnText", m_FontEngine);
+        hostText->Position = glm::vec2(0.0f, 0.0f);
+        hostText->Size = hostBtn->Size;
+        hostText->HorizontalAlign = TextAlignment::Center;
+        hostText->VerticalAlign = VerticalAlignment::Middle;
+        hostText->Text = "Host";
+        hostText->TextColor = glm::vec3(1.0f);
+        hostBtn->AddChild(std::move(hostText));
+
+        // Join Button
+        auto joinBtn = std::make_unique<UIButton>(this, "JoinButton", m_EventService);
+        joinBtn->Position = glm::vec2(150.0f, 120.0f);
+        joinBtn->Size = glm::vec2(120.0f, 40.0f);
+        
+        auto joinText = std::make_unique<UIText>(this, "JoinBtnText", m_FontEngine);
+        joinText->Position = glm::vec2(0.0f, 0.0f);
+        joinText->Size = joinBtn->Size;
+        joinText->HorizontalAlign = TextAlignment::Center;
+        joinText->VerticalAlign = VerticalAlignment::Middle;
+        joinText->Text = "Join";
+        joinText->TextColor = glm::vec3(1.0f);
+        joinBtn->AddChild(std::move(joinText));
+
+        // Status Text
+        auto statusTxt = std::make_unique<UIText>(this, "StatusText", m_FontEngine);
+        statusTxt->Position = glm::vec2(20.0f, 180.0f);
+        statusTxt->Text = "Offline";
+        statusTxt->TextColor = glm::vec3(0.5f, 0.5f, 0.5f);
+        m_StatusText = statusTxt.get();
+        panel->AddChild(std::move(statusTxt));
+
+        // Callbacks
+        hostBtn->OnClickCallback = [this]() {
+            if (m_NetService) {
+                ENGINE_LOG("Host button clicked. Launching dedicated server...");
+#ifdef _WIN32
+                std::system("start bin\\framework.exe --server");
+#elif defined(__APPLE__)
+                std::system("open -n ./bin/framework --args --server");
+#else
+                std::system("./bin/framework --server &");
+#endif
+                m_NetService->Connect("127.0.0.1", 7777);
+                if (m_StatusText) m_StatusText->Text = "Connecting...";
+            }
         };
 
-        panel->AddChild(std::move(btn));
+        joinBtn->OnClickCallback = [this, inputPtr = inputF.get()]() {
+            if (m_NetService) {
+                std::string ip = inputPtr->GetTextElement()->Text;
+                if (ip.empty()) ip = "127.0.0.1";
+                ENGINE_LOG("Join button clicked. Connecting to %s:7777", ip.c_str());
+                m_NetService->Connect(ip, 7777);
+                if (m_StatusText) m_StatusText->Text = "Connecting...";
+            }
+        };
+
         panel->AddChild(std::move(inputF));
+        panel->AddChild(std::move(hostBtn));
+        panel->AddChild(std::move(joinBtn));
 
         registry.AddUIElement(std::move(panel));
+    }
+    
+    if (m_NetService) {
+        m_NetService->SetPacketCallback([this](ENetPeer* peer, void* data, size_t size) {
+            this->OnNetworkPacket(peer, data, size);
+        });
+        m_NetService->OnClientDisconnected = [this](ENetPeer* peer) {
+            this->OnClientDisconnected(peer);
+        };
     }
 
     // Set a reasonable view
@@ -171,10 +226,80 @@ void TestScene::Update(float deltatime)
     }
 
     // Pass input to player and update it
-    if (!m_GameObjects.empty()) {
-        if (auto* player = dynamic_cast<TestPlayer*>(m_GameObjects[0].get())) {
-            player->PassInput(m_Input);
-            player->Update(deltatime);
+    if (!m_NetService || m_NetService->GetMode() != NetworkMode::Client) {
+        if (!m_GameObjects.empty()) {
+            if (auto* player = dynamic_cast<TestPlayer*>(m_GameObjects[0].get())) {
+                player->PassInput(m_Input);
+                player->Update(deltatime);
+            }
+        }
+    }
+    
+    // Networking Updates
+    if (m_NetService) {
+        if (m_NetService->GetMode() == NetworkMode::Client) {
+            if (m_StatusText && m_NetService->IsConnected()) {
+                m_StatusText->Text = "Connected!";
+                m_StatusText->TextColor = glm::vec3(0.0f, 1.0f, 0.0f);
+            } else if (m_StatusText && !m_NetService->IsConnected()) {
+                m_StatusText->Text = "Connecting...";
+                m_StatusText->TextColor = glm::vec3(1.0f, 1.0f, 0.0f);
+            }
+            
+            if (m_NetService->IsConnected() && !m_UIHidden) {
+                registry.ClearUIElements();
+                m_StatusText = nullptr;
+                m_UIHidden = true;
+            }
+            
+            // Interpolate remote player proxies towards their target server positions
+            for (auto const& [localID, targetPos] : m_TargetPositions) {
+                if (registry.HasComponent<TransformComponent>(localID)) {
+                    auto& trans = registry.GetComponent<TransformComponent>(localID);
+                    trans.position = glm::mix(trans.position, targetPos, std::min(15.0f * deltatime, 1.0f));
+                }
+            }
+            
+            if (m_Input && m_NetService->IsConnected()) {
+                ClientInputPacket inputPacket;
+                inputPacket.header.type = PacketType::ClientInput;
+                inputPacket.header.tick = 0;
+                inputPacket.inputMask = 0;
+                if (m_Input->IsKeyDown(GLFW_KEY_W) || m_Input->IsKeyDown(GLFW_KEY_UP)) inputPacket.inputMask |= 1;
+                if (m_Input->IsKeyDown(GLFW_KEY_S) || m_Input->IsKeyDown(GLFW_KEY_DOWN)) inputPacket.inputMask |= 2;
+                if (m_Input->IsKeyDown(GLFW_KEY_A) || m_Input->IsKeyDown(GLFW_KEY_LEFT)) inputPacket.inputMask |= 4;
+                if (m_Input->IsKeyDown(GLFW_KEY_D) || m_Input->IsKeyDown(GLFW_KEY_RIGHT)) inputPacket.inputMask |= 8;
+                
+                m_NetService->SendPacket(m_NetService->GetServerPeer(), 0, &inputPacket, sizeof(inputPacket), 0);
+            }
+        } else if (m_NetService->GetMode() == NetworkMode::Server) {
+            std::vector<char> buffer(sizeof(PacketHeader) + sizeof(uint32_t) + m_PeerToEntity.size() * sizeof(EntityTransformData));
+            
+            PacketHeader* header = reinterpret_cast<PacketHeader*>(buffer.data());
+            header->type = PacketType::ServerUpdate;
+            header->tick = 0;
+            
+            uint32_t* count = reinterpret_cast<uint32_t*>(buffer.data() + sizeof(PacketHeader));
+            *count = m_PeerToEntity.size();
+            
+            EntityTransformData* transforms = reinterpret_cast<EntityTransformData*>(buffer.data() + sizeof(PacketHeader) + sizeof(uint32_t));
+            
+            int i = 0;
+            for (auto const& [peer, entID] : m_PeerToEntity) {
+                transforms[i].entityID = entID;
+                if (registry.HasComponent<TransformComponent>(entID)) {
+                    auto& t = registry.GetComponent<TransformComponent>(entID);
+                    transforms[i].x = t.position.x;
+                    transforms[i].y = t.position.y;
+                } else {
+                    transforms[i].x = 0; transforms[i].y = 0;
+                }
+                i++;
+            }
+            
+            if (m_PeerToEntity.size() > 0) {
+                m_NetService->BroadcastPacket(0, buffer.data(), buffer.size(), 0);
+            }
         }
     }
 
@@ -266,4 +391,168 @@ void TestScene::BuildDebugLines(std::vector<DebugLine>& outDebugLines) const
 #ifdef ENGINE_DEBUG
     outDebugLines = m_TestLines;
 #endif
+}
+
+void TestScene::OnNetworkPacket(ENetPeer* peer, void* data, size_t size) {
+    if (!m_NetService || size < sizeof(PacketHeader)) return;
+    PacketHeader* header = reinterpret_cast<PacketHeader*>(data);
+
+    if (m_NetService->GetMode() == NetworkMode::Server) {
+        if (header->type == PacketType::ClientInput && size >= sizeof(ClientInputPacket)) {
+            if (m_PeerToEntity.find(peer) == m_PeerToEntity.end()) {
+                // Spawn new player for peer
+                auto playerObj = std::make_unique<TestPlayer>(this, "RemotePlayer", m_Assets->GetSpriteSheet("testobj"));
+                EntityID pID = playerObj->GetID();
+                // move player up slightly so they don't clip floor immediately
+                registry.GetComponent<TransformComponent>(pID).position = glm::vec2(0.0f, 2.0f);
+                m_GameObjects.push_back(std::move(playerObj));
+                m_PeerToEntity[peer] = pID;
+                ENGINE_LOG("Server spawned new player for peer!");
+
+                // Send connection welcome packet back to peer with their unique Player Entity ID
+                ConnectPacket welcomePacket;
+                welcomePacket.header.type = PacketType::Connect;
+                welcomePacket.header.tick = 0;
+                welcomePacket.clientEntityID = pID;
+                m_NetService->SendPacket(peer, 0, &welcomePacket, sizeof(welcomePacket), ENET_PACKET_FLAG_RELIABLE);
+            }
+            EntityID id = m_PeerToEntity[peer];
+            ClientInputPacket* input = reinterpret_cast<ClientInputPacket*>(data);
+            
+            if (registry.HasComponent<RigidBodyComponent>(id)) {
+                auto& rb = registry.GetComponent<RigidBodyComponent>(id);
+                glm::vec2 vel(0.0f);
+                if (input->inputMask & 1) vel.y += 1.0f; // W
+                if (input->inputMask & 2) vel.y -= 1.0f; // S
+                if (input->inputMask & 4) vel.x -= 1.0f; // A
+                if (input->inputMask & 8) vel.x += 1.0f; // D
+                vel *= m_MoveSpeed;
+                
+                glm::vec2 currentVel = rb.GetVelocity();
+                rb.SetVelocity(glm::vec2(vel.x, currentVel.y)); // Keep gravity for Y
+                if (input->inputMask & 1) { // If jump (W)
+                     rb.AddForce(glm::vec2(0.0f, 10.0f)); // Simple jump impulse for fun
+                }
+            }
+        }
+    } else if (m_NetService->GetMode() == NetworkMode::Client) {
+        if (header->type == PacketType::Connect && size >= sizeof(ConnectPacket)) {
+            ConnectPacket* connPacket = reinterpret_cast<ConnectPacket*>(data);
+            uint32_t myEntityID = connPacket->clientEntityID;
+            ENGINE_LOG("[Client] Received connection confirmation! My Player Entity ID is: %u", myEntityID);
+        } else if (header->type == PacketType::ServerUpdate) {
+            size_t countOffset = sizeof(PacketHeader);
+            if (size < countOffset + sizeof(uint32_t)) return;
+            uint32_t count = *reinterpret_cast<uint32_t*>(static_cast<char*>(data) + countOffset);
+            
+            size_t dataOffset = countOffset + sizeof(uint32_t);
+            if (size < dataOffset + count * sizeof(EntityTransformData)) return;
+            EntityTransformData* transforms = reinterpret_cast<EntityTransformData*>(static_cast<char*>(data) + dataOffset);
+            
+            // Track all active server entity IDs in this update
+            std::vector<uint32_t> activeServerIDs;
+            activeServerIDs.reserve(count);
+            
+            for (uint32_t i = 0; i < count; ++i) {
+                uint32_t sID = transforms[i].entityID;
+                activeServerIDs.push_back(sID);
+                
+                if (m_ServerToLocalEntity.find(sID) == m_ServerToLocalEntity.end()) {
+                    // Spawn remote player proxy
+                    auto playerObj = std::make_unique<TestPlayer>(this, "ProxyPlayer", m_Assets->GetSpriteSheet("testobj"));
+                    // Strip its rigidbody so it doesn't simulate physics locally (server dictates position)
+                    if (registry.HasComponent<RigidBodyComponent>(playerObj->GetID())) {
+                        registry.RemoveComponent<RigidBodyComponent>(playerObj->GetID());
+                    }
+                    EntityID lID = playerObj->GetID();
+                    m_GameObjects.push_back(std::move(playerObj));
+                    m_ServerToLocalEntity[sID] = lID;
+                    
+                    // Snap position immediately on first receipt to avoid visual sliding from default position
+                    if (registry.HasComponent<TransformComponent>(lID)) {
+                        auto& trans = registry.GetComponent<TransformComponent>(lID);
+                        trans.position = glm::vec2(transforms[i].x, transforms[i].y);
+                    }
+                }
+                EntityID localID = m_ServerToLocalEntity[sID];
+                m_TargetPositions[localID] = glm::vec2(transforms[i].x, transforms[i].y);
+            }
+            
+            // Clean up players that have disconnected (no longer in server updates)
+            std::vector<uint32_t> toRemove;
+            for (auto const& [sID, lID] : m_ServerToLocalEntity) {
+                if (std::find(activeServerIDs.begin(), activeServerIDs.end(), sID) == activeServerIDs.end()) {
+                    toRemove.push_back(sID);
+                }
+            }
+            
+            for (uint32_t sID : toRemove) {
+                EntityID lID = m_ServerToLocalEntity[sID];
+                
+                // Find and get weapon ID
+                EntityID weaponID = 0;
+                for (auto const& obj : m_GameObjects) {
+                    if (obj->GetID() == lID) {
+                        if (auto* player = dynamic_cast<TestPlayer*>(obj.get())) {
+                            weaponID = player->GetWeaponID();
+                        }
+                        break;
+                    }
+                }
+                
+                // Remove from m_GameObjects
+                auto it = std::remove_if(m_GameObjects.begin(), m_GameObjects.end(), [lID](const std::unique_ptr<GameObject>& obj) {
+                    return obj->GetID() == lID;
+                });
+                if (it != m_GameObjects.end()) {
+                    m_GameObjects.erase(it, m_GameObjects.end());
+                }
+                
+                // Destroy entity and weapon from registry
+                registry.Destroy(lID);
+                if (weaponID != 0) {
+                    registry.Destroy(weaponID);
+                }
+                
+                m_ServerToLocalEntity.erase(sID);
+                m_TargetPositions.erase(lID);
+                ENGINE_LOG("Client cleaned up local proxy player (ID: %d) and weapon (ID: %d) for server entity %d", lID, weaponID, sID);
+            }
+        }
+    }
+}
+
+void TestScene::OnClientDisconnected(ENetPeer* peer) {
+    if (m_PeerToEntity.find(peer) != m_PeerToEntity.end()) {
+        EntityID entID = m_PeerToEntity[peer];
+        
+        // Find player in game objects to get its weapon ID
+        EntityID weaponID = 0;
+        for (auto const& obj : m_GameObjects) {
+            if (obj->GetID() == entID) {
+                if (auto* player = dynamic_cast<TestPlayer*>(obj.get())) {
+                    weaponID = player->GetWeaponID();
+                }
+                break;
+            }
+        }
+        
+        // 1. Remove from m_GameObjects
+        auto it = std::remove_if(m_GameObjects.begin(), m_GameObjects.end(), [entID](const std::unique_ptr<GameObject>& obj) {
+            return obj->GetID() == entID;
+        });
+        if (it != m_GameObjects.end()) {
+            m_GameObjects.erase(it, m_GameObjects.end());
+        }
+        
+        // 2. Destroy the player entity and weapon entity from registry
+        registry.Destroy(entID);
+        if (weaponID != 0) {
+            registry.Destroy(weaponID);
+        }
+        
+        // 3. Remove from maps
+        m_PeerToEntity.erase(peer);
+        ENGINE_LOG("Server cleaned up player entity (ID: %d) and weapon (ID: %d) for disconnected peer.", entID, weaponID);
+    }
 }

@@ -233,6 +233,19 @@ void TestScene::Update(float deltatime)
                 player->Update(deltatime);
             }
         }
+    } else {
+        // Client-side prediction: update our own player locally using client input for instant prediction
+        if (m_MyLocalPlayerID != 0) {
+            for (auto const& obj : m_GameObjects) {
+                if (obj->GetID() == m_MyLocalPlayerID) {
+                    if (auto* player = dynamic_cast<TestPlayer*>(obj.get())) {
+                        player->PassInput(m_Input);
+                        player->Update(deltatime);
+                    }
+                    break;
+                }
+            }
+        }
     }
     
     // Networking Updates
@@ -256,7 +269,7 @@ void TestScene::Update(float deltatime)
             for (auto const& [localID, targetPos] : m_TargetPositions) {
                 if (registry.HasComponent<TransformComponent>(localID)) {
                     auto& trans = registry.GetComponent<TransformComponent>(localID);
-                    trans.position = glm::mix(trans.position, targetPos, std::min(15.0f * deltatime, 1.0f));
+                    trans.position = glm::mix(trans.position, targetPos, std::min(25.0f * deltatime, 1.0f));
                 }
             }
             
@@ -265,7 +278,7 @@ void TestScene::Update(float deltatime)
                 inputPacket.header.type = PacketType::ClientInput;
                 inputPacket.header.tick = 0;
                 inputPacket.inputMask = 0;
-                if (m_Input->IsKeyDown(GLFW_KEY_W) || m_Input->IsKeyDown(GLFW_KEY_UP)) inputPacket.inputMask |= 1;
+                if (m_Input->IsKeyDown(GLFW_KEY_W) || m_Input->IsKeyDown(GLFW_KEY_UP) || m_Input->IsKeyDown(GLFW_KEY_SPACE)) inputPacket.inputMask |= 1;
                 if (m_Input->IsKeyDown(GLFW_KEY_S) || m_Input->IsKeyDown(GLFW_KEY_DOWN)) inputPacket.inputMask |= 2;
                 if (m_Input->IsKeyDown(GLFW_KEY_A) || m_Input->IsKeyDown(GLFW_KEY_LEFT)) inputPacket.inputMask |= 4;
                 if (m_Input->IsKeyDown(GLFW_KEY_D) || m_Input->IsKeyDown(GLFW_KEY_RIGHT)) inputPacket.inputMask |= 8;
@@ -359,6 +372,7 @@ void TestScene::Update(float deltatime)
             m_TestRects.push_back({glm::vec3(pPos + circDir * circLen, 0.0f), glm::vec2(circRadius * 2.0f), glm::vec3(0.0f, 1.0f, 0.0f)});
         }
     }
+    registry.Update(deltatime);
 }
 
 void TestScene::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) const
@@ -430,8 +444,8 @@ void TestScene::OnNetworkPacket(ENetPeer* peer, void* data, size_t size) {
                 
                 glm::vec2 currentVel = rb.GetVelocity();
                 rb.SetVelocity(glm::vec2(vel.x, currentVel.y)); // Keep gravity for Y
-                if (input->inputMask & 1) { // If jump (W)
-                     rb.AddForce(glm::vec2(0.0f, 10.0f)); // Simple jump impulse for fun
+                if (input->inputMask & 1) { // If jump (W/Up/Space)
+                     rb.SetVelocity(glm::vec2(rb.GetVelocity().x, 18.0f)); // Snappy jump velocity setting
                 }
             }
         }
@@ -439,6 +453,7 @@ void TestScene::OnNetworkPacket(ENetPeer* peer, void* data, size_t size) {
         if (header->type == PacketType::Connect && size >= sizeof(ConnectPacket)) {
             ConnectPacket* connPacket = reinterpret_cast<ConnectPacket*>(data);
             uint32_t myEntityID = connPacket->clientEntityID;
+            m_MyServerPlayerID = myEntityID;
             ENGINE_LOG("[Client] Received connection confirmation! My Player Entity ID is: %u", myEntityID);
         } else if (header->type == PacketType::ServerUpdate) {
             size_t countOffset = sizeof(PacketHeader);
@@ -460,11 +475,18 @@ void TestScene::OnNetworkPacket(ENetPeer* peer, void* data, size_t size) {
                 if (m_ServerToLocalEntity.find(sID) == m_ServerToLocalEntity.end()) {
                     // Spawn remote player proxy
                     auto playerObj = std::make_unique<TestPlayer>(this, "ProxyPlayer", m_Assets->GetSpriteSheet("testobj"));
-                    // Strip its rigidbody so it doesn't simulate physics locally (server dictates position)
-                    if (registry.HasComponent<RigidBodyComponent>(playerObj->GetID())) {
-                        registry.RemoveComponent<RigidBodyComponent>(playerObj->GetID());
-                    }
                     EntityID lID = playerObj->GetID();
+                    
+                    // If this is NOT our player, strip its rigidbody so it doesn't simulate physics locally
+                    if (sID != m_MyServerPlayerID) {
+                        if (registry.HasComponent<RigidBodyComponent>(lID)) {
+                            registry.RemoveComponent<RigidBodyComponent>(lID);
+                        }
+                    } else {
+                        m_MyLocalPlayerID = lID;
+                        ENGINE_LOG("[Client] Identified my local player entity (ID: %d)", lID);
+                    }
+                    
                     m_GameObjects.push_back(std::move(playerObj));
                     m_ServerToLocalEntity[sID] = lID;
                     
@@ -475,7 +497,26 @@ void TestScene::OnNetworkPacket(ENetPeer* peer, void* data, size_t size) {
                     }
                 }
                 EntityID localID = m_ServerToLocalEntity[sID];
-                m_TargetPositions[localID] = glm::vec2(transforms[i].x, transforms[i].y);
+                if (localID == m_MyLocalPlayerID) {
+                    // Server Reconciliation for client's own predicted player
+                    if (registry.HasComponent<TransformComponent>(localID)) {
+                        auto& trans = registry.GetComponent<TransformComponent>(localID);
+                        glm::vec2 serverPos(transforms[i].x, transforms[i].y);
+                        float dist = glm::distance(trans.position, serverPos);
+                        if (dist > 1.5f) {
+                            trans.position = serverPos;
+                            if (registry.HasComponent<RigidBodyComponent>(localID)) {
+                                registry.GetComponent<RigidBodyComponent>(localID).SetVelocity(glm::vec2(0.0f));
+                            }
+                            ENGINE_LOG("[Client] Large desync detected (%.2f units). Snapping to server.", dist);
+                        } else {
+                            // Soft correction: gently pull towards server position to correct minor drift
+                            trans.position = glm::mix(trans.position, serverPos, 0.1f);
+                        }
+                    }
+                } else {
+                    m_TargetPositions[localID] = glm::vec2(transforms[i].x, transforms[i].y);
+                }
             }
             
             // Clean up players that have disconnected (no longer in server updates)

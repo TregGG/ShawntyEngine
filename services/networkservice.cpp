@@ -70,7 +70,7 @@ bool NetworkService::Connect(const std::string& ip, int port) {
 
 void NetworkService::Disconnect() {
     if (m_ServerPeer) {
-        enet_peer_disconnect(m_ServerPeer, 0);
+        enet_peer_disconnect_now(m_ServerPeer, 0);
         m_ServerPeer = nullptr;
     }
     if (m_Host) {

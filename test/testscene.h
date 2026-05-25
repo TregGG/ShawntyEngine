@@ -52,6 +52,8 @@ private:
     std::map<ENetPeer*, EntityID> m_PeerToEntity; // For server: Peer -> Player Entity
     std::map<uint32_t, EntityID> m_ServerToLocalEntity; // For client: ServerEntityID -> Local Dummy Entity
     std::map<EntityID, glm::vec2> m_TargetPositions; // For client: EntityID -> Target Position for interpolation
+    uint32_t m_MyServerPlayerID = 0;
+    EntityID m_MyLocalPlayerID = 0;
     
     std::vector<DebugLine> m_TestLines;
     std::vector<DebugRect> m_TestRects;

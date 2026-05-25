@@ -100,7 +100,7 @@ void TestPlayer::Update(float deltaTime)
                 // Jump!
                 if (m_Scene->registry.HasComponent<RigidBodyComponent>(m_ID)) {
                     auto& rb = m_Scene->registry.GetComponent<RigidBodyComponent>(m_ID);
-                    rb.SetVelocity(glm::vec2(rb.GetVelocity().x, 15.0f));
+                    rb.SetVelocity(glm::vec2(rb.GetVelocity().x, 18.0f));
                 }
                 spacePressed = true;
             }
@@ -124,6 +124,8 @@ void TestPlayer::Update(float deltaTime)
     if (m_Scene->registry.HasComponent<RigidBodyComponent>(m_ID))
     {
         auto& rb = m_Scene->registry.GetComponent<RigidBodyComponent>(m_ID);
-        rb.AddForce(pushForce * 50.0f);
+        glm::vec2 currentVel = rb.GetVelocity();
+        // Match server-side direct velocity setting (m_MoveSpeed is 5.0f)
+        rb.SetVelocity(glm::vec2(pushForce.x * 5.0f, currentVel.y));
     }
 }

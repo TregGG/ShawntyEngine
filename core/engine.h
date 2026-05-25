@@ -6,6 +6,7 @@ class System;
 class Timer;
 class Input;
 class OpenGLClass;
+class EventService;
 
 class Engine
 {
@@ -27,6 +28,7 @@ private:
     System* m_System;
     Timer* m_Timer;
     Input* m_Input;
+    EventService* m_EventService;
     //Not owned by engine
     Game* m_Game;
     OpenGLClass* m_OpenGL=nullptr;

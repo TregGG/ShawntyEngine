@@ -1,4 +1,6 @@
 #include "entityregistry.h"
+#include "../../../objects/ui/uiobject.h"
+#include <algorithm>
 
 #define ENGINE_CLASS "EntityRegistryService"
 #include "../../../core/enginedebug.h"
@@ -6,6 +8,15 @@
 void EntityRegistryService::Init()
 {
     m_CategoryBuckets.resize(static_cast<size_t>(EntityCategory::Count));
+
+    // Reserve index 0 as invalid/sentinel slot
+    Slot invalidSlot;
+    invalidSlot.generation = 0;
+    invalidSlot.alive = false;
+    invalidSlot.category = EntityCategory::Environment;
+    invalidSlot.name = "Invalid";
+    invalidSlot.registeredBy = "System";
+    m_Slots.push_back(invalidSlot);
 }
 
 EntityID EntityRegistryService::Create(EntityCategory category, std::string_view name, std::string_view registeredBy)
@@ -98,7 +109,7 @@ EntityRegistryService::GetEntities(EntityCategory category) const
     return m_CategoryBuckets[(size_t)category];
 }
 
-void EntityRegistryService::Update(float /*dt*/)
+void EntityRegistryService::Update(float dt)
 {
     for (std::uint32_t index : m_PendingDestroy)
     {
@@ -119,17 +130,107 @@ void EntityRegistryService::Update(float /*dt*/)
 
         slot.alive = false;
         slot.generation++; // invalidate old IDs
-
-        m_FreeList.push_back(index);
     }
-
+    
+    // Remove destroyed entities
+    for(auto e : m_PendingDestroy)
+    {
+        RemoveComponent<TransformComponent>(e);
+        RemoveComponent<SpriteComponent2D>(e);
+        RemoveComponent<RelationshipComponent>(e);
+        RemoveComponent<ColliderComponent>(e);
+        RemoveComponent<RigidBodyComponent>(e);
+        RemoveComponent<AnimatorComponent>(e);
+        m_FreeList.push_back(e);
+    }
     m_PendingDestroy.clear();
+    
+    for (auto& ui : m_UIElements) {
+        ui->Update(dt);
+    }
 }
 
 void EntityRegistryService::Shutdown()
 {
+    m_UIElements.clear();
+    m_Transforms.clear();
+    m_Sprites.clear();
+    m_Relationships.clear();
+    m_Colliders.clear();
+    m_RigidBodies.clear();
+    m_Animators.clear();
     m_Slots.clear();
     m_FreeList.clear();
     m_PendingDestroy.clear();
     m_CategoryBuckets.clear();
+}
+
+void EntityRegistryService::AddUIElement(std::unique_ptr<UIObject> element) {
+    m_UIElements.push_back(std::move(element));
+}
+
+const std::vector<std::unique_ptr<UIObject>>& EntityRegistryService::GetUIElements() const {
+    return m_UIElements;
+}
+
+void EntityRegistryService::RebuildViews() const
+{
+    if (!m_ViewsDirty) return;
+
+    m_CachedTransformSprite.clear();
+    m_CachedPhysics.clear();
+    m_CachedAnimators.clear();
+    m_CachedRelationships.clear();
+
+    const auto& activeTransforms = m_Transforms.GetActiveList();
+    const auto& activeSprites = m_Sprites.GetActiveList();
+    const auto& activeColliders = m_Colliders.GetActiveList();
+    const auto& activeAnimators = m_Animators.GetActiveList();
+    const auto& activeRels = m_Relationships.GetActiveList();
+
+    for (size_t i = 0; i < m_Slots.size(); ++i) {
+        if (!m_Slots[i].alive) continue;
+        
+        EntityID e = MakeEntityID(i, m_Slots[i].generation);
+        bool hasTrans = i < activeTransforms.size() && activeTransforms[i];
+
+        if (hasTrans && i < activeSprites.size() && activeSprites[i]) {
+            m_CachedTransformSprite.push_back(e);
+        }
+        if (hasTrans && i < activeColliders.size() && activeColliders[i]) {
+            m_CachedPhysics.push_back(e);
+        }
+        if (i < activeAnimators.size() && activeAnimators[i]) {
+            m_CachedAnimators.push_back(e);
+        }
+        if (i < activeRels.size() && activeRels[i]) {
+            m_CachedRelationships.push_back(e);
+        }
+    }
+
+    m_ViewsDirty = false;
+}
+
+const std::vector<EntityID>& EntityRegistryService::ViewTransformAndSprite() const
+{
+    RebuildViews();
+    return m_CachedTransformSprite;
+}
+
+const std::vector<EntityID>& EntityRegistryService::ViewPhysicsObjects() const
+{
+    RebuildViews();
+    return m_CachedPhysics;
+}
+
+const std::vector<EntityID>& EntityRegistryService::ViewAnimators() const
+{
+    RebuildViews();
+    return m_CachedAnimators;
+}
+
+const std::vector<EntityID>& EntityRegistryService::ViewRelationships() const
+{
+    RebuildViews();
+    return m_CachedRelationships;
 }

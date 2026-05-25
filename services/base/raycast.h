@@ -1,14 +1,14 @@
 #pragma once
 #include <glm/vec2.hpp>
 
-class ColliderComponent;
+#include "../core/entityid.h"
 
 struct RaycastHit {
     bool hit = false;
     glm::vec2 point = glm::vec2(0.0f);
     glm::vec2 normal = glm::vec2(0.0f);
     float distance = 0.0f;
-    ColliderComponent* collider = nullptr; // Note: Ensure PhysicsSystem processes hits properly!
+    EntityID entity = 0; // The entity that was hit
 };
 
 // Exposes explicit global macro layout for ease of usage across gameplay!

@@ -7,6 +7,7 @@
 #include "input.h"
 #include "logger.h"
 #include "../render/openglclass.h"
+#include "../services/base/eventservice.h"
 #include "engineconfig.h"
 #define ENGINE_CLASS "Engine"
 #include "enginedebug.h"
@@ -52,6 +53,7 @@ bool Engine::Initialize(Game* game)
     m_System= new System();
     m_Timer= new Timer();
     m_Input= new Input();
+    m_EventService = new EventService();
     m_OpenGL=new OpenGLClass();
 
     if(!m_System->Initialize(800,600,"Engine"))
@@ -64,6 +66,8 @@ bool Engine::Initialize(Game* game)
             ENGINE_ERROR("Initialize failed: OpenGLClass::Initialize failed");
          return false;
     }
+    m_EventService->Init();
+    m_Game->SetEventService(m_EventService);
     m_Timer->Start();
     
     if(!m_Game->OnInit())
@@ -104,7 +108,7 @@ void Engine::Run()
         // Time & input
         m_Timer->Tick();
         m_Input->BeginFrame();
-        m_Input->ProcessEvents(m_System->GetInputEvents());
+        m_Input->ProcessEvents(m_System->GetInputEvents(), m_EventService);
         m_System->ClearInputEvents();
 
         m_Game->OnInput(*m_Input);
@@ -131,6 +135,13 @@ void Engine::Shutdown()
     {
         delete m_Input;
         m_Input = nullptr;
+    }
+
+    if (m_EventService)
+    {
+        m_EventService->Shutdown();
+        delete m_EventService;
+        m_EventService = nullptr;
     }
 
     if (m_OpenGL)

@@ -7,12 +7,12 @@ The engine includes a built-in logging system to help you debug your game, track
 To use the logger in any file, you first need to define the `ENGINE_CLASS` macro at the very top of your file (before including the debug header). This tells the logger which file the message is coming from.
 
 ```cpp
-#define ENGINE_CLASS "PlayerComponent"
+#define ENGINE_CLASS "TestPlayer"
 #include "core/enginedebug.h"
 
 // ... inside your code:
 
-void PlayerComponent::Update(float deltaTime) {
+void TestPlayer::Update(float deltaTime) {
     if (health <= 0) {
         ENGINE_LOG("Player died! Score: %d", score);
     }

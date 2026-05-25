@@ -7,7 +7,7 @@
 
 //STATICS->InputMANAGEMENT
 
-static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+static void KeyCallback(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/)
 {
     System* system = static_cast<System*>(glfwGetWindowUserPointer(window));
     if (!system)
@@ -22,7 +22,7 @@ static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, i
 }
 
 
-static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+static void MouseButtonCallback(GLFWwindow* window, int button, int action, int /*mods*/)
 {
     System* system = static_cast<System*>(glfwGetWindowUserPointer(window));
     if (!system)
@@ -46,6 +46,18 @@ static void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     event.type = InputEventType::MouseMove;
     event.mouseX = xpos;
     event.mouseY = ypos;
+
+    system->PushRawInputEvent(event);
+}
+
+static void CharCallback(GLFWwindow* window, unsigned int codepoint)
+{
+    System* system = static_cast<System*>(glfwGetWindowUserPointer(window));
+    if (!system) return;
+
+    RawInputEvent event{};
+    event.type = InputEventType::Char;
+    event.codepoint = codepoint;
 
     system->PushRawInputEvent(event);
 }
@@ -91,6 +103,7 @@ bool System::Initialize(int width, int height, const char* title)
     glfwSetKeyCallback(m_Window,KeyCallback);
     glfwSetMouseButtonCallback(m_Window,MouseButtonCallback);
     glfwSetCursorPosCallback(m_Window,CursorPosCallback);
+    glfwSetCharCallback(m_Window,CharCallback);
 
 
     if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))

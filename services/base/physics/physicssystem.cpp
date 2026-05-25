@@ -7,13 +7,15 @@
 #include <glm/geometric.hpp>
 #include <algorithm>
 
+#include "../entityregistry/entityregistry.h"
+
 // ============================
 // Internal Quadtree Node
 // ============================
 class QuadtreeNode {
 public:
     ColliderComponent::AABB bounds;
-    std::vector<ColliderComponent*> colliders;
+    std::vector<EntityID> colliders;
     std::unique_ptr<QuadtreeNode> children[4];
     bool isLeaf = true;
     
@@ -50,9 +52,12 @@ public:
         isLeaf = false;
     }
 
-    int GetIndex(ColliderComponent* collider) {
+    int GetIndex(EntityID colliderEntity, EntityRegistryService* reg) {
         int index = -1;
-        auto cbounds = collider->GetBounds();
+        const auto& col = reg->GetComponent<ColliderComponent>(colliderEntity);
+        const auto& trans = reg->GetComponent<TransformComponent>(colliderEntity);
+        auto cbounds = col.GetBounds(trans);
+        
         double verticalMidpoint = bounds.minX + (bounds.maxX - bounds.minX) / 2.0;
         double horizontalMidpoint = bounds.minY + (bounds.maxY - bounds.minY) / 2.0;
 
@@ -71,25 +76,25 @@ public:
         return index;
     }
 
-    void Insert(ColliderComponent* collider) {
+    void Insert(EntityID colliderEntity, EntityRegistryService* reg) {
         if (!isLeaf) {
-            int index = GetIndex(collider);
+            int index = GetIndex(colliderEntity, reg);
             if (index != -1) {
-                children[index]->Insert(collider);
+                children[index]->Insert(colliderEntity, reg);
                 return;
             }
         }
 
-        colliders.push_back(collider);
+        colliders.push_back(colliderEntity);
 
         if (colliders.size() > MAX_OBJECTS && level < MAX_LEVELS) {
             if (isLeaf) Split();
             
             auto it = colliders.begin();
             while (it != colliders.end()) {
-                int index = GetIndex(*it);
+                int index = GetIndex(*it, reg);
                 if (index != -1) {
-                    children[index]->Insert(*it);
+                    children[index]->Insert(*it, reg);
                     it = colliders.erase(it);
                 } else {
                     ++it;
@@ -98,10 +103,10 @@ public:
         }
     }
 
-    std::vector<ColliderComponent*> Retrieve(std::vector<ColliderComponent*>& returnObjects, ColliderComponent* collider) {
-        int index = GetIndex(collider);
+    std::vector<EntityID>& Retrieve(std::vector<EntityID>& returnObjects, EntityID colliderEntity, EntityRegistryService* reg) {
+        int index = GetIndex(colliderEntity, reg);
         if (index != -1 && !isLeaf) {
-            children[index]->Retrieve(returnObjects, collider);
+            children[index]->Retrieve(returnObjects, colliderEntity, reg);
         }
         returnObjects.insert(returnObjects.end(), colliders.begin(), colliders.end());
         return returnObjects;
@@ -121,22 +126,30 @@ void PhysicsSystem::Init() {
 }
 
 void PhysicsSystem::Update(float dt) {
+    if (!m_Registry) return;
+
     // 1. Integration (Positional progression)
     const glm::vec2 GRAVITY(0.0f, -9.81f);
-    for (auto rb : m_RigidBodies) {
-        if (!rb->IsEnabled() || !rb->GetOwner()->IsActive()) continue;
-        if (rb->GetType() == BodyType::Static) continue;
+    
+    // We iterate over entities that have RigidBody and Transform
+    for (EntityID e : m_Registry->ViewPhysicsObjects()) {
+        if (!m_Registry->HasComponent<RigidBodyComponent>(e)) continue;
 
-        if (rb->GetUseGravity()) {
-            rb->AddForce(GRAVITY * rb->GetGravityScale() * rb->GetMass()); 
-        }
-        glm::vec2 vel = rb->GetVelocity();
-        vel += rb->GetAcceleration() * dt;
-        vel *= (1.0f - rb->GetDrag() * dt);
-        rb->SetVelocity(vel);
+        auto& rb = m_Registry->GetComponent<RigidBodyComponent>(e);
+        auto& transform = m_Registry->GetComponent<TransformComponent>(e);
         
-        rb->GetOwner()->GetTransform().position += vel * dt;
-        rb->ClearForces();
+        if (rb.GetType() == BodyType::Static) continue;
+
+        if (rb.GetUseGravity()) {
+            rb.AddForce(GRAVITY * rb.GetGravityScale() * rb.GetMass()); 
+        }
+        glm::vec2 vel = rb.GetVelocity();
+        vel += rb.GetAcceleration() * dt;
+        vel *= (1.0f - rb.GetDrag() * dt);
+        rb.SetVelocity(vel);
+        
+        transform.position += vel * dt;
+        rb.ClearForces();
     }
 
     // 2. Overlap calculations
@@ -145,26 +158,35 @@ void PhysicsSystem::Update(float dt) {
 
     // 3. Mathematical Displacement (Avoiding intersections continuously)
     for (const auto& ev : m_Collisions) {
-        if (ev.a->IsTrigger() || ev.b->IsTrigger()) continue;
+        auto& colA = m_Registry->GetComponent<ColliderComponent>(ev.a);
+        auto& colB = m_Registry->GetComponent<ColliderComponent>(ev.b);
         
-        auto rbA = ev.a->GetOwner()->GetComponent<RigidBodyComponent>();
-        auto rbB = ev.b->GetOwner()->GetComponent<RigidBodyComponent>();
+        if (colA.IsTrigger() || colB.IsTrigger()) continue;
+        
+        bool hasRbA = m_Registry->HasComponent<RigidBodyComponent>(ev.a);
+        bool hasRbB = m_Registry->HasComponent<RigidBodyComponent>(ev.b);
+        
+        RigidBodyComponent* rbA = hasRbA ? &m_Registry->GetComponent<RigidBodyComponent>(ev.a) : nullptr;
+        RigidBodyComponent* rbB = hasRbB ? &m_Registry->GetComponent<RigidBodyComponent>(ev.b) : nullptr;
         
         bool aMovable = rbA && rbA->GetType() == BodyType::Dynamic;
         bool bMovable = rbB && rbB->GetType() == BodyType::Dynamic;
         
         if (!aMovable && !bMovable) continue;
         
+        auto& transA = m_Registry->GetComponent<TransformComponent>(ev.a);
+        auto& transB = m_Registry->GetComponent<TransformComponent>(ev.b);
+
         // Positional Displacement
         if (aMovable && !bMovable) {
-            ev.a->GetOwner()->GetTransform().position += ev.normal * ev.depth;
+            transA.position += ev.normal * ev.depth;
         } else if (!aMovable && bMovable) { 
             // Note: normal explicitly points A outward, so we invert testing -normal for B!
-            ev.b->GetOwner()->GetTransform().position -= ev.normal * ev.depth;
+            transB.position -= ev.normal * ev.depth;
         } else {
             // Both dynamic: divide depth natively avoiding clipping limits
-            ev.a->GetOwner()->GetTransform().position += ev.normal * (ev.depth * 0.5f);
-            ev.b->GetOwner()->GetTransform().position -= ev.normal * (ev.depth * 0.5f);
+            transA.position += ev.normal * (ev.depth * 0.5f);
+            transB.position -= ev.normal * (ev.depth * 0.5f);
         }
 
         // Velocity Resolution (Elasticity)
@@ -201,43 +223,19 @@ void PhysicsSystem::Update(float dt) {
 
 void PhysicsSystem::Shutdown() {
     if (m_Quadtree) m_Quadtree->Clear();
-    m_RigidBodies.clear();
-    m_Colliders.clear();
     m_Collisions.clear();
     m_PreviousCollisions.clear();
 }
 
-void PhysicsSystem::RegisterCollider(ColliderComponent* collider) {
-    auto it = std::find(m_Colliders.begin(), m_Colliders.end(), collider);
-    if (it == m_Colliders.end()) {
-        m_Colliders.push_back(collider);
-    }
-}
+bool PhysicsSystem::CalculateManifold(EntityID a, EntityID b, glm::vec2& outNormal, float& outDepth) {
+    if (!m_Registry) return false;
+    const auto& colA = m_Registry->GetComponent<ColliderComponent>(a);
+    const auto& transA = m_Registry->GetComponent<TransformComponent>(a);
+    const auto& colB = m_Registry->GetComponent<ColliderComponent>(b);
+    const auto& transB = m_Registry->GetComponent<TransformComponent>(b);
 
-void PhysicsSystem::UnregisterCollider(ColliderComponent* collider) {
-    auto it = std::find(m_Colliders.begin(), m_Colliders.end(), collider);
-    if (it != m_Colliders.end()) {
-        m_Colliders.erase(it);
-    }
-}
-
-void PhysicsSystem::RegisterRigidBody(RigidBodyComponent* rb) {
-    auto it = std::find(m_RigidBodies.begin(), m_RigidBodies.end(), rb);
-    if (it == m_RigidBodies.end()) {
-        m_RigidBodies.push_back(rb);
-    }
-}
-
-void PhysicsSystem::UnregisterRigidBody(RigidBodyComponent* rb) {
-    auto it = std::find(m_RigidBodies.begin(), m_RigidBodies.end(), rb);
-    if (it != m_RigidBodies.end()) {
-        m_RigidBodies.erase(it);
-    }
-}
-
-bool PhysicsSystem::CalculateManifold(ColliderComponent* a, ColliderComponent* b, glm::vec2& outNormal, float& outDepth) {
-    auto boundsA = a->GetBounds();
-    auto boundsB = b->GetBounds();
+    auto boundsA = colA.GetBounds(transA);
+    auto boundsB = colB.GetBounds(transB);
 
     float overlapX = std::min(boundsA.maxX - boundsB.minX, boundsB.maxX - boundsA.minX);
     if (overlapX <= 0) return false;
@@ -260,38 +258,49 @@ bool PhysicsSystem::CalculateManifold(ColliderComponent* a, ColliderComponent* b
 void PhysicsSystem::CheckCollisions() {
     m_PreviousCollisions = m_Collisions;
     m_Collisions.clear();
+    if (!m_Registry) return;
+
+    std::vector<EntityID> colliders = m_Registry->ViewPhysicsObjects();
+
     if (m_Quadtree) {
         m_Quadtree->Clear();
 
         // 1. Re-build tree dynamically
-        for (auto c : m_Colliders) {
-            // Only check currently active components essentially
-            if (c->IsEnabled()) {
-                m_Quadtree->Insert(c);
-            }
+        for (auto e : colliders) {
+            m_Quadtree->Insert(e, m_Registry);
         }
     }
 
-    std::vector<ColliderComponent*> potentialCollisions;
+    std::vector<EntityID> potentialCollisions;
     
     // 2. Query against populated tree
-    for (size_t i = 0; i < m_Colliders.size(); ++i) {
-        if (!m_Colliders[i]->IsEnabled()) continue;
+    for (size_t i = 0; i < colliders.size(); ++i) {
         
         potentialCollisions.clear();
-        m_Quadtree->Retrieve(potentialCollisions, m_Colliders[i]);
+        m_Quadtree->Retrieve(potentialCollisions, colliders[i], m_Registry);
 
         for (size_t j = 0; j < potentialCollisions.size(); ++j) {
-            // Memory address ordering technique solves 'duplicate/self' pair handling intrinsically
-            if (m_Colliders[i] < potentialCollisions[j]) {
+            // ID ordering technique solves 'duplicate/self' pair handling intrinsically
+            if (colliders[i] < potentialCollisions[j]) {
                 glm::vec2 normal;
                 float depth;
-                if (CalculateManifold(m_Colliders[i], potentialCollisions[j], normal, depth)) {
-                    uint32_t layerBitA = 1 << static_cast<int>(m_Colliders[i]->GetOwner()->GetLayer());
-                    uint32_t layerBitB = 1 << static_cast<int>(potentialCollisions[j]->GetOwner()->GetLayer());
+                if (CalculateManifold(colliders[i], potentialCollisions[j], normal, depth)) {
+                    
+                    const auto& colA = m_Registry->GetComponent<ColliderComponent>(colliders[i]);
+                    const auto& colB = m_Registry->GetComponent<ColliderComponent>(potentialCollisions[j]);
 
-                    if ((m_Colliders[i]->GetLayerMask() & layerBitB) != 0 && (potentialCollisions[j]->GetLayerMask() & layerBitA) != 0) {
-                        m_Collisions.push_back({m_Colliders[i], potentialCollisions[j], normal, depth});
+                    // Layer handling. Assuming layer is now in SpriteComponent or we have a default. 
+                    // Let's use Layer from SpriteComponent if available, otherwise Layer::Foreground.
+                    Layer layerA = Layer::Foreground;
+                    Layer layerB = Layer::Foreground;
+                    if (m_Registry->HasComponent<SpriteComponent2D>(colliders[i])) layerA = m_Registry->GetComponent<SpriteComponent2D>(colliders[i]).layer;
+                    if (m_Registry->HasComponent<SpriteComponent2D>(potentialCollisions[j])) layerB = m_Registry->GetComponent<SpriteComponent2D>(potentialCollisions[j]).layer;
+                    
+                    uint32_t layerBitA = 1 << static_cast<int>(layerA);
+                    uint32_t layerBitB = 1 << static_cast<int>(layerB);
+
+                    if ((colA.GetLayerMask() & layerBitB) != 0 && (colB.GetLayerMask() & layerBitA) != 0) {
+                        m_Collisions.push_back({colliders[i], potentialCollisions[j], normal, depth});
                     }
                 }
             }
@@ -299,14 +308,14 @@ void PhysicsSystem::CheckCollisions() {
     }
 }
 
-bool PhysicsSystem::HasCollision(ColliderComponent* obj) const {
+bool PhysicsSystem::HasCollision(EntityID obj) const {
     for (const auto& ev : m_Collisions) {
         if (ev.a == obj || ev.b == obj) return true;
     }
     return false;
 }
 
-bool PhysicsSystem::IsColliding(ColliderComponent* a, ColliderComponent* b) const {
+bool PhysicsSystem::IsColliding(EntityID a, EntityID b) const {
     for (const auto& ev : m_Collisions) {
         if ((ev.a == a && ev.b == b) || (ev.a == b && ev.b == a)) return true;
     }
@@ -314,17 +323,25 @@ bool PhysicsSystem::IsColliding(ColliderComponent* a, ColliderComponent* b) cons
 }
 
 void PhysicsSystem::DispatchEvents() {
+    if (!m_Registry) return;
+
     // Execute OnTriggerEnter by checking strictly for totally new overlap instances
     for (const auto& ev : m_Collisions) {
         auto it = std::find(m_PreviousCollisions.begin(), m_PreviousCollisions.end(), ev);
         if (it == m_PreviousCollisions.end()) {
-            if (ev.a->IsTrigger()) {
-                auto& cb = ev.a->GetOnTriggerEnter();
-                if (cb) cb(ev.a, ev.b);
+            if (m_Registry->HasComponent<ColliderComponent>(ev.a)) {
+                auto& colA = m_Registry->GetComponent<ColliderComponent>(ev.a);
+                if (colA.IsTrigger()) {
+                    auto& cb = colA.GetOnTriggerEnter();
+                    if (cb) cb(ev.a, ev.b);
+                }
             }
-            if (ev.b->IsTrigger()) {
-                auto& cb = ev.b->GetOnTriggerEnter();
-                if (cb) cb(ev.b, ev.a);
+            if (m_Registry->HasComponent<ColliderComponent>(ev.b)) {
+                auto& colB = m_Registry->GetComponent<ColliderComponent>(ev.b);
+                if (colB.IsTrigger()) {
+                    auto& cb = colB.GetOnTriggerEnter();
+                    if (cb) cb(ev.b, ev.a);
+                }
             }
         }
     }
@@ -333,33 +350,42 @@ void PhysicsSystem::DispatchEvents() {
     for (const auto& ev : m_PreviousCollisions) {
         auto it = std::find(m_Collisions.begin(), m_Collisions.end(), ev);
         if (it == m_Collisions.end()) {
-            if (ev.a->IsTrigger()) {
-                auto& cb = ev.a->GetOnTriggerExit();
-                if (cb) cb(ev.a, ev.b);
+            if (m_Registry->HasComponent<ColliderComponent>(ev.a)) {
+                auto& colA = m_Registry->GetComponent<ColliderComponent>(ev.a);
+                if (colA.IsTrigger()) {
+                    auto& cb = colA.GetOnTriggerExit();
+                    if (cb) cb(ev.a, ev.b);
+                }
             }
-            if (ev.b->IsTrigger()) {
-                auto& cb = ev.b->GetOnTriggerExit();
-                if (cb) cb(ev.b, ev.a);
+            if (m_Registry->HasComponent<ColliderComponent>(ev.b)) {
+                auto& colB = m_Registry->GetComponent<ColliderComponent>(ev.b);
+                if (colB.IsTrigger()) {
+                    auto& cb = colB.GetOnTriggerExit();
+                    if (cb) cb(ev.b, ev.a);
+                }
             }
         }
     }
 }
 
-bool PhysicsSystem::HasSolidCollision(ColliderComponent* obj) const {
-    if (obj->IsTrigger()) return false;
+bool PhysicsSystem::HasSolidCollision(EntityID obj) const {
+    if (!m_Registry) return false;
+    const auto& objCol = m_Registry->GetComponent<ColliderComponent>(obj);
+    if (objCol.IsTrigger()) return false;
 
     for (const auto& ev : m_Collisions) {
-        if (ev.a == obj && !ev.b->IsTrigger()) return true;
-        if (ev.b == obj && !ev.a->IsTrigger()) return true;
+        if (ev.a == obj && !m_Registry->GetComponent<ColliderComponent>(ev.b).IsTrigger()) return true;
+        if (ev.b == obj && !m_Registry->GetComponent<ColliderComponent>(ev.a).IsTrigger()) return true;
     }
     return false;
 }
 
-std::vector<ColliderComponent*> PhysicsSystem::GetOverlappingTriggers(ColliderComponent* obj) const {
-    std::vector<ColliderComponent*> triggers;
+std::vector<EntityID> PhysicsSystem::GetOverlappingTriggers(EntityID obj) const {
+    std::vector<EntityID> triggers;
+    if (!m_Registry) return triggers;
     for (const auto& ev : m_Collisions) {
-        if (ev.a == obj && ev.b->IsTrigger()) triggers.push_back(ev.b);
-        if (ev.b == obj && ev.a->IsTrigger()) triggers.push_back(ev.a);
+        if (ev.a == obj && m_Registry->GetComponent<ColliderComponent>(ev.b).IsTrigger()) triggers.push_back(ev.b);
+        if (ev.b == obj && m_Registry->GetComponent<ColliderComponent>(ev.a).IsTrigger()) triggers.push_back(ev.a);
     }
     return triggers;
 }
@@ -411,34 +437,42 @@ static bool RayIntersectAABB(glm::vec2 start, glm::vec2 dir, float length, const
     return true;
 }
 
-bool PhysicsSystem::Raycast(const glm::vec2& start, const glm::vec2& dir, float length, RaycastHit& outHit, uint32_t layerMask, ColliderComponent* ignoreCollider, bool hitTriggers) const {
+bool PhysicsSystem::Raycast(const glm::vec2& start, const glm::vec2& dir, float length, RaycastHit& outHit, uint32_t layerMask, EntityID ignoreEntity, bool hitTriggers) const {
     outHit.hit = false;
     outHit.distance = length;
+
+    if (!m_Registry) return false;
 
     // Normalizing trajectory implicitly ensuring accurate metrics distances
     glm::vec2 ndir = glm::normalize(dir);
 
     // Simplistic loop over all actively tracked objects 
     // Quadtree optimization could be hooked here specifically later!
-    for (auto* col : m_Colliders) {
+    for (EntityID e : m_Registry->ViewPhysicsObjects()) {
         
-        if (col == ignoreCollider) continue;
-        if (!col->GetOwner() || !col->GetOwner()->IsActive()) continue;
-        if (!hitTriggers && col->IsTrigger()) continue;
+        if (e == ignoreEntity) continue;
+        
+        const auto& col = m_Registry->GetComponent<ColliderComponent>(e);
+        const auto& trans = m_Registry->GetComponent<TransformComponent>(e);
 
-        uint32_t colLayerBit = 1 << static_cast<int>(col->GetOwner()->GetLayer());
+        if (!hitTriggers && col.IsTrigger()) continue;
+
+        Layer layer = Layer::Foreground;
+        if (m_Registry->HasComponent<SpriteComponent2D>(e)) layer = m_Registry->GetComponent<SpriteComponent2D>(e).layer;
+
+        uint32_t colLayerBit = 1 << static_cast<int>(layer);
         if ((layerMask & colLayerBit) == 0) continue;
 
         float t;
         glm::vec2 nRaw;
         
-        if (RayIntersectAABB(start, ndir, length, col->GetBounds(), t, nRaw)) {
+        if (RayIntersectAABB(start, ndir, length, col.GetBounds(trans), t, nRaw)) {
             if (t < outHit.distance) {
                 outHit.hit = true;
                 outHit.distance = t;
                 outHit.point = start + ndir * t;
                 outHit.normal = nRaw;
-                outHit.collider = col;
+                outHit.entity = e;
             }
         }
     }
@@ -446,25 +480,32 @@ bool PhysicsSystem::Raycast(const glm::vec2& start, const glm::vec2& dir, float 
     return outHit.hit;
 }
 
-bool PhysicsSystem::BoxCast(const glm::vec2& start, const glm::vec2& end, const glm::vec2& size, RaycastHit& outHit, uint32_t layerMask, ColliderComponent* ignoreCollider, bool hitTriggers) const {
+bool PhysicsSystem::BoxCast(const glm::vec2& start, const glm::vec2& end, const glm::vec2& size, RaycastHit& outHit, uint32_t layerMask, EntityID ignoreEntity, bool hitTriggers) const {
     outHit.hit = false;
     glm::vec2 diff = end - start;
     float length = glm::length(diff);
     if (length < 1e-6f) return false;
+    if (!m_Registry) return false;
     
     glm::vec2 ndir = diff / length;
     outHit.distance = length;
 
-    for (auto* col : m_Colliders) {
-        if (col == ignoreCollider) continue;
-        if (!col->GetOwner() || !col->GetOwner()->IsActive()) continue;
-        if (!hitTriggers && col->IsTrigger()) continue;
+    for (EntityID e : m_Registry->ViewPhysicsObjects()) {
+        if (e == ignoreEntity) continue;
+        
+        const auto& col = m_Registry->GetComponent<ColliderComponent>(e);
+        const auto& trans = m_Registry->GetComponent<TransformComponent>(e);
 
-        uint32_t colLayerBit = 1 << static_cast<int>(col->GetOwner()->GetLayer());
+        if (!hitTriggers && col.IsTrigger()) continue;
+
+        Layer layer = Layer::Foreground;
+        if (m_Registry->HasComponent<SpriteComponent2D>(e)) layer = m_Registry->GetComponent<SpriteComponent2D>(e).layer;
+
+        uint32_t colLayerBit = 1 << static_cast<int>(layer);
         if ((layerMask & colLayerBit) == 0) continue;
 
         // Expand bounds by box half extents (Minkowski Sum)
-        ColliderComponent::AABB bounds = col->GetBounds();
+        ColliderComponent::AABB bounds = col.GetBounds(trans);
         bounds.minX -= size.x * 0.5f;
         bounds.maxX += size.x * 0.5f;
         bounds.minY -= size.y * 0.5f;
@@ -477,7 +518,7 @@ bool PhysicsSystem::BoxCast(const glm::vec2& start, const glm::vec2& end, const 
             outHit.distance = 0.0f;
             outHit.point = start;
             outHit.normal = glm::vec2(0.0f, 1.0f);
-            outHit.collider = col;
+            outHit.entity = e;
             continue;
         }
 
@@ -491,31 +532,38 @@ bool PhysicsSystem::BoxCast(const glm::vec2& start, const glm::vec2& end, const 
                 glm::vec2 boxCenter = start + ndir * t;
                 outHit.point = boxCenter - glm::vec2(nRaw.x * size.x * 0.5f, nRaw.y * size.y * 0.5f);
                 outHit.normal = nRaw;
-                outHit.collider = col;
+                outHit.entity = e;
             }
         }
     }
     return outHit.hit;
 }
 
-bool PhysicsSystem::CircleCast(const glm::vec2& start, const glm::vec2& end, float radius, RaycastHit& outHit, uint32_t layerMask, ColliderComponent* ignoreCollider, bool hitTriggers) const {
+bool PhysicsSystem::CircleCast(const glm::vec2& start, const glm::vec2& end, float radius, RaycastHit& outHit, uint32_t layerMask, EntityID ignoreEntity, bool hitTriggers) const {
     outHit.hit = false;
     glm::vec2 diff = end - start;
     float length = glm::length(diff);
     if (length < 1e-6f) return false;
+    if (!m_Registry) return false;
     
     glm::vec2 ndir = diff / length;
     outHit.distance = length;
 
-    for (auto* col : m_Colliders) {
-        if (col == ignoreCollider) continue;
-        if (!col->GetOwner() || !col->GetOwner()->IsActive()) continue;
-        if (!hitTriggers && col->IsTrigger()) continue;
+    for (EntityID e : m_Registry->ViewPhysicsObjects()) {
+        if (e == ignoreEntity) continue;
+        
+        const auto& col = m_Registry->GetComponent<ColliderComponent>(e);
+        const auto& trans = m_Registry->GetComponent<TransformComponent>(e);
 
-        uint32_t colLayerBit = 1 << static_cast<int>(col->GetOwner()->GetLayer());
+        if (!hitTriggers && col.IsTrigger()) continue;
+
+        Layer layer = Layer::Foreground;
+        if (m_Registry->HasComponent<SpriteComponent2D>(e)) layer = m_Registry->GetComponent<SpriteComponent2D>(e).layer;
+
+        uint32_t colLayerBit = 1 << static_cast<int>(layer);
         if ((layerMask & colLayerBit) == 0) continue;
 
-        ColliderComponent::AABB b = col->GetBounds();
+        ColliderComponent::AABB b = col.GetBounds(trans);
         
         // Distance from start to AABB
         float dx = std::max(0.0f, std::max(b.minX - start.x, start.x - b.maxX));
@@ -525,7 +573,7 @@ bool PhysicsSystem::CircleCast(const glm::vec2& start, const glm::vec2& end, flo
             outHit.distance = 0.0f;
             outHit.point = start;
             outHit.normal = glm::vec2(0.0f, 1.0f);
-            outHit.collider = col;
+            outHit.entity = e;
             continue;
         }
 
@@ -602,7 +650,7 @@ bool PhysicsSystem::CircleCast(const glm::vec2& start, const glm::vec2& end, flo
             glm::vec2 circleCenter = start + ndir * closestT;
             outHit.point = circleCenter - hitNormal * radius;
             outHit.normal = hitNormal;
-            outHit.collider = col;
+            outHit.entity = e;
         }
     }
     return outHit.hit;

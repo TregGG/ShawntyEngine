@@ -32,6 +32,7 @@ private:
     void CollectDebugRenderables();
     void SubmitRenderables();
     void SubmitDebugRenderables();
+    void RenderUI();
 
 private:
     Scene*  m_Scene  = nullptr;   // non-owning

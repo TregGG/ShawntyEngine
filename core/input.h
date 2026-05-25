@@ -4,6 +4,8 @@
 #include <vector>
 #include "system.h"   // for RawInputEvent
 
+class EventService;
+
 class Input
 {
 public:
@@ -15,7 +17,7 @@ public:
 
     // Frame lifecycle
     void BeginFrame();
-    void ProcessEvents(const std::vector<RawInputEvent>& events);
+    void ProcessEvents(const std::vector<RawInputEvent>& events, EventService* eventService = nullptr);
 
     // Queries
     bool IsKeyDown(int key) const;

@@ -1,5 +1,6 @@
 #include "rendermanager.h"
 #include "spriterendererclass.h"
+#include "../objects/ui/uiobject.h"
 #include<glad/glad.h>
 #include "../levels/scene.h"
 #define ENGINE_CLASS "RenderManager"
@@ -30,6 +31,9 @@ void RenderManager::OnScreenChange(int width, int height)
 {
     if (!m_Camera || height == 0)
         return;
+
+    m_ViewportWidth = width;
+    m_ViewportHeight = height;
 
     float aspect = static_cast<float>(width) / static_cast<float>(height);
 
@@ -63,41 +67,55 @@ void RenderManager::Render()
 
     SubmitRenderables();
     SubmitDebugRenderables();
+    
+    RenderUI();
 }
 
 void RenderManager::CollectRenderables()
 {
-   std::vector<RenderableSprite> renderables;
-    m_Scene->BuildRenderables(renderables);   
+    std::vector<EntityID> renderables = m_Scene->registry.ViewTransformAndSprite();   
     const glm::mat4& vp = m_Camera->GetViewProjection();
 
-    for (const RenderableSprite& r : renderables)
+    for (EntityID e : renderables)
     {
-        if (!r.spriteSheet)
+        const auto& transform = m_Scene->registry.GetComponent<TransformComponent>(e);
+        const auto& sprite = m_Scene->registry.GetComponent<SpriteComponent2D>(e);
+
+        if (!sprite.spriteSheet)
             continue;
 
-        if (r.frameIndex < 0 ||
-            r.frameIndex >= static_cast<int>(r.spriteSheet->frames.size()))
+        int frameIndex = sprite.frameIndex;
+
+        // Animator overrides static frame if present
+        if (m_Scene->registry.HasComponent<AnimatorComponent>(e)) {
+            const auto& animator = m_Scene->registry.GetComponent<AnimatorComponent>(e);
+            frameIndex = animator.GetFrameIndex();
+        }
+
+        if (frameIndex < 0 ||
+            frameIndex >= static_cast<int>(sprite.spriteSheet->frames.size()))
             continue;
 
-        // Build model matrix (hidden from gameplay)
-        glm::mat4 model = glm::translate(glm::mat4(1.0f),
-                                         glm::vec3(r.transform.position, 0.0f));
+        // Note: For parents and children, the absolute world position should be computed.
+        // For now, we assume transform.position is absolute world position, which should be
+        // scaled appropriately (this might need to be multiplied by PPT later).
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), 
+                                         glm::vec3(transform.GetWorldPosition(), 0.0f));
 
         model = glm::rotate(model,
-                            r.transform.rotation,
+                            transform.rotation,
                             glm::vec3(0, 0, 1));
 
         model = glm::scale(model,
-                           glm::vec3(r.transform.size, 1.0f));
+                           glm::vec3(transform.size, 1.0f));
 
         glm::mat4 mvp = vp * model;
 
         m_RenderQueue.push_back({
             mvp,
-            r.spriteSheet,
-            r.frameIndex,
-            r.layer
+            sprite.spriteSheet,
+            frameIndex,
+            sprite.layer
         });
     }
 }
@@ -171,6 +189,19 @@ void RenderManager::SubmitDebugRenderables()
         m_SpriteRenderer.DrawDebugLine(entry.mvp, entry.color);
     }
 #endif
+}
+
+void RenderManager::RenderUI()
+{
+    if (!m_Scene || m_ViewportWidth == 0 || m_ViewportHeight == 0) return;
+    
+    // Top-left is 0,0, bottom-right is width,height
+    glm::mat4 projection = glm::ortho(0.0f, (float)m_ViewportWidth, (float)m_ViewportHeight, 0.0f, -1.0f, 1.0f);
+    
+    const auto& uiElements = m_Scene->registry.GetUIElements();
+    for (const auto& ui : uiElements) {
+        ui->Render(projection);
+    }
 }
 
 void RenderManager::EndFrame()

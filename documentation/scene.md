@@ -1,65 +1,76 @@
 # Scene Management
 
-A `Scene` represents a distinct state or level in your game. For example, your Main Menu, Level 1, and Game Over screen would each be their own Scene.
+A `Scene` represents a distinct state (like a Main Menu, options page, or level) in your game. It acts as the primary holder for the `EntityRegistryService` and schedules systems updates.
 
-## Creating a Scene
+---
 
-To create a new scene, create a class that inherits from `Scene` and implement its three core lifecycle methods: `OnEnter`, `OnExit`, and `Update`.
+## 1. Creating a Scene
+To implement a custom scene, subclass `Scene` and implement `OnEnter`, `OnExit`, and `Update` methods:
 
 ```cpp
 #include "levels/scene.h"
+#include "testplayer.h"
 
-class MainMenuScene : public Scene {
+class MainLevel : public Scene {
 public:
-    // Pass the AssetManager to the base Scene class
-    MainMenuScene(AssetManager* assets) : Scene(assets) {}
+    MainLevel(AssetManager* assets) : Scene(assets) {}
 
-    // Called once when the scene is loaded
+    // Called when the scene is loaded
     void OnEnter() override {
-        // Create your GameObjects here
-        auto background = std::make_unique<GameObject>("Background");
-        background->GetTransform().position = glm::vec2(0.0f, 0.0f);
-        
-        // Add components...
-        
-        // Add the object to the scene's master list
-        m_GameObjects.push_back(std::move(background));
+        // 1. Initialize the registry
+        registry.Init();
+        m_Physics.Init();
+        m_Physics.BindRegistry(&registry);
+
+        const SpriteSheetAsset* sheet = m_Assets->GetSpriteSheet("PlayerSheet");
+
+        // 2. Instantiate GameObjects (like TestPlayer)
+        auto player = std::make_unique<TestPlayer>(this, "Player", sheet);
+        m_GameObjects.push_back(std::move(player));
     }
 
     // Called every frame
     void Update(float deltatime) override {
-        // Call update on all GameObjects
-        for(auto& obj : m_GameObjects) {
-            if (obj && obj->IsActive()) {
-                obj->Update(deltatime);
+        // Forward input and update wrappers
+        if (!m_GameObjects.empty()) {
+            if (auto* player = dynamic_cast<TestPlayer*>(m_GameObjects[0].get())) {
+                player->PassInput(m_Input);
+                player->Update(deltatime);
+            }
+        }
+
+        // Run physics simulation
+        m_Physics.Update(deltatime);
+
+        // Process animator components
+        for (EntityID e : registry.ViewAnimators()) {
+            auto& animator = registry.GetComponent<AnimatorComponent>(e);
+            if (animator.IsActive()) animator.Update(deltatime);
+        }
+
+        // Resolve transform hierarchy (rudimentary parent-child positioning)
+        for (EntityID e : registry.ViewRelationships()) {
+            const auto& rel = registry.GetComponent<RelationshipComponent>(e);
+            if (rel.parent != 0) {
+                auto& parentTrans = registry.GetComponent<TransformComponent>(rel.parent);
+                auto& childTrans = registry.GetComponent<TransformComponent>(e);
+                childTrans.position = parentTrans.position + childTrans.localPosition;
             }
         }
     }
 
-    // Called once when the scene is unloaded
+    // Called when the scene is unloaded
     void OnExit() override {
-        // Clean up any custom memory here
-        // Note: GameObjects in m_GameObjects are automatically cleaned up!
+        m_Physics.Shutdown();
+        registry.Shutdown();
     }
 };
 ```
 
-## Scene Responsibilities
+---
 
-The `Scene` base class provides several important built-in features that you have access to:
-
-### 1. `m_GameObjects` List
-The scene owns the master list of all `GameObject`s. When the scene is destroyed, it automatically cleans up and deletes all objects in this list.
-
-### 2. Rendering Collection
-You do not need to write rendering code in your scene. The base `Scene` class provides a `BuildRenderables()` function. Every frame, the engine automatically calls this function. It scans your `m_GameObjects` list, finds everything with a `SpriteRenderer2D`, and sends it to the graphics system to be drawn.
-
-### 3. `m_Camera`
-Every scene has its own `Camera`. You can access it using `GetCamera()`. You can move the camera's position to follow the player around your level!
-
-```cpp
-GetCamera().SetPosition(playerPos);
-```
-
-### 4. Inputs and Assets
-You have direct access to pointers for the `Input` system (to check if keys are pressed) and the `AssetManager` (`m_Assets`) to load new textures or objects during the level.
+## 2. Built-in Scene Properties
+- **`registry`**: The database holding all active entities and their components.
+- **`m_GameObjects`**: Pointers to factory wrappers (`GameObject` or subclasses like `TestPlayer`). These wrappers are automatically cleaned up when the scene is exited.
+- **`m_Camera`**: View parameters (position, zoom, projection matrices) accessed via `GetCamera()`.
+- **`m_Input`**: Pointer to the engine `Input` manager forwarding key/mouse press states to scenes.

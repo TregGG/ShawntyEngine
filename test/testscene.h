@@ -11,12 +11,18 @@ class GameObject;
 class AssetManager;
 class Input;
 
+#include "../objects/ui/uipanel.h"
+#include "../objects/ui/uitext.h"
+#include "../objects/ui/uibutton.h"
+#include "../objects/ui/uiinputfield.h"
+#include "../render/fontengine.h"
+#include "../services/base/eventservice.h"
+
 class TestScene : public Scene
 {
 public:
-    explicit TestScene(AssetManager* assets)
-        : Scene(assets)
-    {}
+    TestScene(AssetManager* assets, EventService* eventService, FontEngine* fontEngine)
+        : Scene(assets), m_EventService(eventService), m_FontEngine(fontEngine) {}
 
     void OnEnter() override;
     void OnExit() override;
@@ -29,8 +35,9 @@ private:
 
     // std::vector<std::unique_ptr<GameObject>> m_GameObjects;
     float m_MoveSpeed = 5.0f;
-    EntityRegistryService m_Registry;
     PhysicsSystem m_Physics;
+    EventService* m_EventService = nullptr;
+    FontEngine* m_FontEngine = nullptr;
     
     std::vector<DebugLine> m_TestLines;
     std::vector<DebugRect> m_TestRects;

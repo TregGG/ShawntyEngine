@@ -245,6 +245,14 @@ void TestScene::Update(float deltatime)
                 SimulateServerTick();
                 m_Physics.Update(tickInterval);
 
+                // Send reliable tick sync every 60 ticks (1 second)
+                if (m_ServerTick % 60 == 0) {
+                    PacketHeader tickHeader;
+                    tickHeader.type = PacketType::TickSync;
+                    tickHeader.tick = m_ServerTick;
+                    m_NetService->BroadcastPacket(0, &tickHeader, sizeof(PacketHeader), ENET_PACKET_FLAG_RELIABLE);
+                }
+
                 // Broadcast ServerUpdate (velocities) or StateSync (positions every 15 ticks)
                 if (m_ServerTick % 15 == 0) {
                     std::vector<char> buffer(sizeof(PacketHeader) + sizeof(uint32_t) + m_PeerToEntity.size() * sizeof(EntityPositionData));
@@ -554,9 +562,6 @@ glm::vec2 TestScene::ProjectPlayerState(EntityID entID, ENetPeer* peer, uint32_t
         pos += vel * dt;
     }
     
-    // Safety clamp to prevent falling below ground pivot
-    pos.y = std::max(pos.y, -2.0f);
-    
     return pos;
 }
 
@@ -694,6 +699,13 @@ void TestScene::OnNetworkPacket(ENetPeer* peer, void* data, size_t size) {
                 
                 m_ServerToLocalEntity.erase(sID);
                 ENGINE_LOG("Client cleaned up local proxy player (ID: %d) and weapon (ID: %d) for server entity %d", lID, weaponID, sID);
+            }
+        } else if (header->type == PacketType::TickSync) {
+            // Hard sync client tick to server tick only if it is significantly off
+            int diff = std::abs((int)m_ClientTick - (int)header->tick);
+            if (diff > 100) {
+                ENGINE_LOG("[Client] Tick difference is %d (> 100). Hard syncing client tick from %d to %d", diff, m_ClientTick, header->tick);
+                m_ClientTick = header->tick;
             }
         } else if (header->type == PacketType::StateSync) {
             // Receive absolute position sync (verification package)

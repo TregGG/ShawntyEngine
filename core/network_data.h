@@ -10,7 +10,8 @@ enum class PacketType : uint8_t {
     ActionRequest,   // Client -> Server (Shoot, Interact)
     ActionConfirm,   // Server -> Client (Action validated)
     AdminCommand,    // Client -> Server (e.g., Kick, Stop)
-    ServerCommand    // Server -> Client (e.g., Switch Scene)
+    ServerCommand,   // Server -> Client (e.g., Switch Scene)
+    TickSync         // Server -> Client (Reliable tick synchronization)
 };
 
 #pragma pack(push, 1)

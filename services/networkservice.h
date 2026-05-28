@@ -29,6 +29,12 @@ public:
     bool IsConnected() const { return m_IsConnected; }
     ENetPeer* GetServerPeer() const { return m_ServerPeer; }
     
+    bool IsPlayerPushingPrevented() const { return m_PreventPlayerPushing; }
+    void SetPreventPlayerPushing(bool prevent) { m_PreventPlayerPushing = prevent; }
+    
+    bool IsPlayersTransparent() const { return m_PlayersTransparent; }
+    void SetPlayersTransparent(bool transparent) { m_PlayersTransparent = transparent; }
+    
     std::function<void()> OnShutdownRequested;
     
     using PeerCallback = std::function<void(ENetPeer* peer)>;
@@ -58,4 +64,6 @@ private:
     
     PacketCallback m_PacketCallback;
     bool m_IsConnected = false;
+    bool m_PreventPlayerPushing = true;
+    bool m_PlayersTransparent = false;
 };

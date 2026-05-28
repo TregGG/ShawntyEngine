@@ -169,6 +169,20 @@ void PhysicsSystem::Update(float dt) {
         auto& colA = m_Registry->GetComponent<ColliderComponent>(ev.a);
         auto& colB = m_Registry->GetComponent<ColliderComponent>(ev.b);
         if (colA.IsTrigger() || colB.IsTrigger()) continue;
+
+        bool isPlayerCollision = false;
+        if (m_PreventPlayerPlayerPushing || m_PlayersTransparent) {
+            Layer layerA = Layer::Foreground;
+            Layer layerB = Layer::Foreground;
+            if (m_Registry->HasComponent<SpriteComponent2D>(ev.a)) layerA = m_Registry->GetComponent<SpriteComponent2D>(ev.a).layer;
+            if (m_Registry->HasComponent<SpriteComponent2D>(ev.b)) layerB = m_Registry->GetComponent<SpriteComponent2D>(ev.b).layer;
+            if (layerA == Layer::Player && layerB == Layer::Player) {
+                isPlayerCollision = true;
+                if (m_PlayersTransparent) {
+                    continue;
+                }
+            }
+        }
         
         bool hasRbA = m_Registry->HasComponent<RigidBodyComponent>(ev.a);
         bool hasRbB = m_Registry->HasComponent<RigidBodyComponent>(ev.b);
@@ -181,6 +195,22 @@ void PhysicsSystem::Update(float dt) {
         
         bool aMovable = rbA && rbA->GetType() == BodyType::Dynamic;
         bool bMovable = rbB && rbB->GetType() == BodyType::Dynamic;
+
+        if (isPlayerCollision && m_PreventPlayerPlayerPushing) {
+            float speedA = aMovable ? glm::length(rbA->GetVelocity()) : 0.0f;
+            float speedB = bMovable ? glm::length(rbB->GetVelocity()) : 0.0f;
+
+            if (speedA > speedB + 0.1f) {
+                bDisplaceable = false;
+                bMovable = false;
+            } else if (speedB > speedA + 0.1f) {
+                aDisplaceable = false;
+                aMovable = false;
+            } else {
+                aMovable = false;
+                bMovable = false;
+            }
+        }
         
         if (!aDisplaceable && !bDisplaceable) continue;
         

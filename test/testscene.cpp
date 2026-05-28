@@ -183,6 +183,7 @@ void TestScene::OnEnter()
     }
     
     if (m_NetService) {
+        m_Physics.SetPreventPlayerPlayerPushing(m_NetService->IsPlayerPushingPrevented());
         m_NetService->SetPacketCallback([this](ENetPeer* peer, void* data, size_t size) {
             this->OnNetworkPacket(peer, data, size);
         });
@@ -209,6 +210,9 @@ void TestScene::OnExit()
 
 void TestScene::Update(float deltatime)
 {
+    // Clamp deltatime to avoid huge bursts of ticks (spiral of death) when window loses focus
+    deltatime = std::min(deltatime, 0.1f);
+
     glm::vec2 cameraDir(0.0f);
 
     EntityID playerEntity = 0;
@@ -233,6 +237,9 @@ void TestScene::Update(float deltatime)
     while (m_TimeAccumulator >= tickInterval)
     {
         if (m_NetService) {
+            m_Physics.SetPreventPlayerPlayerPushing(m_NetService->IsPlayerPushingPrevented());
+            m_Physics.SetPlayersTransparent(m_NetService->IsPlayersTransparent());
+            
             if (m_NetService->GetMode() == NetworkMode::Server) {
                 m_ServerTick++;
                 SimulateServerTick();

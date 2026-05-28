@@ -65,6 +65,12 @@ public:
 
     const std::vector<CollisionEvent>& GetCollisions() const;
 
+    bool IsPlayerPlayerPushingPrevented() const { return m_PreventPlayerPlayerPushing; }
+    void SetPreventPlayerPlayerPushing(bool prevent) { m_PreventPlayerPlayerPushing = prevent; }
+
+    bool IsPlayersTransparent() const { return m_PlayersTransparent; }
+    void SetPlayersTransparent(bool transparent) { m_PlayersTransparent = transparent; }
+
 private:
     void CheckCollisions();
     void DispatchEvents();
@@ -79,4 +85,6 @@ private:
     std::vector<CollisionEvent> m_Collisions;
     
     std::unique_ptr<QuadtreeNode> m_Quadtree;
+    bool m_PreventPlayerPlayerPushing = true;
+    bool m_PlayersTransparent = false;
 };

@@ -8,6 +8,12 @@ void RigidBodyComponent::AddForce(const glm::vec2& force) {
     }
 }
 
+void RigidBodyComponent::ApplyLinearImpulse(const glm::vec2& impulse) {
+    if (m_Type == BodyType::Dynamic && m_InvMass > 0.0f) {
+        m_Velocity += impulse * m_InvMass;
+    }
+}
+
 void RigidBodyComponent::SetMass(float mass) {
     if (mass <= 0.0f) {
         m_Mass = 0.0f;

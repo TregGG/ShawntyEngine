@@ -72,10 +72,19 @@ System::~System()
 
 }
 
-bool System::Initialize(int width, int height, const char* title)
+bool System::Initialize(int width, int height, const char* title, bool headless)
 {
-    ENGINE_LOG("Initializing window %dx%d", width, height);
+    ENGINE_LOG("Initializing system...");
     m_shouldClose=false;
+    
+    if (headless) {
+        ENGINE_LOG("Headless mode enabled, skipping window creation.");
+        m_Width = width;
+        m_Height = height;
+        return true;
+    }
+    
+    ENGINE_LOG("Initializing window %dx%d", width, height);
     if(!glfwInit())
     {
         ENGINE_ERROR("Failed to initialize GLFW");
@@ -133,6 +142,7 @@ bool System::Initialize(int width, int height, const char* title)
 
 void System::PollEvents()
 {
+   if (!m_Window) return; // Headless
 
    glfwPollEvents();
 
@@ -163,7 +173,9 @@ void System::Shutdown()
 
 void System::SwapBuffers()
 {
-    glfwSwapBuffers(m_Window);
+    if (m_Window) {
+        glfwSwapBuffers(m_Window);
+    }
 }
 
 

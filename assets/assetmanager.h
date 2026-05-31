@@ -11,7 +11,7 @@
 class AssetManager
 {
 public:
-    bool Initialize(const std::string& compiledAssetRoot);
+    bool Initialize(const std::string& compiledAssetRoot, bool headless = false);
     void Shutdown();
 
     // object-level queries
@@ -34,4 +34,6 @@ private:
 
     // object → asset lookup
     std::unordered_map<ObjectID, ObjectAssetDescriptor> m_objectAssets;
+    
+    bool m_Headless = false;
 };

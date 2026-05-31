@@ -21,6 +21,7 @@ public:
 
     const glm::vec2& GetAcceleration() const { return m_Acceleration; }
     void AddForce(const glm::vec2& force);
+    void ApplyLinearImpulse(const glm::vec2& impulse);
 
     float GetMass() const { return m_Mass; }
     float GetInverseMass() const { return m_InvMass; }

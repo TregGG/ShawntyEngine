@@ -105,8 +105,16 @@ public:
 
     std::vector<EntityID>& Retrieve(std::vector<EntityID>& returnObjects, EntityID colliderEntity, EntityRegistryService* reg) {
         int index = GetIndex(colliderEntity, reg);
-        if (index != -1 && !isLeaf) {
-            children[index]->Retrieve(returnObjects, colliderEntity, reg);
+        if (!isLeaf) {
+            if (index != -1) {
+                children[index]->Retrieve(returnObjects, colliderEntity, reg);
+            } else {
+                for (int i = 0; i < 4; ++i) {
+                    if (children[i]) {
+                        children[i]->Retrieve(returnObjects, colliderEntity, reg);
+                    }
+                }
+            }
         }
         returnObjects.insert(returnObjects.end(), colliders.begin(), colliders.end());
         return returnObjects;
@@ -160,8 +168,21 @@ void PhysicsSystem::Update(float dt) {
     for (const auto& ev : m_Collisions) {
         auto& colA = m_Registry->GetComponent<ColliderComponent>(ev.a);
         auto& colB = m_Registry->GetComponent<ColliderComponent>(ev.b);
-        
         if (colA.IsTrigger() || colB.IsTrigger()) continue;
+
+        bool isPlayerCollision = false;
+        if (m_PreventPlayerPlayerPushing || m_PlayersTransparent) {
+            Layer layerA = Layer::Foreground;
+            Layer layerB = Layer::Foreground;
+            if (m_Registry->HasComponent<SpriteComponent2D>(ev.a)) layerA = m_Registry->GetComponent<SpriteComponent2D>(ev.a).layer;
+            if (m_Registry->HasComponent<SpriteComponent2D>(ev.b)) layerB = m_Registry->GetComponent<SpriteComponent2D>(ev.b).layer;
+            if (layerA == Layer::Player && layerB == Layer::Player) {
+                isPlayerCollision = true;
+                if (m_PlayersTransparent) {
+                    continue;
+                }
+            }
+        }
         
         bool hasRbA = m_Registry->HasComponent<RigidBodyComponent>(ev.a);
         bool hasRbB = m_Registry->HasComponent<RigidBodyComponent>(ev.b);
@@ -169,22 +190,41 @@ void PhysicsSystem::Update(float dt) {
         RigidBodyComponent* rbA = hasRbA ? &m_Registry->GetComponent<RigidBodyComponent>(ev.a) : nullptr;
         RigidBodyComponent* rbB = hasRbB ? &m_Registry->GetComponent<RigidBodyComponent>(ev.b) : nullptr;
         
+        bool aDisplaceable = rbA && (rbA->GetType() == BodyType::Dynamic || rbA->GetType() == BodyType::Kinematic);
+        bool bDisplaceable = rbB && (rbB->GetType() == BodyType::Dynamic || rbB->GetType() == BodyType::Kinematic);
+        
         bool aMovable = rbA && rbA->GetType() == BodyType::Dynamic;
         bool bMovable = rbB && rbB->GetType() == BodyType::Dynamic;
+
+        if (isPlayerCollision && m_PreventPlayerPlayerPushing) {
+            float speedA = aMovable ? glm::length(rbA->GetVelocity()) : 0.0f;
+            float speedB = bMovable ? glm::length(rbB->GetVelocity()) : 0.0f;
+
+            if (speedA > speedB + 0.1f) {
+                bDisplaceable = false;
+                bMovable = false;
+            } else if (speedB > speedA + 0.1f) {
+                aDisplaceable = false;
+                aMovable = false;
+            } else {
+                aMovable = false;
+                bMovable = false;
+            }
+        }
         
-        if (!aMovable && !bMovable) continue;
+        if (!aDisplaceable && !bDisplaceable) continue;
         
         auto& transA = m_Registry->GetComponent<TransformComponent>(ev.a);
         auto& transB = m_Registry->GetComponent<TransformComponent>(ev.b);
 
         // Positional Displacement
-        if (aMovable && !bMovable) {
+        if (aDisplaceable && !bDisplaceable) {
             transA.position += ev.normal * ev.depth;
-        } else if (!aMovable && bMovable) { 
+        } else if (!aDisplaceable && bDisplaceable) { 
             // Note: normal explicitly points A outward, so we invert testing -normal for B!
             transB.position -= ev.normal * ev.depth;
         } else {
-            // Both dynamic: divide depth natively avoiding clipping limits
+            // Both displaceable: divide depth natively avoiding clipping limits
             transA.position += ev.normal * (ev.depth * 0.5f);
             transB.position -= ev.normal * (ev.depth * 0.5f);
         }

@@ -19,5 +19,6 @@ public:
     NetworkControl* CreateNetworkControl() override;
 
 private:
-    Scene* m_TestScene = nullptr;
+    Scene* m_TestScene1 = nullptr;
+    Scene* m_TestScene2 = nullptr;
 };

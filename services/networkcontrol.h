@@ -5,6 +5,7 @@
 #include <map>
 #include <cstdint>
 #include <vector>
+#include <functional>
 #include <glm/vec2.hpp>
 #include <enet/enet.h>
 #include "../core/network_data.h"
@@ -41,6 +42,10 @@ public:
     uint32_t GetLocalPlayerID() const { return m_MyLocalPlayerID; }
     uint32_t GetServerTick() const { return m_ServerTick; }
     uint32_t GetClientTick() const { return m_ClientTick; }
+
+    std::function<void(const std::string&)> OnServerCommandReceived;
+    std::vector<EntityID> GetActivePlayerEntities() const;
+    virtual void OnSceneChanged();
 
 protected:
     // Game-specific virtual callbacks

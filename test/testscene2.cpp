@@ -1,5 +1,5 @@
-#include "testscene.h"
-#define ENGINE_CLASS "TestScene"
+#include "testscene2.h"
+#define ENGINE_CLASS "TestScene2"
 #include "../core/enginedebug.h"
 #include <glm/vec2.hpp>
 #include <glm/geometric.hpp>
@@ -16,7 +16,7 @@
 #include <GLFW/glfw3.h>
 #include <algorithm>
 
-void TestScene::OnEnter()
+void TestScene2::OnEnter()
 {
     registry.Init();
     m_Physics.Init();
@@ -86,9 +86,10 @@ void TestScene::OnEnter()
     
     m_GameObjects.push_back(std::move(trampObj));
 
-    // 4. Create UI
+    // 4. Create UI (if not server and not already connected)
     bool isServer = (m_NetService && m_NetService->GetMode() == NetworkMode::Server);
-    if (m_FontEngine && !isServer) {
+    bool isConnected = (m_NetService && m_NetService->IsConnected());
+    if (m_FontEngine && !isServer && !isConnected) {
         // UI Panel Background
         auto panel = std::make_unique<UIPanel>(this, "MainPanel");
         panel->Position = glm::vec2(50.0f, 50.0f);
@@ -98,7 +99,7 @@ void TestScene::OnEnter()
         // UI Text
         auto text = std::make_unique<UIText>(this, "TitleText", m_FontEngine);
         text->Position = glm::vec2(20.0f, 10.0f);
-        text->Text = "Multiplayer Test";
+        text->Text = "Multiplayer Test - Level 2";
         text->TextColor = glm::vec3(1.0f, 0.8f, 0.0f); // Gold
         panel->AddChild(std::move(text));
 
@@ -188,11 +189,13 @@ void TestScene::OnEnter()
     m_Camera.SetCameraPosition(0.0f, 0.0f);
 }
 
-void TestScene::OnExit()
+void TestScene2::OnExit()
 {
+    m_Physics.Shutdown();
+    registry.Shutdown();
 }
 
-void TestScene::Update(float deltatime)
+void TestScene2::Update(float deltatime)
 {
     // Ensure m_NetControl has the latest non-null m_Input pointer
     if (m_NetControl) {
@@ -250,8 +253,6 @@ void TestScene::Update(float deltatime)
         }
     }
 
-
-
     // Status logic
     if (m_NetService) {
         if (m_NetService->GetMode() == NetworkMode::Offline) {
@@ -278,12 +279,12 @@ void TestScene::Update(float deltatime)
     registry.Update(deltatime);
 }
 
-void TestScene::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) const
+void TestScene2::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) const
 {
     outDebugRects.insert(outDebugRects.end(), m_TestRects.begin(), m_TestRects.end());
 }
 
-void TestScene::BuildDebugLines(std::vector<DebugLine>& outDebugLines) const
+void TestScene2::BuildDebugLines(std::vector<DebugLine>& outDebugLines) const
 {
     outDebugLines.insert(outDebugLines.end(), m_TestLines.begin(), m_TestLines.end());
     

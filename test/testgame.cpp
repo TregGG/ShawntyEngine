@@ -1,5 +1,6 @@
 #include "testgame.h"
-#include "testscene.h"
+#include "testscene1.h"
+#include "testscene2.h"
 
 #include "../core/engine.h"
 #include "../core/input.h"
@@ -9,6 +10,7 @@
 #include "testnetworkcontrol.h"
 
 #include <string>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <GLFW/glfw3.h>
@@ -111,13 +113,44 @@ bool TestGame::OnInit()
         ENGINE_LOG("Server mode: skipping RenderManager and FontEngine initialization");
     }
 
-    ENGINE_LOG("FontEngine initialized, creating TestScene");
-	m_TestScene = new TestScene(&m_AssetManager, m_EventService, &m_FontEngine, m_NetService, m_NetControl);
+    ENGINE_LOG("FontEngine initialized, creating TestScene1 and TestScene2");
+	m_TestScene1 = new TestScene1(&m_AssetManager, m_EventService, &m_FontEngine, m_NetService, m_NetControl);
+	m_TestScene2 = new TestScene2(&m_AssetManager, m_EventService, &m_FontEngine, m_NetService, m_NetControl);
 
-	m_SceneManager.SetInitialScene(m_TestScene);
+	m_SceneManager.SetInitialScene(m_TestScene1);
     
     if (!isServer) {
-	    m_RenderManager.BindScene(m_TestScene);
+	    m_RenderManager.BindScene(m_TestScene1);
+    }
+
+    if (isServer) {
+        static_cast<TestScene1*>(m_TestScene1)->OnAllPlayersInTrigger = [this]() {
+            if (m_NetService && m_NetService->GetMode() == NetworkMode::Server && m_NetControl) {
+                ServerCommandPacket packet;
+                packet.header.type = PacketType::ServerCommand;
+                packet.header.tick = m_NetControl->GetServerTick();
+                strncpy(packet.command, "load_scene level2", sizeof(packet.command));
+                m_NetService->BroadcastPacket(0, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
+                m_NetControl->OnSceneChanged();
+                this->SetScene(m_TestScene2);
+            }
+        };
+    }
+
+    if (m_NetControl) {
+        m_NetControl->OnServerCommandReceived = [this](const std::string& command) {
+            if (command == "load_scene level2") {
+                ENGINE_LOG("Client: Switching scene to level 2 as commanded by server");
+                if (m_NetControl) {
+                    m_NetControl->OnSceneChanged();
+                }
+                this->SetScene(m_TestScene2);
+            }
+        };
+        if (!isServer && std::getenv("ENGINE_BOT")) {
+            ENGINE_LOG("Bot mode: Auto-connecting to local server");
+            m_NetService->Connect("127.0.0.1", 7777);
+        }
     }
 
     ENGINE_LOG("OnInit completed");
@@ -126,10 +159,10 @@ bool TestGame::OnInit()
 
 void TestGame::OnInput(const Input& input)
 {
-	// Pass input reference to scene for direct handling
-	if (m_TestScene)
+	// Pass input reference to active scene dynamically
+	if (m_SceneManager.GetActiveScene())
 	{
-		m_TestScene->SetInput(input);
+		m_SceneManager.GetActiveScene()->SetInput(input);
 	}
     
     // Networking tests
@@ -170,10 +203,15 @@ void TestGame::OnShutdown()
         m_RenderManager.Shutdown();
     }
     m_SceneManager.Shutdown();
-    if (m_TestScene)
+    if (m_TestScene1)
     {
-        delete m_TestScene;
-        m_TestScene = nullptr;
+        delete m_TestScene1;
+        m_TestScene1 = nullptr;
+    }
+    if (m_TestScene2)
+    {
+        delete m_TestScene2;
+        m_TestScene2 = nullptr;
     }
 
 	m_AssetManager.Shutdown();

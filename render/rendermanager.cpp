@@ -25,6 +25,10 @@ void RenderManager::BindScene(Scene* scene)
 {
     m_Scene = scene;
     m_Camera = scene ? &scene->GetCamera() : nullptr;
+    if (m_Camera && m_ViewportWidth > 0 && m_ViewportHeight > 0)
+    {
+        OnScreenChange(m_ViewportWidth, m_ViewportHeight);
+    }
 }
 
 void RenderManager::OnScreenChange(int width, int height)

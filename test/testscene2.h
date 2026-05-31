@@ -24,10 +24,10 @@ class Input;
 class NetworkService;
 class NetworkControl;
 
-class TestScene : public Scene
+class TestScene2 : public Scene
 {
 public:
-    TestScene(AssetManager* assets, EventService* eventService, FontEngine* fontEngine, NetworkService* netService, NetworkControl* netControl)
+    TestScene2(AssetManager* assets, EventService* eventService, FontEngine* fontEngine, NetworkService* netService, NetworkControl* netControl)
         : Scene(assets), m_EventService(eventService), m_FontEngine(fontEngine), m_NetService(netService), m_NetControl(netControl) {}
 
     void OnEnter() override;

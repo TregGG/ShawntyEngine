@@ -4,6 +4,7 @@
 #include "../levels/scene.h"
 #include <algorithm>
 #include "testplayer.h"
+#include <chrono>
 #include "../objects/components/rigidbodycomponent.h"
 #include "../objects/components/components.h"
 #include <GLFW/glfw3.h>
@@ -63,6 +64,29 @@ void TestNetworkControl::OnDestroyPlayer(EntityID entity) {
 }
 
 uint16_t TestNetworkControl::OnGenerateInputMask(Input* input) {
+    if (std::getenv("ENGINE_BOT")) {
+        static auto startTime = std::chrono::steady_clock::now();
+        auto now = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - startTime).count() < 3) {
+            return 0; // Wait for other bots to connect
+        }
+
+        if (m_Scene) {
+            EntityID myID = GetLocalPlayerID();
+            if (myID != 0 && m_Scene->registry.HasComponent<TransformComponent>(myID)) {
+                auto const& trans = m_Scene->registry.GetComponent<TransformComponent>(myID);
+                uint16_t mask = 0;
+                if (trans.position.x < 5.0f) {
+                    mask |= 8; // D (Move right)
+                } else if (trans.position.x > 5.2f) {
+                    mask |= 4; // A (Move left)
+                }
+                return mask;
+            }
+        }
+        return 8; // Default move right
+    }
+
     uint16_t mask = 0;
     if (input->IsKeyDown(GLFW_KEY_SPACE)) mask |= 1;
     if (input->IsKeyDown(GLFW_KEY_W))     mask |= 2;
@@ -90,4 +114,9 @@ void TestNetworkControl::OnApplyInput(EntityID entity, uint16_t inputMask) {
     }
     
     rb.SetVelocity(vel);
+}
+
+void TestNetworkControl::OnSceneChanged() {
+    NetworkControl::OnSceneChanged();
+    m_ManagedObjects.clear();
 }

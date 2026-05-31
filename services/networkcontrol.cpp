@@ -272,6 +272,11 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
                 OnDestroyPlayer(m_ServerToLocalEntity[sID]);
                 m_ServerToLocalEntity.erase(sID);
             }
+        } else if (header->type == PacketType::ServerCommand && size >= sizeof(ServerCommandPacket)) {
+            ServerCommandPacket* cmdPacket = reinterpret_cast<ServerCommandPacket*>(data);
+            if (OnServerCommandReceived) {
+                OnServerCommandReceived(cmdPacket->command);
+            }
         } else if (header->type == PacketType::TickSync) {
             int diff = std::abs((int)m_ClientTick - (int)header->tick);
             if (diff > 100) {
@@ -363,4 +368,26 @@ void NetworkControl::OnClientDisconnected(ENetPeer* peer) {
         OnDestroyPlayer(entID);
         m_PeerToEntity.erase(peer);
     }
+}
+
+std::vector<EntityID> NetworkControl::GetActivePlayerEntities() const {
+    std::vector<EntityID> players;
+    for (auto const& [peer, entID] : m_PeerToEntity) {
+        players.push_back(entID);
+    }
+    return players;
+}
+
+void NetworkControl::OnSceneChanged() {
+    m_PeerToEntity.clear();
+    m_BufferedPeerInputs.clear();
+    m_LastExecutedInputs.clear();
+
+    m_ServerToLocalEntity.clear();
+    m_MyServerPlayerID = 0;
+    m_MyLocalPlayerID = 0;
+    m_ClientStateHistory.clear();
+    m_ClientInputHistory.clear();
+
+    ENGINE_LOG("NetworkControl: Cleared connection entities and ticks for scene transition.");
 }

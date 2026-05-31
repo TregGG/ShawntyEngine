@@ -11,6 +11,7 @@ class TestNetworkControl : public NetworkControl {
 public:
     TestNetworkControl(AssetManager* assets);
     ~TestNetworkControl() override;
+    void OnSceneChanged() override;
 
 protected:
     EntityID OnSpawnPlayer(ENetPeer* peer, bool isLocal) override;

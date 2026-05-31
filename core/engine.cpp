@@ -59,7 +59,10 @@ bool Engine::Initialize(Game* game, bool isServer)
     m_Input= new Input();
     m_EventService = new EventService();
     m_NetworkService = new NetworkService();
-    m_NetworkControl = new NetworkControl();
+    m_NetworkControl = m_Game->CreateNetworkControl();
+    if (!m_NetworkControl) {
+        m_NetworkControl = new NetworkControl();
+    }
     m_OpenGL=new OpenGLClass();
 
     if(!m_System->Initialize(800,600,"Engine", m_IsServer))
@@ -87,11 +90,15 @@ bool Engine::Initialize(Game* game, bool isServer)
     };
     
     if (m_IsServer) {
-        m_NetworkService->Host(7777); // Default server port
+        if (!m_NetworkService->Host(7777)) {
+            ENGINE_ERROR("Failed to start server on port 7777. ENet Host creation failed. (Port probably in use).");
+            return false;
+        }
     }
     
     m_Game->SetEventService(m_EventService);
     m_Game->SetNetworkServices(m_NetworkService, m_NetworkControl);
+    m_Game->SetServerMode(m_IsServer);
     m_Timer->Start();
     
     if(!m_Game->OnInit())

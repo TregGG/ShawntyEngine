@@ -6,12 +6,16 @@
 #include "../assets/assetmanager.h"
 #include "../core/enginedebug.h"
 #include "../services/networkservice.h"
-#include "../services/networkcontrol.h"
+#include "testnetworkcontrol.h"
 
 #include <string>
 #include <filesystem>
 #include <fstream>
 #include <GLFW/glfw3.h>
+
+NetworkControl* TestGame::CreateNetworkControl() {
+    return new TestNetworkControl(&m_AssetManager);
+}
 
 namespace fs = std::filesystem;
 
@@ -85,8 +89,7 @@ bool TestGame::OnInit()
 		return false;
 	}
 
-    ENGINE_LOG("Assets written, initializing AssetManager");
-    bool isServer = (m_NetService && m_NetService->GetMode() == NetworkMode::Server);
+    bool isServer = IsServer();
 	if (!m_AssetManager.Initialize(compiledRoot, isServer))
 	{
         ENGINE_ERROR("AssetManager failed to initialize");
@@ -109,7 +112,7 @@ bool TestGame::OnInit()
     }
 
     ENGINE_LOG("FontEngine initialized, creating TestScene");
-	m_TestScene = new TestScene(&m_AssetManager, m_EventService, &m_FontEngine, m_NetService);
+	m_TestScene = new TestScene(&m_AssetManager, m_EventService, &m_FontEngine, m_NetService, m_NetControl);
 
 	m_SceneManager.SetInitialScene(m_TestScene);
     
@@ -161,7 +164,7 @@ void TestGame::OnRender()
 
 void TestGame::OnShutdown()
 {   
-    bool isServer = (m_NetService && m_NetService->GetMode() == NetworkMode::Server);
+    bool isServer = IsServer();
     
     if (!isServer) {
         m_RenderManager.Shutdown();

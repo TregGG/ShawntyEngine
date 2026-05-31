@@ -16,6 +16,8 @@ public:
     void OnRender() override;
     void OnShutdown() override;
 
+    NetworkControl* CreateNetworkControl() override;
+
 private:
     Scene* m_TestScene = nullptr;
 };

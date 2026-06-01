@@ -116,14 +116,14 @@ sequenceDiagram
     participant Clients
     Note over Server: Check triggers. All players in zone.
     Server->>Clients: ServerCommandPacket ("load_scene level2")
-    Server->>Server: OnSceneChanged() & SetScene(TestScene2)
+    Server->>Server: OnSceneChanged() & Reload/LoadScene("testscene2.scene")
     Note over Clients: ServerCommandPacket received.
-    Clients->>Clients: OnSceneChanged() & SetScene(TestScene2)
-    Note over Clients: Next client Tick runs on TestScene2.<br/>Local player ID is 0.
+    Clients->>Clients: OnSceneChanged() & Reload/LoadScene("testscene2.scene")
+    Note over Clients: Next client Tick runs on the new scene.<br/>Local player ID is 0.
     Clients->>Server: ClientInputPacket
-    Note over Server: Server receives input.<br/>Spawns player in TestScene2.
+    Note over Server: Server receives input.<br/>Spawns player in the new scene.
     Server->>Clients: ConnectPacket (clientEntityID = NewID)
-    Clients->>Clients: Spawn player locally in TestScene2
+    Clients->>Clients: Spawn player locally in the new scene
 ```
 
 1. **Trigger Condition Met**: When all active players enter the trigger zone simultaneously, the server initiates the transition.
@@ -131,5 +131,5 @@ sequenceDiagram
 3. **State Reset (`OnSceneChanged()`)**:
    - Both the server and clients call `OnSceneChanged()`, which clears connection maps (`m_PeerToEntity`, `m_ServerToLocalEntity`), state history, and resets local/server player IDs to 0.
    - `TestNetworkControl::OnSceneChanged()` clears `m_ManagedObjects` to destroy player unique pointers from the old scene, avoiding memory leaks.
-4. **Load Scene**: Both server and clients call `SetScene(m_TestScene2)`. The old scene's registries are destroyed (`OnExit()`) and the new scene is initialized (`OnEnter()`).
-5. **Self-Healing Spawning**: On the next client update tick, the client continues sending inputs. The server receives the packet from the client's peer (which is now missing from its cleared maps), spawns a new player in `TestScene2`, and sends back a `ConnectPacket`. The client receives the welcome packet and spawns its local player in `TestScene2` automatically.
+4. **Load Scene**: Both server and clients call `DataDrivenScene::Reload()` or load the new JSON scene file. The old scene's registries are destroyed (`OnExit()`), Python scripts are detached, and the new scene is initialized (`OnEnter()`).
+5. **Self-Healing Spawning**: On the next client update tick, the client continues sending inputs. The server receives the packet from the client's peer (which is now missing from its cleared maps), spawns a new player in the new scene, and sends back a `ConnectPacket`. The client receives the welcome packet and spawns its local player in the new scene automatically.

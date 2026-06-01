@@ -10,7 +10,7 @@ You need a C++17 compatible compiler and standard OpenGL/GLFW libraries installe
 
 **On Ubuntu/Debian:**
 ```bash
-sudo apt-get install build-essential libglfw3-dev libgl1-mesa-dev pkg-config libfreetype6-dev
+sudo apt-get install build-essential libglfw3-dev libgl1-mesa-dev pkg-config libfreetype6-dev python3-dev
 ```
 
 **On Arch Linux (using pacman):**
@@ -40,67 +40,69 @@ If you ever want to rebuild everything from scratch, run `make clean` first.
 
 ## Creating Your First Game
 
-Making a game involves extending the `Game` and `Scene` classes, and creating `GameObjects`.
+ShawntyEngine is **data-driven**. You don't need to write C++ code to design levels or gameplay logic. Instead, you design levels using JSON `.scene` files and write gameplay logic in Python.
 
-1. **Set up the Game Loop:**
-The `Game` class handles your main lifecycle hooks (init, update, render).
+1. **Design a Scene (JSON):**
+Create a `level1.scene` file to define your entities and their components.
+```json
+{
+    "version": 1,
+    "scene": {
+        "name": "Level 1",
+        "entities": [
+            {
+                "name": "Player",
+                "components": {
+                    "transform": { "position": [10.0, 5.0] },
+                    "sprite": { "layer": "Foreground" },
+                    "rigidbody": { "bodyType": "Dynamic" },
+                    "script": {
+                        "path": "scripts/player.py",
+                        "class": "PlayerController"
+                    }
+                }
+            }
+        ]
+    }
+}
+```
+
+2. **Write Game Logic (Python):**
+Create `scripts/player.py`. Scripts can read input, apply physics, and respond to triggers.
+```python
+import shawnty
+
+class PlayerController:
+    def OnUpdate(self, entity, dt, input):
+        if input.is_key_pressed(shawnty.KEY_SPACE):
+            entity.get_rigidbody().apply_impulse(shawnty.Vec2(0, 15))
+```
+
+3. **Load the Scene in C++:**
+In your main `Game` class, use `DataDrivenScene` to load everything automatically.
 ```cpp
+#include "core/engine.h"
+#include "levels/datadrivenscene.h"
+
 class MyGame : public Game {
+    DataDrivenScene* m_Scene;
 public:
-    bool OnInit() override;
-    void OnInput(const Input& input) override;
-    void OnUpdate(float deltaTime) override;
-    void OnRender() override;
-    void OnShutdown() override;
-};
-```
-
-2. **Create a Scene:**
-A `Scene` is where all your game objects live (like a specific level or menu screen).
-```cpp
-class MyLevel : public Scene {
-public:
-    MyLevel(AssetManager* assets) : Scene(assets) {}
-
-    void OnEnter() override {
-        registry.Init();
-
-        // Create player when the scene loads
-        auto player = std::make_unique<GameObject>(this, "Player");
-        EntityID pID = player->GetID();
-
-        TransformComponent pt;
-        pt.position = glm::vec2(100.0f, 100.0f);
-        pt.size = glm::vec2(1.0f, 1.0f);
-        registry.AddComponent<TransformComponent>(pID, pt);
-
-        m_GameObjects.push_back(std::move(player));
+    bool OnInit() override {
+        m_Scene = new DataDrivenScene(&m_AssetManager, "level1.scene");
+        m_SceneManager.SetInitialScene(m_Scene);
+        return true;
     }
     
-    void OnExit() override {
-        registry.Shutdown();
-    }
-    
-    void Update(float deltatime) override {
-        // Run physics and updates
-        m_Physics.Update(deltatime);
+    void OnUpdate(float deltaTime) override {
+        m_SceneManager.Update(deltaTime);
     }
 };
-```
 
-3. **Start the Engine:**
-In your `main.cpp`, initialize the engine with your game and run it!
-```cpp
 int main() {
     Engine engine;
     MyGame game;
-
-    if (!engine.Initialize(&game)) {
-        return -1;
-    }
-    
+    engine.Initialize(&game);
     engine.Run();
-    engine.Shutdown();
     return 0;
 }
 ```
@@ -109,13 +111,13 @@ int main() {
 
 Want to learn more? Check out the detailed guides in the `documentation/` folder:
 
-- **[Entity-Component System](documentation/components.md)**: How to make GameObjects and custom Behaviors.
+- **[Python Scripting](documentation/scripting_guide.md)**: How to write gameplay logic in Python.
+- **[Multiplayer Architecture](documentation/multiplayer/architecture_physics_scenes.md)**: How client-server state sync works.
+- **[Entity-Component System](documentation/components.md)**: How the underlying C++ components work.
 - **[Physics & Collisions](documentation/physics.md)**: How bounding boxes, rigid bodies, and collisions work.
 - **[Rendering Pipeline](documentation/rendering.md)**: How sprites and graphics are drawn.
 - **[Entity Registry](documentation/registry.md)**: Grouping and finding game objects easily.
-- **[Scene Management](documentation/scene.md)**: How levels and game screens work.
 - **[Asset Manager](documentation/assetmanager.md)**: Loading textures and animations.
-- **[Logging System](documentation/logging.md)**: How to track bugs and print messages.
 
 ## Contributing
 

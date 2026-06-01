@@ -1,0 +1,49 @@
+{
+    "version": 1,
+    "prefab": {
+        "name": "Player",
+        "category": "Player",
+        "components": {
+            "transform": {
+                "position": [0.0, 5.0],
+                "size": [1.0, 1.0]
+            },
+            "sprite": {
+                "objectId": "testobj",
+                "frameIndex": 0,
+                "layer": "Player"
+            },
+            "collider": {
+                "autoBounds": true
+            },
+            "rigidbody": {
+                "bodyType": "Dynamic",
+                "drag": 2.0,
+                "useGravity": true,
+                "gravityScale": 2.0
+            }
+        },
+        "children": [
+            {
+                "editorId": "weapon",
+                "name": "Weapon",
+                "category": "Environment",
+                "components": {
+                    "transform": {
+                        "localPosition": [1.0, -0.3],
+                        "size": [0.5, 0.5]
+                    },
+                    "sprite": {
+                        "objectId": "testobj",
+                        "frameIndex": 0,
+                        "layer": "Player"
+                    },
+                    "collider": {
+                        "autoBounds": true,
+                        "isTrigger": true
+                    }
+                }
+            }
+        ]
+    }
+}

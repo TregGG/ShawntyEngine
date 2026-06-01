@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include "../../../core/entityid.h"
 #include "../../service.h"
 #include <vector>
@@ -12,6 +13,7 @@
 #include "../../../objects/components/collidercomponent.h"
 #include "../../../objects/components/rigidbodycomponent.h"
 #include "../../../objects/components/animator.h"
+#include "../../../objects/components/scriptcomponent.h"
 #include "../../../objects/ui/uiobject.h"
 
 template<typename T>
@@ -93,6 +95,7 @@ public:
         else if constexpr (std::is_same_v<T, ColliderComponent>) { return m_Colliders.Add(e, comp); }
         else if constexpr (std::is_same_v<T, RigidBodyComponent>) { return m_RigidBodies.Add(e, comp); }
         else if constexpr (std::is_same_v<T, AnimatorComponent>) { return m_Animators.Add(e, comp); }
+        else if constexpr (std::is_same_v<T, ScriptComponent>) { return m_Scripts.Add(e, comp); }
         else { static_assert(sizeof(T) == 0, "Unsupported component type"); }
     }
 
@@ -103,6 +106,7 @@ public:
         else if constexpr (std::is_same_v<T, ColliderComponent>) { return m_Colliders.Get(e); }
         else if constexpr (std::is_same_v<T, RigidBodyComponent>) { return m_RigidBodies.Get(e); }
         else if constexpr (std::is_same_v<T, AnimatorComponent>) { return m_Animators.Get(e); }
+        else if constexpr (std::is_same_v<T, ScriptComponent>) { return m_Scripts.Get(e); }
         else { static_assert(sizeof(T) == 0, "Unsupported component type"); }
     }
 
@@ -113,6 +117,7 @@ public:
         else if constexpr (std::is_same_v<T, ColliderComponent>) { return m_Colliders.Get(e); }
         else if constexpr (std::is_same_v<T, RigidBodyComponent>) { return m_RigidBodies.Get(e); }
         else if constexpr (std::is_same_v<T, AnimatorComponent>) { return m_Animators.Get(e); }
+        else if constexpr (std::is_same_v<T, ScriptComponent>) { return m_Scripts.Get(e); }
         else { static_assert(sizeof(T) == 0, "Unsupported component type"); }
     }
 
@@ -123,6 +128,7 @@ public:
         else if constexpr (std::is_same_v<T, ColliderComponent>) { return m_Colliders.Has(e); }
         else if constexpr (std::is_same_v<T, RigidBodyComponent>) { return m_RigidBodies.Has(e); }
         else if constexpr (std::is_same_v<T, AnimatorComponent>) { return m_Animators.Has(e); }
+        else if constexpr (std::is_same_v<T, ScriptComponent>) { return m_Scripts.Has(e); }
         else { static_assert(sizeof(T) == 0, "Unsupported component type"); return false;}
     }
 
@@ -134,6 +140,7 @@ public:
         else if constexpr (std::is_same_v<T, ColliderComponent>) { m_Colliders.Remove(e); }
         else if constexpr (std::is_same_v<T, RigidBodyComponent>) { m_RigidBodies.Remove(e); }
         else if constexpr (std::is_same_v<T, AnimatorComponent>) { m_Animators.Remove(e); }
+        else if constexpr (std::is_same_v<T, ScriptComponent>) { m_Scripts.Remove(e); }
         else { static_assert(sizeof(T) == 0, "Unsupported component type"); }
     }
 
@@ -147,6 +154,11 @@ public:
         m_ViewsDirty = true;
     }
 
+    // --- Editor ID System ---
+    void SetEditorId(EntityID entity, const std::string& editorId);
+    const std::string& GetEditorId(EntityID entity) const;
+    EntityID FindByEditorId(const std::string& editorId) const;
+
 private:
     void RebuildViews() const;
     ComponentPool<TransformComponent> m_Transforms;
@@ -155,6 +167,7 @@ private:
     ComponentPool<ColliderComponent> m_Colliders;
     ComponentPool<RigidBodyComponent> m_RigidBodies;
     ComponentPool<AnimatorComponent> m_Animators;
+    ComponentPool<ScriptComponent> m_Scripts;
 
     mutable bool m_ViewsDirty = true;
     mutable std::vector<EntityID> m_CachedTransformSprite;
@@ -171,6 +184,7 @@ private:
         EntityCategory category = EntityCategory::Environment;
         std::string name;
         std::string registeredBy;
+        std::string editorId;   // Stable ID for editor/scene file round-tripping
     };
 
     std::vector<Slot> m_Slots;
@@ -184,4 +198,7 @@ private:
 
     // Fast category access
     std::vector<std::vector<std::uint32_t>> m_CategoryBuckets;
+
+    // Editor ID reverse lookup: editorId -> EntityID
+    std::unordered_map<std::string, EntityID> m_EditorIdMap;
 };

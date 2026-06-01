@@ -48,8 +48,10 @@ public:
     virtual void BuildDebugLines(std::vector<DebugLine>& /*outDebugLines*/) const {}
     
     void SetInput(const Input& input) {m_Input=&input;};
+    const Input* GetInput() const { return m_Input; }
 
     Camera& GetCamera(){return m_Camera;};
+    const Camera& GetCamera() const { return m_Camera; };
 
     EntityRegistryService registry; // The Database
 

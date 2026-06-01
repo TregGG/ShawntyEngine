@@ -6,6 +6,7 @@
 #include "../assets/assetmanager.h"
 
 class Scene;
+class DataDrivenScene;
 
 class TestGame : public Game
 {
@@ -19,6 +20,19 @@ public:
     NetworkControl* CreateNetworkControl() override;
 
 private:
-    Scene* m_TestScene1 = nullptr;
-    Scene* m_TestScene2 = nullptr;
+    // Helper: Create UI for host/join (called after scene enters)
+    void CreateNetworkUI(Scene* scene);
+
+    DataDrivenScene* m_DDScene1 = nullptr;
+    DataDrivenScene* m_DDScene2 = nullptr;
+
+    // Networking UI state
+    class UIText* m_StatusText = nullptr;
+    bool m_UIHidden = false;
+
+    // Track the scene trigger entity for scene transition
+    EntityID m_TriggerID = 0;
+
+    // Fixed timestep accumulator for networking ticks
+    float m_NetworkTimeAccumulator = 0.0f;
 };

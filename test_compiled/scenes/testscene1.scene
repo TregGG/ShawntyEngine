@@ -1,0 +1,57 @@
+{
+    "version": 1,
+    "scene": {
+        "name": "TestScene1",
+        "camera": {
+            "position": [0.0, 0.0],
+            "scale": 2.0
+        },
+        "entities": [
+            {
+                "editorId": "ground",
+                "name": "Ground",
+                "category": "Environment",
+                "components": {
+                    "transform": {
+                        "position": [0.0, -3.0],
+                        "size": [25.0, 1.0]
+                    },
+                    "sprite": {
+                        "objectId": "testobj",
+                        "frameIndex": 0,
+                        "layer": "Background"
+                    },
+                    "collider": {
+                        "autoBounds": true
+                    },
+                    "rigidbody": {
+                        "bodyType": "Static",
+                        "elasticity": 0.0
+                    }
+                }
+            },
+            {
+                "editorId": "scene_trigger",
+                "name": "SceneTrigger",
+                "category": "Environment",
+                "components": {
+                    "transform": {
+                        "position": [5.0, -1.0],
+                        "size": [2.0, 2.0]
+                    },
+                    "sprite": {
+                        "layer": "Foreground"
+                    },
+                    "collider": {
+                        "autoBounds": true,
+                        "isTrigger": true
+                    },
+                    "script": {
+                        "path": "test_compiled/scripts/scene_trigger.py",
+                        "class": "SceneTrigger"
+                    }
+                }
+            }
+        ]
+    }
+}

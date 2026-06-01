@@ -278,9 +278,13 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
                 OnServerCommandReceived(cmdPacket->command);
             }
         } else if (header->type == PacketType::TickSync) {
-            int diff = std::abs((int)m_ClientTick - (int)header->tick);
-            if (diff > 100) {
-                m_ClientTick = header->tick;
+            uint32_t targetClientTick = header->tick + m_LatencyOffsetTicks;
+            int diff = (int)m_ClientTick - (int)targetClientTick;
+            if (std::abs(diff) > 3) {
+                m_ClientTick = targetClientTick;
+                m_ClientStateHistory.clear();
+                m_ClientInputHistory.clear();
+                ENGINE_LOG("[Client] Clock drifted by %d ticks. Resynchronized client tick to %u.", diff, m_ClientTick);
             }
         } else if (header->type == PacketType::StateSync) {
             size_t countOffset = sizeof(PacketHeader);
@@ -292,6 +296,14 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
             EntityPositionData* positions = reinterpret_cast<EntityPositionData*>(static_cast<char*>(data) + dataOffset);
             
             uint32_t serverUpdateTick = header->tick;
+            uint32_t targetClientTick = serverUpdateTick + m_LatencyOffsetTicks;
+            int diff = (int)m_ClientTick - (int)targetClientTick;
+            if (std::abs(diff) > 3) {
+                m_ClientTick = targetClientTick;
+                m_ClientStateHistory.clear();
+                m_ClientInputHistory.clear();
+                ENGINE_LOG("[Client StateSync] Clock drifted by %d ticks. Resynchronized client tick to %u.", diff, m_ClientTick);
+            }
             
             std::vector<uint32_t> activeServerIDs;
             activeServerIDs.reserve(count);

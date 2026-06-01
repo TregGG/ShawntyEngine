@@ -141,6 +141,14 @@ void EntityRegistryService::Update(float dt)
         RemoveComponent<ColliderComponent>(e);
         RemoveComponent<RigidBodyComponent>(e);
         RemoveComponent<AnimatorComponent>(e);
+        RemoveComponent<ScriptComponent>(e);
+
+        // Clean up editor ID mapping
+        if (e < m_Slots.size() && !m_Slots[e].editorId.empty()) {
+            m_EditorIdMap.erase(m_Slots[e].editorId);
+            m_Slots[e].editorId.clear();
+        }
+
         m_FreeList.push_back(e);
     }
     m_PendingDestroy.clear();
@@ -159,10 +167,43 @@ void EntityRegistryService::Shutdown()
     m_Colliders.clear();
     m_RigidBodies.clear();
     m_Animators.clear();
+    m_Scripts.clear();
     m_Slots.clear();
     m_FreeList.clear();
     m_PendingDestroy.clear();
     m_CategoryBuckets.clear();
+    m_EditorIdMap.clear();
+}
+
+// --- Editor ID System ---
+
+void EntityRegistryService::SetEditorId(EntityID entity, const std::string& editorId) {
+    std::uint32_t index = EntityIndex(entity);
+    if (index >= m_Slots.size()) return;
+    
+    // Remove old mapping if exists
+    if (!m_Slots[index].editorId.empty()) {
+        m_EditorIdMap.erase(m_Slots[index].editorId);
+    }
+    
+    m_Slots[index].editorId = editorId;
+    if (!editorId.empty()) {
+        m_EditorIdMap[editorId] = entity;
+    }
+}
+
+static const std::string s_EmptyString;
+
+const std::string& EntityRegistryService::GetEditorId(EntityID entity) const {
+    std::uint32_t index = EntityIndex(entity);
+    if (index >= m_Slots.size()) return s_EmptyString;
+    return m_Slots[index].editorId;
+}
+
+EntityID EntityRegistryService::FindByEditorId(const std::string& editorId) const {
+    auto it = m_EditorIdMap.find(editorId);
+    if (it != m_EditorIdMap.end()) return it->second;
+    return 0; // Invalid entity
 }
 
 void EntityRegistryService::AddUIElement(std::unique_ptr<UIObject> element) {

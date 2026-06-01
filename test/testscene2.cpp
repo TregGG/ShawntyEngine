@@ -281,7 +281,24 @@ void TestScene2::Update(float deltatime)
 
 void TestScene2::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) const
 {
+#ifdef ENGINE_DEBUG
+    outDebugRects.clear();
+    for (EntityID e : registry.ViewPhysicsObjects()) 
+    {
+        const auto& col = registry.GetComponent<ColliderComponent>(e);
+        const auto& trans = registry.GetComponent<TransformComponent>(e);
+        
+        auto b = col.GetBounds(trans);
+        glm::vec2 size(b.maxX - b.minX, b.maxY - b.minY);
+        glm::vec3 pos(b.minX + size.x * 0.5f, b.minY + size.y * 0.5f, 0.0f);
+        
+        glm::vec3 cColor = col.IsTrigger() ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+        outDebugRects.push_back({pos, size, cColor});
+    }
     outDebugRects.insert(outDebugRects.end(), m_TestRects.begin(), m_TestRects.end());
+#else
+    (void)outDebugRects;
+#endif
 }
 
 void TestScene2::BuildDebugLines(std::vector<DebugLine>& outDebugLines) const

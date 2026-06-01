@@ -35,7 +35,7 @@ rwildcard=$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(su
 SRCS := main.cpp \
         external/glad/src/glad.c \
         $(wildcard external/enet/*.c) \
-        $(call rwildcard,core levels render assets objects test services,*.cpp)
+        $(call rwildcard,core levels render assets objects test services serialization scripting,*.cpp)
 
 # --------------------------------------------------
 # Object files
@@ -51,7 +51,10 @@ OBJS := $(patsubst %,$(OBJ_DIR)/%,$(OBJS))
 
 BASE_FLAGS := -std=c++17 -Wall -Wextra -g \
               -Icore -Ilevels -Iexternal/glad/include -Iexternal/glm -Iexternal/enet/include \
-              $(shell pkg-config --cflags freetype2)
+              -Iexternal \
+              $(shell pkg-config --cflags freetype2) \
+              $(shell pkg-config --cflags python3-embed) \
+              $(shell python3 -m pybind11 --includes)
 
 ifeq ($(BUILD),console)
 CXXFLAGS := $(BASE_FLAGS) -DENGINE_DEBUG -DENGINE_LOG_CONSOLE
@@ -63,7 +66,8 @@ else
 CXXFLAGS := $(BASE_FLAGS) -DENGINE_DEBUG -DENGINE_LOG_BOTH
 endif
 
-LDFLAGS := $(shell pkg-config --cflags --libs glfw3 freetype2) -lGL
+LDFLAGS := $(shell pkg-config --cflags --libs glfw3 freetype2) -lGL \
+           $(shell pkg-config --libs python3-embed)
 
 # --------------------------------------------------
 # Default target

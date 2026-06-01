@@ -197,13 +197,17 @@ void PhysicsSystem::Update(float dt) {
         bool bMovable = rbB && rbB->GetType() == BodyType::Dynamic;
 
         if (isPlayerCollision && m_PreventPlayerPlayerPushing) {
-            float speedA = aMovable ? glm::length(rbA->GetVelocity()) : 0.0f;
-            float speedB = bMovable ? glm::length(rbB->GetVelocity()) : 0.0f;
+            glm::vec2 velA = rbA ? rbA->GetVelocity() : glm::vec2(0.0f);
+            glm::vec2 velB = rbB ? rbB->GetVelocity() : glm::vec2(0.0f);
 
-            if (speedA > speedB + 0.1f) {
+            float pushAtoB = -glm::dot(velA, ev.normal);
+            float pushBtoA = glm::dot(velB, ev.normal);
+
+            float threshold = 0.05f;
+            if (pushAtoB > threshold && pushBtoA <= threshold) {
                 bDisplaceable = false;
                 bMovable = false;
-            } else if (speedB > speedA + 0.1f) {
+            } else if (pushBtoA > threshold && pushAtoB <= threshold) {
                 aDisplaceable = false;
                 aMovable = false;
             } else {

@@ -293,7 +293,23 @@ void TestScene1::Update(float deltatime)
 
 void TestScene1::BuildDebugRenderables(std::vector<DebugRect>& outDebugRects) const
 {
+#ifdef ENGINE_DEBUG
+    outDebugRects.clear();
+    for (EntityID e : registry.ViewPhysicsObjects()) 
+    {
+        const auto& col = registry.GetComponent<ColliderComponent>(e);
+        const auto& trans = registry.GetComponent<TransformComponent>(e);
+        
+        auto b = col.GetBounds(trans);
+        glm::vec2 size(b.maxX - b.minX, b.maxY - b.minY);
+        glm::vec3 pos(b.minX + size.x * 0.5f, b.minY + size.y * 0.5f, 0.0f);
+        
+        glm::vec3 cColor = col.IsTrigger() ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+        outDebugRects.push_back({pos, size, cColor});
+    }
+#else
     (void)outDebugRects;
+#endif
 }
 
 void TestScene1::BuildDebugLines(std::vector<DebugLine>& outDebugLines) const
@@ -301,22 +317,4 @@ void TestScene1::BuildDebugLines(std::vector<DebugLine>& outDebugLines) const
     // Draw crosshair at origin
     outDebugLines.push_back({glm::vec2(-0.5f, 0.0f), glm::vec2(0.5f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f)});
     outDebugLines.push_back({glm::vec2(0.0f, -0.5f), glm::vec2(0.0f, 0.5f), glm::vec3(0.0f, 1.0f, 0.0f)});
-
-    // Draw level trigger zone boundary (outlined in green)
-    if (registry.HasComponent<TransformComponent>(m_TriggerID)) {
-        auto const& trans = registry.GetComponent<TransformComponent>(m_TriggerID);
-        glm::vec2 pos = trans.position;
-        glm::vec2 size = trans.size;
-        
-        glm::vec2 half = size * 0.5f;
-        glm::vec2 tl = pos + glm::vec2(-half.x, half.y);
-        glm::vec2 tr = pos + glm::vec2(half.x, half.y);
-        glm::vec2 bl = pos + glm::vec2(-half.x, -half.y);
-        glm::vec2 br = pos + glm::vec2(half.x, -half.y);
-        
-        outDebugLines.push_back({tl, tr, glm::vec3(0.0f, 1.0f, 0.0f)});
-        outDebugLines.push_back({tr, br, glm::vec3(0.0f, 1.0f, 0.0f)});
-        outDebugLines.push_back({br, bl, glm::vec3(0.0f, 1.0f, 0.0f)});
-        outDebugLines.push_back({bl, tl, glm::vec3(0.0f, 1.0f, 0.0f)});
-    }
 }

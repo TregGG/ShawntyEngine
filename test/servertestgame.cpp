@@ -38,14 +38,7 @@ DataDrivenScene* ServerTestGame::GetOrCreateScene(const std::string& path) {
 
 bool ServerTestGame::OnInit()
 {
-    ENGINE_LOG("ServerTestGame::OnInit");
-
     const std::string compiledRoot = "test_compiled";
-    if (!WriteTestCompiledAssets(compiledRoot))
-    {
-        ENGINE_ERROR("Failed to write compiled assets");
-        return false;
-    }
 
     if (!m_AssetManager.Initialize(compiledRoot, true))
     {

@@ -9,6 +9,7 @@ import json
 import asyncio
 from pathlib import Path
 from typing import Optional
+import subprocess
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -300,20 +301,88 @@ async def upload_texture(file: UploadFile = File(...)):
     ext = Path(file.filename).suffix.lower()
     if ext not in allowed:
         raise HTTPException(400, f"Unsupported format: {ext}. Use: {allowed}")
-    dest = os.path.join(TEXTURES_DIR, file.filename)
-    with open(dest, "wb") as f:
-        content = await file.read()
-        f.write(content)
+    
     name = Path(file.filename).stem
+    # If already a TGA, save directly
+    if ext == '.tga':
+        dest = os.path.join(TEXTURES_DIR, f"{name}.tga")
+        with open(dest, "wb") as f:
+            content = await file.read()
+            f.write(content)
+    else:
+        # Save temp file
+        temp_path = os.path.join(TEXTURES_DIR, f"temp_{file.filename}")
+        with open(temp_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+        
+        # Convert using ImageMagick 'convert' or fallback to 'magick'
+        tga_path = os.path.join(TEXTURES_DIR, f"{name}.tga")
+        try:
+            result = subprocess.run(
+                ["convert", temp_path, tga_path],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                # Try 'magick' fallback
+                result = subprocess.run(
+                    ["magick", temp_path, tga_path],
+                    capture_output=True,
+                    text=True
+                )
+                if result.returncode != 0:
+                    raise Exception(f"ImageMagick failed: {result.stderr}")
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise HTTPException(500, f"Image conversion to TGA failed: {str(e)}")
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                
     await manager.broadcast({"type": "texture_uploaded", "name": name})
     _send_reload_packet()
-    return {"status": "ok", "name": name, "filename": file.filename}
+    return {"status": "ok", "name": name, "filename": f"{name}.tga"}
 
-@app.get("/api/textures")
-async def list_textures():
-    if not os.path.isdir(TEXTURES_DIR):
-        return []
-    return sorted(f for f in os.listdir(TEXTURES_DIR) if not f.startswith('.'))
+@app.get("/api/textures/{name}/image")
+async def get_texture_image(name: str):
+    tga_path = os.path.join(TEXTURES_DIR, f"{name}.tga")
+    png_path = os.path.join(TEXTURES_DIR, f"{name}.png")
+    
+    if not os.path.exists(tga_path):
+        raise HTTPException(404, f"Texture '{name}' not found")
+        
+    if not os.path.exists(png_path):
+        try:
+            subprocess.run(["convert", tga_path, png_path], check=True)
+        except Exception:
+            try:
+                subprocess.run(["magick", tga_path, png_path], check=True)
+            except Exception as e:
+                raise HTTPException(500, f"Failed to convert TGA to PNG: {str(e)}")
+                
+    return FileResponse(png_path, media_type="image/png")
+
+@app.delete("/api/textures/{name}")
+async def delete_texture(name: str):
+    tga_path = os.path.join(TEXTURES_DIR, f"{name}.tga")
+    png_path = os.path.join(TEXTURES_DIR, f"{name}.png")
+    
+    deleted = False
+    if os.path.exists(tga_path):
+        os.remove(tga_path)
+        deleted = True
+    if os.path.exists(png_path):
+        os.remove(png_path)
+        deleted = True
+        
+    if not deleted:
+        raise HTTPException(404, f"Texture '{name}' not found")
+        
+    await manager.broadcast({"type": "texture_deleted", "name": name})
+    _send_reload_packet()
+    return {"status": "ok", "name": name}
 
 # --- Spritesheet CRUD ---
 @app.get("/api/spritesheets")
@@ -327,6 +396,18 @@ async def get_spritesheet(name: str):
         raise HTTPException(404, f"Spritesheet '{name}' not found")
     with open(filepath, "r") as f:
         return {"name": name, "content": f.read()}
+
+@app.put("/api/spritesheets/{name}")
+async def update_spritesheet(name: str, request: Request):
+    filepath = os.path.join(SPRITESHEETS_DIR, f"{name}.ssheet")
+    if not os.path.exists(filepath):
+        raise HTTPException(404, f"Spritesheet '{name}' not found")
+    body = await request.json()
+    with open(filepath, "w") as f:
+        f.write(body.get("content", ""))
+    await manager.broadcast({"type": "spritesheet_updated", "name": name})
+    _send_reload_packet()
+    return {"status": "ok", "name": name}
 
 @app.post("/api/spritesheets")
 async def create_spritesheet(request: Request):
@@ -348,6 +429,111 @@ async def create_spritesheet(request: Request):
         f.write("\n".join(lines) + "\n")
     _send_reload_packet()
     return {"status": "ok", "name": name, "frameCount": idx}
+
+@app.post("/api/spritesheets/{name}/append")
+async def append_spritesheet_frame(name: str, file: UploadFile = File(...)):
+    ssheet_path = os.path.join(SPRITESHEETS_DIR, f"{name}.ssheet")
+    if not os.path.exists(ssheet_path):
+        raise HTTPException(404, f"Spritesheet '{name}' not found")
+        
+    with open(ssheet_path, "r") as f:
+        content = f.read()
+        
+    lines = content.strip().split("\n")
+    texture_name = name
+    frames = []
+    
+    for line in lines:
+        line = line.strip()
+        if line.startswith("texture:"):
+            texture_name = line.split(":", 1)[1].strip()
+        elif ":" in line and "=" in line:
+            parts = line.split(":", 1)
+            idx = int(parts[0].strip())
+            frame_data = {}
+            for p in parts[1].strip().split():
+                if "=" in p:
+                    k, v = p.split("=", 1)
+                    frame_data[k] = int(v)
+            frames.append((idx, frame_data))
+            
+    next_idx = len(frames)
+    next_x = 0
+    if frames:
+        frames.sort(key=lambda x: x[0])
+        last_frame = frames[-1][1]
+        next_x = last_frame.get("x", 0) + last_frame.get("w", 32)
+        
+    temp_path = os.path.join(TEXTURES_DIR, f"temp_append_{file.filename}")
+    with open(temp_path, "wb") as f:
+        f.write(await file.read())
+        
+    new_w, new_h = 32, 32
+    try:
+        ident_res = subprocess.run(
+            ["identify", "-format", "%w %h", temp_path],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        parts = ident_res.stdout.strip().split()
+        if len(parts) == 2:
+            new_w, new_h = int(parts[0]), int(parts[1])
+    except Exception:
+        try:
+            ident_res = subprocess.run(
+                ["magick", "identify", "-format", "%w %h", temp_path],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            parts = ident_res.stdout.strip().split()
+            if len(parts) == 2:
+                new_w, new_h = int(parts[0]), int(parts[1])
+        except Exception:
+            pass
+            
+    tga_path = os.path.join(TEXTURES_DIR, f"{texture_name}.tga")
+    png_path = os.path.join(TEXTURES_DIR, f"{texture_name}.png")
+    
+    try:
+        if os.path.exists(tga_path):
+            subprocess.run(["convert", tga_path, temp_path, "+append", tga_path], check=True)
+        else:
+            subprocess.run(["convert", temp_path, tga_path], check=True)
+        if os.path.exists(png_path):
+            os.remove(png_path)
+    except Exception as e:
+        try:
+            if os.path.exists(tga_path):
+                subprocess.run(["magick", tga_path, temp_path, "+append", tga_path], check=True)
+            else:
+                subprocess.run(["magick", temp_path, tga_path], check=True)
+            if os.path.exists(png_path):
+                os.remove(png_path)
+        except Exception as e2:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise HTTPException(500, f"Failed to append image: {str(e2)}")
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            
+    new_frame_line = f"{next_idx}: x={next_x} y=0 w={new_w} h={new_h}"
+    with open(ssheet_path, "a") as f:
+        f.write(new_frame_line + "\n")
+        
+    await manager.broadcast({"type": "spritesheet_updated", "name": name})
+    _send_reload_packet()
+    
+    return {
+        "status": "ok",
+        "frameIndex": next_idx,
+        "x": next_x,
+        "y": 0,
+        "w": new_w,
+        "h": new_h
+    }
 
 # --- Animation CRUD ---
 @app.get("/api/animations")

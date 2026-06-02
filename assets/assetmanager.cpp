@@ -153,17 +153,20 @@ bool AssetManager::LoadTexture(const AssetID& id,
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
+        GLenum internalFormat = (channels == 4) ? GL_RGBA : GL_RGB;
+        GLenum sourceFormat = (channels == 4) ? GL_BGRA : GL_BGR;
 
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         glTexImage2D(GL_TEXTURE_2D,
                      0,
-                     format,
+                     internalFormat,
                      width,
                      height,
                      0,
-                     format,
+                     sourceFormat,
                      GL_UNSIGNED_BYTE,
                      pixels.data());
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
         glBindTexture(GL_TEXTURE_2D, 0);
     } else {
@@ -195,7 +198,13 @@ bool AssetManager::LoadSpriteSheet(const AssetID& id,
         if (line.rfind("texture:", 0) == 0)
         {
             AssetID texId = line.substr(8);
-            sheet.texture = &m_textures.at(texId); // TextureGPU*
+            auto it = m_textures.find(texId);
+            if (it != m_textures.end()) {
+                sheet.texture = &it->second; // TextureGPU*
+            } else {
+                ENGINE_ERROR("SpriteSheet %s references missing texture %s", id.c_str(), texId.c_str());
+                sheet.texture = nullptr;
+            }
         }
         else if (std::isdigit(line[0]))
         {
@@ -295,3 +304,10 @@ const AnimationSetAsset* AssetManager::GetAnimationSet(const ObjectID& objectId)
     const auto& obj = m_objectAssets.at(objectId);
     return &m_animationSets.at(obj.animationSet);
 }
+
+bool AssetManager::Reload(const std::string& compiledAssetRoot)
+{
+    Shutdown();
+    return Initialize(compiledAssetRoot, m_Headless);
+}
+

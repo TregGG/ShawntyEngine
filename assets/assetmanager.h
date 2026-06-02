@@ -13,6 +13,7 @@ class AssetManager
 public:
     bool Initialize(const std::string& compiledAssetRoot, bool headless = false);
     void Shutdown();
+    bool Reload(const std::string& compiledAssetRoot);
 
     // object-level queries
     const SpriteSheetAsset* GetSpriteSheet(const ObjectID& objectId) const;

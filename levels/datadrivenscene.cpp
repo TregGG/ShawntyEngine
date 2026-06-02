@@ -140,6 +140,9 @@ void DataDrivenScene::Update(float deltatime)
 void DataDrivenScene::Reload()
 {
     ENGINE_LOG("Reloading scene from: %s", m_SceneFilePath.c_str());
+    if (m_Assets) {
+        m_Assets->Reload("test_compiled");
+    }
     OnExit();
     OnEnter();
     ENGINE_LOG("Scene reloaded successfully");

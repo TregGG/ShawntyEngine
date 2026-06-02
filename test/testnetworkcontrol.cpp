@@ -14,14 +14,8 @@ TestNetworkControl::TestNetworkControl(AssetManager* assets) : m_Assets(assets) 
 TestNetworkControl::~TestNetworkControl() {}
 
 EntityID TestNetworkControl::OnSpawnPlayer(ENetPeer* peer, bool isLocal) {
-    auto playerObj = std::make_unique<TestPlayer>(m_Scene, "Player", m_Assets->GetSpriteSheet("testobj"));
+    auto playerObj = std::make_unique<TestPlayer>(m_Scene, "Player", m_Assets->GetSpriteSheet("player_box"), m_Assets);
     EntityID lID = playerObj->GetID();
-    
-    // Set spawn position
-    if (m_Scene->registry.HasComponent<TransformComponent>(lID)) {
-        auto& trans = m_Scene->registry.GetComponent<TransformComponent>(lID);
-        trans.position = glm::vec2(0.0f, 2.0f);
-    }
 
     if (!isLocal && peer == nullptr) { // It's a remote proxy on the client
         if (m_Scene->registry.HasComponent<RigidBodyComponent>(lID)) {

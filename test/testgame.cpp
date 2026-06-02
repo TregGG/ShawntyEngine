@@ -221,11 +221,6 @@ bool TestGame::OnInit()
     ENGINE_LOG("OnInit");
 
     const std::string compiledRoot = "test_compiled";
-    if (!WriteTestCompiledAssets(compiledRoot))
-    {
-        ENGINE_ERROR("Failed to write compiled assets");
-        return false;
-    }
 
     if (!m_AssetManager.Initialize(compiledRoot, false))
     {

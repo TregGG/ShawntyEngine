@@ -5,6 +5,7 @@ import Inspector from './components/Inspector'
 import Viewport from './components/Viewport'
 import ScriptBrowser from './components/ScriptBrowser'
 import PrefabBrowser from './components/PrefabBrowser'
+import TextureBrowser from './components/TextureBrowser'
 import { useScenes, useScene, saveScene, useAssets, useScripts } from './hooks/useApi'
 import { useWebSocket } from './hooks/useWebSocket'
 
@@ -54,7 +55,7 @@ function App() {
   // --- API data ---
   const { scenes, loading: scenesLoading, refresh: refreshScenes } = useScenes()
   const { scene, loading: sceneLoading, refresh: refreshScene } = useScene(currentSceneName)
-  const { assets } = useAssets()
+  const { assets, refresh: refreshAssets } = useAssets()
   const { scripts: scriptsList } = useScripts()
 
   // Local copy of scene data for editing
@@ -557,6 +558,7 @@ function App() {
               entityIndex={selectedEntityIndex}
               onUpdate={(updated) => updateEntity(selectedEntityIndex, updated)}
               assets={assets}
+              refreshAssets={refreshAssets}
               scripts={scriptsList}
             />
           </div>
@@ -566,6 +568,7 @@ function App() {
             entityIndex={selectedEntityIndex}
             onUpdate={(updated) => updateEntity(selectedEntityIndex, updated)}
             assets={assets}
+            refreshAssets={refreshAssets}
             scripts={scriptsList}
           />
         )}
@@ -587,9 +590,21 @@ function App() {
           >
             🧩 Prefabs
           </button>
+          <button
+            className={bottomTab === 'textures' ? 'active' : ''}
+            onClick={() => setBottomTab('textures')}
+          >
+            🖼️ Textures
+          </button>
         </div>
         <div className="tab-content">
           {bottomTab === 'scripts' && <ScriptBrowser />}
+          {bottomTab === 'textures' && (
+            <TextureBrowser
+              assets={assets}
+              refreshAssets={refreshAssets}
+            />
+          )}
           {bottomTab === 'prefabs' && (
             <PrefabBrowser
               onInstantiate={(prefabData) => {

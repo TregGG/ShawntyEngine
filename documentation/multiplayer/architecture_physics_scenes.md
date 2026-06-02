@@ -12,12 +12,12 @@ ShawntyEngine is built on a server-authoritative Entity Component System (ECS) r
 | :--- | :--- | :--- |
 | **Ground / Environment** | Authoritative Static Colliders | Replicated Colliders + Visual Sprites |
 | **Local Player** | Simulated Rigid Body (Authoritative) | Dynamic Rigid Body (Locally Predicted) |
-| **Remote Players** | Simulated Rigid Body (Authoritative) | Kinematic Rigid Body (Interpolated Proxies) |
+| **Remote Players** | Simulated Rigid Body (Authoritative) | Kinematic Rigid Body (Dead Reckoning + Velocity Corrections) |
 | **Visual Sprites / UI** | Stripped (Headless Execution) | Rendered Sprites + HUD |
 
 All player positioning and velocity data are owned by the server. The client registry contains:
 1. **Local Player (`m_MyLocalPlayerID`)**: Runs local input predictions to eliminate responsiveness lag.
-2. **Remote Player Proxies**: Replicated entities controlled by server position updates. Their gravity, drag, and forces are disabled client-side (set to Kinematic mode) to prevent local physics drift.
+2. **Remote Player Proxies**: Replicated entities controlled by server position updates. Their gravity and drag are disabled client-side, but they remain **Kinematic** rigid bodies. This allows the local physics engine to process their velocities (Dead Reckoning) and enforce solid ground collisions, preventing them from falling through floors during latency windows.
 
 ---
 
@@ -101,8 +101,9 @@ if (historyIt != m_ClientStateHistory.end()) {
 }
 ```
 
-* **Hard Snap**: If the position error is greater than $1.5\text{ units}$, the client snap-teleports the player to the server position to correct collision penetration.
-* **Soft Correction**: If the error is small, the client blends $50\%$ of the error into the current position and offsets the historical prediction states to prevent visual stuttering.
+* **Hard Snap**: If the position error is greater than $2.0\text{ units}$, the client snap-teleports the player to the server position to correct massive desyncs (e.g. teleporting through a portal).
+* **Soft Correction**: For local players, the client blends $50\%$ of the error into the current position and offsets the historical prediction states to prevent visual stuttering.
+* **Remote Player Dead Reckoning**: For remote proxies, the server sends high-frequency velocity updates. The client extrapolates their position based on velocity and latency. When a `StateSync` arrives, the client computes an error offset. If the player is stationary and the error is small (typical latency overshoot), the correction is suppressed to prevent "moonwalking". If moving, a **Correction Velocity** is calculated and applied smoothly over $0.2\text{s}$ alongside the normal physics integration.
 
 ---
 

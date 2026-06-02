@@ -10,8 +10,8 @@
 #define ENGINE_CLASS "DataDrivenScene"
 #include "../core/enginedebug.h"
 
-DataDrivenScene::DataDrivenScene(AssetManager* assets, const std::string& sceneFilePath)
-    : Scene(assets), m_SceneFilePath(sceneFilePath)
+DataDrivenScene::DataDrivenScene(AssetManager* assets, const std::string& sceneFilePath, FontEngine* fontEngine, EventService* eventService)
+    : Scene(assets), m_SceneFilePath(sceneFilePath), m_FontEngine(fontEngine), m_EventService(eventService)
 {
 }
 
@@ -26,7 +26,7 @@ void DataDrivenScene::OnEnter()
         return;
     }
 
-    auto result = SceneSerializer::LoadScene(m_SceneFilePath, this, m_Assets);
+    auto result = SceneSerializer::LoadScene(m_SceneFilePath, this, m_Assets, m_FontEngine, m_EventService);
     if (result.success) {
         m_EditorIdMap = std::move(result.editorIdMap);
         ENGINE_LOG("DataDrivenScene entered: %s (%zu entities loaded)",

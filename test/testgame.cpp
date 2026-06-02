@@ -247,7 +247,39 @@ bool TestGame::OnInit()
     }
 
     // Create UI for host/join (on the scene's registry)
-    CreateNetworkUI(m_DDScene1);
+    // CreateNetworkUI(m_DDScene1); // Comment out hardcoded UI to prefer Data-Driven UI
+
+    m_DDScene1->registry.SetUIActionCallback([this](const std::string& action, const std::string& target) {
+        if (action == "Host") {
+            ENGINE_LOG("Host Action triggered. Launching dedicated server...");
+#ifdef _WIN32
+            std::system("start bin\\framework.exe --server");
+#elif defined(__APPLE__)
+            std::system("open -n ./bin/framework --args --server");
+#else
+            std::system("./bin/framework --server &");
+#endif
+            if (m_NetService) m_NetService->Connect("127.0.0.1", 7777);
+        } else if (action == "Join") {
+            std::string ip = "127.0.0.1";
+            if (!target.empty() && m_DDScene1) {
+                if (auto inputF = m_DDScene1->registry.FindUIElementRecursive(target)) {
+                    if (auto uiInput = dynamic_cast<UIInputField*>(inputF)) {
+                        if (uiInput->GetTextElement()) ip = uiInput->GetTextElement()->Text;
+                    }
+                }
+            }
+            ENGINE_LOG("Join Action triggered. Connecting to %s:7777", ip.c_str());
+            if (m_NetService) m_NetService->Connect(ip, 7777);
+        } else if (action == "ToggleActive") {
+            if (m_DDScene1) {
+                EntityID eid = m_DDScene1->GetEntityByEditorId(target);
+                if (eid != 0) {
+                    ENGINE_LOG("ToggleActive triggered for %s (Not yet implemented in core components)", target.c_str());
+                }
+            }
+        }
+    });
 
     // ---- Server: scene transition when all players in trigger ----
     if (isServer && m_NetControl && m_TriggerID != 0) {

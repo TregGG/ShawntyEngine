@@ -7,10 +7,13 @@
 
 class AssetManager;
 
+class FontEngine;
+class EventService;
+
 class DataDrivenScene : public Scene
 {
 public:
-    DataDrivenScene(AssetManager* assets, const std::string& sceneFilePath);
+    DataDrivenScene(AssetManager* assets, const std::string& sceneFilePath, FontEngine* fontEngine = nullptr, EventService* eventService = nullptr);
     ~DataDrivenScene() override = default;
 
     void OnEnter() override;
@@ -39,6 +42,8 @@ private:
     ScriptEngine m_ScriptEngine;
     float m_TimeAccumulator = 0.0f;
 
-    // Editor ID → Runtime EntityID mapping (populated by SceneSerializer)
     std::unordered_map<std::string, EntityID> m_EditorIdMap;
+
+    FontEngine* m_FontEngine = nullptr;
+    EventService* m_EventService = nullptr;
 };

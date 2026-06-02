@@ -3,8 +3,11 @@
     "scene": {
         "name": "TestScene1",
         "camera": {
-            "position": [0.0, 0.0],
-            "scale": 2.0
+            "position": [
+                0,
+                0
+            ],
+            "scale": 2
         },
         "entities": [
             {
@@ -13,8 +16,14 @@
                 "category": "Environment",
                 "components": {
                     "transform": {
-                        "position": [0.0, -3.0],
-                        "size": [25.0, 1.0]
+                        "position": [
+                            0,
+                            -3
+                        ],
+                        "size": [
+                            25,
+                            1
+                        ]
                     },
                     "sprite": {
                         "objectId": "testobj",
@@ -26,7 +35,36 @@
                     },
                     "rigidbody": {
                         "bodyType": "Static",
-                        "elasticity": 0.0
+                        "elasticity": 0
+                    }
+                }
+            },
+            {
+                "editorId": "ground_copy_1780349007526",
+                "name": "Ground (Copy)",
+                "category": "Environment",
+                "components": {
+                    "transform": {
+                        "position": [
+                            0,
+                            2.8
+                        ],
+                        "size": [
+                            25,
+                            1
+                        ]
+                    },
+                    "sprite": {
+                        "objectId": "testobj",
+                        "frameIndex": 0,
+                        "layer": "Background"
+                    },
+                    "collider": {
+                        "autoBounds": true
+                    },
+                    "rigidbody": {
+                        "bodyType": "Static",
+                        "elasticity": 0
                     }
                 }
             },
@@ -36,8 +74,14 @@
                 "category": "Environment",
                 "components": {
                     "transform": {
-                        "position": [5.0, -1.0],
-                        "size": [2.0, 2.0]
+                        "position": [
+                            5,
+                            -1
+                        ],
+                        "size": [
+                            2,
+                            2
+                        ]
                     },
                     "sprite": {
                         "layer": "Foreground"

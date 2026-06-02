@@ -11,6 +11,10 @@
 #include "../objects/components/rigidbodycomponent.h"
 #include "../objects/components/animator.h"
 #include "../objects/components/scriptcomponent.h"
+#include "../objects/ui/uipanel.h"
+#include "../objects/ui/uitext.h"
+#include "../objects/ui/uibutton.h"
+#include "../objects/ui/uiinputfield.h"
 
 #define ENGINE_CLASS "SceneSerializer"
 #include "../core/enginedebug.h"
@@ -219,13 +223,70 @@ EntityID LoadEntity(const json& entityJson, Scene* scene, AssetManager* assets,
     return entityId;
 }
 
+std::unique_ptr<UIObject> LoadUIElement(const json& uiJson, Scene* scene, FontEngine* fontEngine, EventService* eventService) {
+    std::string type = uiJson.value("type", "Panel");
+    std::string name = uiJson.value("name", "UIElement");
+    
+    std::unique_ptr<UIObject> el;
+    
+    if (type == "Panel") {
+        el = std::make_unique<UIPanel>(scene, name);
+    } else if (type == "Text") {
+        auto t = std::make_unique<UIText>(scene, name, fontEngine);
+        t->Text = uiJson.value("text", "Text");
+        t->TextColor = glm::vec3(uiJson.value("textColor", std::vector<float>{1.0f, 1.0f, 1.0f}).data());
+        el = std::move(t);
+    } else if (type == "Button") {
+        auto b = std::make_unique<UIButton>(scene, name, eventService);
+        b->ActionType = uiJson.value("action", "");
+        b->ActionTarget = uiJson.value("actionTarget", "");
+        if (uiJson.contains("text")) {
+            auto t = std::make_unique<UIText>(scene, name + "_text", fontEngine);
+            t->Text = uiJson.value("text", "Button");
+            b->AddChild(std::move(t));
+        }
+        el = std::move(b);
+    } else if (type == "Input") {
+        auto i = std::make_unique<UIInputField>(scene, name, eventService, fontEngine);
+        if (i->GetTextElement()) {
+            i->GetTextElement()->Text = uiJson.value("text", "");
+        }
+        el = std::move(i);
+    } else {
+        el = std::make_unique<UIPanel>(scene, name);
+    }
+
+    el->Position = ReadVec2(uiJson, "position");
+    el->Size = ReadVec2(uiJson, "size", {100.0f, 40.0f});
+    
+    if (uiJson.contains("backgroundColor") && uiJson["backgroundColor"].is_array() && uiJson["backgroundColor"].size() >= 4) {
+        el->BackgroundColor = glm::vec4(
+            uiJson["backgroundColor"][0].get<float>(),
+            uiJson["backgroundColor"][1].get<float>(),
+            uiJson["backgroundColor"][2].get<float>(),
+            uiJson["backgroundColor"][3].get<float>()
+        );
+    }
+
+    if (uiJson.contains("children") && uiJson["children"].is_array()) {
+        for (const auto& childJson : uiJson["children"]) {
+            if (auto childEl = LoadUIElement(childJson, scene, fontEngine, eventService)) {
+                el->AddChild(std::move(childEl));
+            }
+        }
+    }
+
+    return el;
+}
+
 } // anonymous namespace
 
 // ============================================================
 // LoadScene
 // ============================================================
 SceneSerializer::SceneLoadResult SceneSerializer::LoadScene(
-    const std::string& filepath, Scene* scene, AssetManager* assets) {
+    const std::string& filepath, Scene* scene, AssetManager* assets,
+    FontEngine* fontEngine, EventService* eventService) {
 
     SceneLoadResult result;
 
@@ -310,6 +371,15 @@ SceneSerializer::SceneLoadResult SceneSerializer::LoadScene(
             }
 
             scene->registry.AddComponent<RelationshipComponent>(parentId, parentRel);
+        }
+    }
+
+    // Load UI
+    if (sceneData.contains("ui") && sceneData["ui"].is_array()) {
+        for (const auto& uiJson : sceneData["ui"]) {
+            if (auto el = LoadUIElement(uiJson, scene, fontEngine, eventService)) {
+                scene->registry.AddUIElement(std::move(el));
+            }
         }
     }
 
@@ -464,6 +534,44 @@ bool SceneSerializer::SaveScene(const std::string& filepath, const Scene* scene)
         relsArray.push_back(relJson);
     }
     sceneData["relationships"] = relsArray;
+
+    // Serialize UI
+    auto saveUIElement = [](const UIObject* el, auto& saveUIElementRef) -> json {
+        json uiJson;
+        uiJson["name"] = el->GetName();
+        uiJson["position"] = {el->Position.x, el->Position.y};
+        uiJson["size"] = {el->Size.x, el->Size.y};
+        uiJson["backgroundColor"] = {el->BackgroundColor.r, el->BackgroundColor.g, el->BackgroundColor.b, el->BackgroundColor.a};
+
+        if (dynamic_cast<const UIPanel*>(el)) uiJson["type"] = "Panel";
+        if (auto t = dynamic_cast<const UIText*>(el)) {
+            uiJson["type"] = "Text";
+            uiJson["text"] = t->Text;
+            uiJson["textColor"] = {t->TextColor.r, t->TextColor.g, t->TextColor.b};
+        } else if (auto b = dynamic_cast<const UIButton*>(el)) {
+            uiJson["type"] = "Button";
+            uiJson["action"] = b->ActionType;
+            uiJson["actionTarget"] = b->ActionTarget;
+            // The text is a child but for simplicity in editor, we handle it
+        } else if (auto i = dynamic_cast<const UIInputField*>(el)) {
+            uiJson["type"] = "Input";
+            if (i->GetTextElement()) uiJson["text"] = i->GetTextElement()->Text;
+        }
+
+        json childrenArr = json::array();
+        for (const auto& child : el->GetChildren()) {
+            childrenArr.push_back(saveUIElementRef(child.get(), saveUIElementRef));
+        }
+        if (!childrenArr.empty()) uiJson["children"] = childrenArr;
+
+        return uiJson;
+    };
+
+    json uiArray = json::array();
+    for (const auto& el : scene->registry.GetUIElements()) {
+        uiArray.push_back(saveUIElement(el.get(), saveUIElement));
+    }
+    sceneData["ui"] = uiArray;
 
     sceneJson["scene"] = sceneData;
 

@@ -7,6 +7,8 @@
 
 class Scene;
 class AssetManager;
+class FontEngine;
+class EventService;
 
 class SceneSerializer {
 public:
@@ -19,7 +21,9 @@ public:
     // Loads a .scene JSON file and populates the given Scene's registry
     static SceneLoadResult LoadScene(const std::string& filepath,
                                      Scene* scene,
-                                     AssetManager* assets);
+                                     AssetManager* assets,
+                                     FontEngine* fontEngine = nullptr,
+                                     EventService* eventService = nullptr);
 
     // Saves current scene state to a .scene JSON file
     static bool SaveScene(const std::string& filepath,

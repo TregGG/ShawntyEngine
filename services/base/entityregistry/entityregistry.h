@@ -69,6 +69,25 @@ public:
     const std::vector<std::unique_ptr<UIObject>>& GetUIElements() const;
     void ClearUIElements() { m_UIElements.clear(); }
 
+    template<typename T>
+    T* FindUIElement(const std::string& name) const {
+        for (const auto& el : m_UIElements) {
+            if (el->GetName() == name) return dynamic_cast<T*>(el.get());
+            // Need a recursive search if elements have children, but UIObject doesn't expose children nicely
+            // We'll implement a recursive search in cpp
+        }
+        return nullptr;
+    }
+    
+    // Recursive search by name
+    UIObject* FindUIElementRecursive(const std::string& name) const;
+
+    using UIActionCallback = std::function<void(const std::string&, const std::string&)>;
+    void SetUIActionCallback(UIActionCallback cb) { m_UIActionCallback = cb; }
+    void TriggerUIAction(const std::string& action, const std::string& target) {
+        if (m_UIActionCallback) m_UIActionCallback(action, target);
+    }
+
     // Create entity with category
     EntityID Create(EntityCategory category, std::string_view name, std::string_view registeredBy);
 
@@ -160,6 +179,7 @@ public:
     EntityID FindByEditorId(const std::string& editorId) const;
 
 private:
+    UIActionCallback m_UIActionCallback;
     void RebuildViews() const;
     ComponentPool<TransformComponent> m_Transforms;
     ComponentPool<SpriteComponent2D> m_Sprites;

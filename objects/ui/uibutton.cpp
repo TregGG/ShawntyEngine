@@ -21,6 +21,9 @@ void UIButton::OnClick()
     if (OnClickCallback) {
         OnClickCallback();
     }
+    if (m_Scene && !ActionType.empty()) {
+        m_Scene->registry.TriggerUIAction(ActionType, ActionTarget);
+    }
 }
 
 void UIButton::OnEvent(Event& e)

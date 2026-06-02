@@ -4,4 +4,6 @@ obj/
 .github/
 .vscode/
 logs.txt
+client1.log
+client2.log
 framework.layout

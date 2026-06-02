@@ -7,3 +7,6 @@ logs.txt
 client1.log
 client2.log
 framework.layout
+.engine_internals.md
+__pycache__/
+*.pyc

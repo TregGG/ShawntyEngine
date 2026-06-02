@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 export default function Toolbar({
   scenes, currentScene, onSceneChange, onSave, onAddEntity,
-  saveStatus, connected, refreshScenes
+  saveStatus, connected, refreshScenes, uiMode, setUiMode
 }) {
   const [showNewScene, setShowNewScene] = useState(false)
   const [newSceneName, setNewSceneName] = useState('')
@@ -59,6 +59,15 @@ export default function Toolbar({
             + Scene
           </button>
         )}
+
+        <div style={{ width: '1px', height: '24px', background: '#333', margin: '0 8px' }} />
+
+        <button 
+          className={`btn-sm ${uiMode ? 'btn-primary' : 'btn-secondary'}`} 
+          onClick={() => setUiMode(!uiMode)}
+        >
+          {uiMode ? '📱 UI Mode: ON' : '📱 UI Mode: OFF'}
+        </button>
       </div>
 
       <div className="toolbar-center">

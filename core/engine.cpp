@@ -27,9 +27,8 @@ Engine::~Engine()
 
 }
 
-bool Engine::Initialize(Game* game, bool isServer)
+bool Engine::Initialize(Game* game)
 {
-    m_IsServer = isServer;
     #if defined(ENGINE_RELEASE)
 
         // No logging in release
@@ -65,18 +64,16 @@ bool Engine::Initialize(Game* game, bool isServer)
     }
     m_OpenGL=new OpenGLClass();
 
-    if(!m_System->Initialize(800,600,"Engine", m_IsServer))
+    if (!m_System->Initialize(800,600,"Engine", false))
     {
            ENGINE_ERROR("Initialize failed: System::Initialize failed");
         return false;
     }
     
-    if (!m_IsServer) {
-        if (!m_OpenGL->Initialize(m_System, 800, 600))
-        {
-                ENGINE_ERROR("Initialize failed: OpenGLClass::Initialize failed");
-             return false;
-        }
+    if (!m_OpenGL->Initialize(m_System, 800, 600))
+    {
+            ENGINE_ERROR("Initialize failed: OpenGLClass::Initialize failed");
+         return false;
     }
     
     m_EventService->Init();
@@ -89,16 +86,8 @@ bool Engine::Initialize(Game* game, bool isServer)
         this->Quit();
     };
     
-    if (m_IsServer) {
-        if (!m_NetworkService->Host(7777)) {
-            ENGINE_ERROR("Failed to start server on port 7777. ENet Host creation failed. (Port probably in use).");
-            return false;
-        }
-    }
-    
     m_Game->SetEventService(m_EventService);
     m_Game->SetNetworkServices(m_NetworkService, m_NetworkControl);
-    m_Game->SetServerMode(m_IsServer);
     m_Timer->Start();
     
     if(!m_Game->OnInit())
@@ -139,28 +128,21 @@ void Engine::Run()
         // Time & input
         m_Timer->Tick();
         
-        if (!m_IsServer) {
-            m_Input->BeginFrame();
-            m_Input->ProcessEvents(m_System->GetInputEvents(), m_EventService);
-            m_System->ClearInputEvents();
-            m_Game->OnInput(*m_Input);
-        }
+        m_Input->BeginFrame();
+        m_Input->ProcessEvents(m_System->GetInputEvents(), m_EventService);
+        m_System->ClearInputEvents();
+        m_Game->OnInput(*m_Input);
 
         m_NetworkService->Update(m_Timer->GetDeltaTime());
         m_NetworkControl->Update(m_Timer->GetDeltaTime());
 
         m_Game->OnUpdate(m_Timer->GetDeltaTime());
 
-        if (!m_IsServer) {
-            // Rendering phase - delegate to Game
-            m_Game->OnRender();
-            
-            // Swap buffers
-            m_System->SwapBuffers();
-        } else {
-            // Cap server tick rate to ~60 Hz to avoid CPU core pegging and network packet flooding
-            std::this_thread::sleep_for(std::chrono::milliseconds(16));
-        }
+        // Rendering phase - delegate to Game
+        m_Game->OnRender();
+        
+        // Swap buffers
+        m_System->SwapBuffers();
         }
 }
 void Engine::Shutdown()

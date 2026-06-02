@@ -17,6 +17,39 @@ function App() {
   const [bottomTab, setBottomTab] = useState('scripts')
   const [saveStatus, setSaveStatus] = useState(null)
   const [editingPrefab, setEditingPrefab] = useState(null) // { name, data }
+  const [uiMode, setUiMode] = useState(false) // Toggle to show/edit only UI entities
+
+  // Layout sizes
+  const [hierarchyW, setHierarchyW] = useState(240)
+  const [inspectorW, setInspectorW] = useState(300)
+  const [bottomH, setBottomH] = useState(200)
+
+  // Resizing state
+  const [resizing, setResizing] = useState(null) // 'hierarchy', 'inspector', 'bottom'
+
+  useEffect(() => {
+    if (!resizing) return
+
+    const handleMouseMove = (e) => {
+      if (resizing === 'hierarchy') {
+        setHierarchyW(Math.max(150, Math.min(600, e.clientX)))
+      } else if (resizing === 'inspector') {
+        setInspectorW(Math.max(200, Math.min(800, window.innerWidth - e.clientX)))
+      } else if (resizing === 'bottom') {
+        setBottomH(Math.max(100, Math.min(600, window.innerHeight - e.clientY)))
+      }
+    }
+
+    const handleMouseUp = () => setResizing(null)
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [resizing])
 
   // --- API data ---
   const { scenes, loading: scenesLoading, refresh: refreshScenes } = useScenes()
@@ -26,10 +59,59 @@ function App() {
 
   // Local copy of scene data for editing
   const [sceneData, setSceneData] = useState(null)
+  // Helper to convert C++ recursive UI structure into flat Editor entities
+  const convertUIToEntities = (uiArray, entitiesOut, relsOut, parentId = null) => {
+    if (!uiArray) return
+    for (const ui of uiArray) {
+      const editorId = `ui_${Math.random().toString(36).substr(2, 9)}`
+      const entity = {
+        editorId,
+        name: ui.name || 'UIElement',
+        category: 'UI',
+        components: {
+          ui: {
+            type: ui.type || 'Panel',
+            position: ui.position || [0, 0],
+            size: ui.size || [100, 100],
+            backgroundColor: ui.backgroundColor || [1, 1, 1, 1],
+            text: ui.text || '',
+            textColor: ui.textColor || [1, 1, 1],
+            action: ui.action || '',
+            actionTarget: ui.actionTarget || ''
+          }
+        }
+      }
+      entitiesOut.push(entity)
+
+      if (parentId) {
+        let rel = relsOut.find(r => r.parent === parentId)
+        if (!rel) {
+          rel = { parent: parentId, children: [] }
+          relsOut.push(rel)
+        }
+        rel.children.push(editorId)
+      }
+
+      if (ui.children && ui.children.length > 0) {
+        convertUIToEntities(ui.children, entitiesOut, relsOut, editorId)
+      }
+    }
+  }
+
   // Sync scene data when loaded from API
   useEffect(() => {
     if (scene) {
-      setSceneData(JSON.parse(JSON.stringify(scene)))
+      const parsed = JSON.parse(JSON.stringify(scene))
+      
+      // Convert UI into flat entities
+      if (parsed.scene && parsed.scene.ui) {
+        if (!parsed.scene.entities) parsed.scene.entities = []
+        if (!parsed.scene.relationships) parsed.scene.relationships = []
+        convertUIToEntities(parsed.scene.ui, parsed.scene.entities, parsed.scene.relationships)
+        delete parsed.scene.ui // Remove it from state, we reconstruct on save
+      }
+
+      setSceneData(parsed)
       setSelectedEntityIndex(null)
     }
   }, [scene])
@@ -80,11 +162,19 @@ function App() {
   const addEntity = useCallback(() => {
     setSceneData(prev => {
       const next = JSON.parse(JSON.stringify(prev))
+      const isUI = uiMode
       const newEntity = {
         editorId: `entity_${Date.now()}`,
-        name: `Entity ${next.scene ? next.scene.entities.length + 1 : 1}`,
-        category: 'Environment',
-        components: {
+        name: isUI ? `UI Element ${next.scene ? next.scene.entities.filter(e=>e.category==='UI').length + 1 : 1}` : `Entity ${next.scene ? next.scene.entities.length + 1 : 1}`,
+        category: isUI ? 'UI' : 'Environment',
+        components: isUI ? {
+          ui: {
+            type: 'Panel',
+            position: [0, 0],
+            size: [100, 40],
+            backgroundColor: [0.5, 0.5, 0.5, 1.0]
+          }
+        } : {
           transform: {
             position: [0.0, 0.0],
             size: [1.0, 1.0],
@@ -136,12 +226,19 @@ function App() {
   const addChild = useCallback((parentIndex) => {
     setSceneData(prev => {
       const next = JSON.parse(JSON.stringify(prev))
-      
+      const isUI = uiMode
       const newEntity = {
         editorId: `entity_${Date.now()}`,
-        name: `Child Entity`,
-        category: 'Environment',
-        components: {
+        name: isUI ? `Child UI Element` : `Child Entity`,
+        category: isUI ? 'UI' : 'Environment',
+        components: isUI ? {
+          ui: {
+            type: 'Panel',
+            position: [0, 0],
+            size: [100, 40],
+            backgroundColor: [0.5, 0.5, 0.5, 1.0]
+          }
+        } : {
           transform: { position: [0.0, 0.0], size: [1.0, 1.0], rotation: 0 }
         }
       }
@@ -235,13 +332,47 @@ function App() {
 
   // --- Save ---
   const handleSave = useCallback(async () => {
-    if (editingPrefab && sceneData) {
+    let saveData = sceneData
+    if (sceneData?.scene) {
+      saveData = JSON.parse(JSON.stringify(sceneData))
+      const rootUI = []
+      const relationships = saveData.scene.relationships || []
+      const uiEntities = saveData.scene.entities.filter(e => e.category === 'UI')
+      saveData.scene.entities = saveData.scene.entities.filter(e => e.category !== 'UI')
+      
+      const buildUI = (editorId) => {
+        const entity = uiEntities.find(e => e.editorId === editorId)
+        if (!entity) return null
+        const uiObj = { name: entity.name, ...entity.components.ui }
+        const rel = relationships.find(r => r.parent === editorId)
+        if (rel && rel.children) {
+          uiObj.children = rel.children.map(buildUI).filter(Boolean)
+        }
+        return uiObj
+      }
+      
+      uiEntities.forEach(uiEnt => {
+        const isChild = relationships.some(r => r.children.includes(uiEnt.editorId))
+        if (!isChild) {
+          rootUI.push(buildUI(uiEnt.editorId))
+        }
+      })
+      
+      saveData.scene.relationships = relationships.map(r => ({
+        ...r,
+        children: r.children.filter(cid => !uiEntities.some(u => u.editorId === cid))
+      })).filter(r => !uiEntities.some(u => u.editorId === r.parent) && r.children.length > 0)
+      
+      saveData.scene.ui = rootUI
+    }
+
+    if (editingPrefab && saveData) {
       try {
         setSaveStatus('saving')
         await fetch(`/api/prefabs/${editingPrefab.name}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sceneData),
+          body: JSON.stringify(saveData),
         })
         setSaveStatus('saved')
         setTimeout(() => setSaveStatus(null), 2000)
@@ -253,10 +384,10 @@ function App() {
       return
     }
 
-    if (!currentSceneName || !sceneData) return
+    if (!currentSceneName || !saveData) return
     try {
       setSaveStatus('saving')
-      await saveScene(currentSceneName, sceneData)
+      await saveScene(currentSceneName, saveData)
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus(null), 2000)
     } catch (err) {
@@ -300,7 +431,15 @@ function App() {
   }, [sceneData?.scene?.name])
 
   return (
-    <div className="editor-layout">
+    <div 
+      className={`editor-layout ${resizing ? 'resizing' : ''}`}
+      style={{
+        '--hierarchy-w': `${hierarchyW}px`,
+        '--inspector-w': `${inspectorW}px`,
+        '--bottom-h': `${bottomH}px`,
+        cursor: resizing === 'hierarchy' || resizing === 'inspector' ? 'col-resize' : resizing === 'bottom' ? 'row-resize' : 'auto'
+      }}
+    >
       <Toolbar
         scenes={scenes || []}
         currentScene={currentSceneName}
@@ -310,6 +449,8 @@ function App() {
         saveStatus={saveStatus}
         connected={connected}
         refreshScenes={refreshScenes}
+        uiMode={uiMode}
+        setUiMode={setUiMode}
       />
 
       <div className="panel hierarchy-panel">
@@ -342,11 +483,15 @@ function App() {
           onAdd={addEntity}
           onAddChild={addChild}
           onParent={parentEntity}
+          uiMode={uiMode}
         />
       </div>
 
+      <div className="resizer-vertical" style={{ gridArea: 'hierarchy', justifySelf: 'end' }} onMouseDown={() => setResizing('hierarchy')} />
+
       <div className="viewport-area">
         <Viewport
+          uiMode={uiMode}
           entities={
             editingPrefab && sceneData?.prefab
               ? [
@@ -368,13 +513,19 @@ function App() {
               : entities
               
             const entity = JSON.parse(JSON.stringify(entityArray[index]))
-            entity.components.transform.position = [newPos.x, newPos.y]
+            if (entity.components.ui) {
+              entity.components.ui.position = [newPos.x, newPos.y]
+            } else if (entity.components.transform) {
+              entity.components.transform.position = [newPos.x, newPos.y]
+            }
             updateEntity(index, entity)
           }}
           camera={camera}
           onCameraChange={setCamera}
         />
       </div>
+
+      <div className="resizer-vertical" style={{ gridArea: 'inspector', justifySelf: 'start', marginLeft: '-5px' }} onMouseDown={() => setResizing('inspector')} />
 
       <div className="panel inspector-panel">
         {editingPrefab ? (
@@ -419,6 +570,8 @@ function App() {
           />
         )}
       </div>
+
+      <div className="resizer-horizontal" style={{ gridArea: 'bottom', alignSelf: 'start', marginTop: '-5px' }} onMouseDown={() => setResizing('bottom')} />
 
       <div className="bottom-panel">
         <div className="tab-bar">

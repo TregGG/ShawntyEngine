@@ -148,6 +148,36 @@ body {
   height: 100vh;
   overflow: hidden;
   background: var(--bg-deepest);
+  grid-template-areas:
+    "toolbar   toolbar   toolbar"
+    "hierarchy viewport  inspector"
+    "bottom    bottom    inspector";
+}
+
+.resizer-vertical {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 10;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.resizer-vertical:hover, .resizer-vertical:active {
+  background: var(--accent);
+}
+
+.resizer-horizontal {
+  height: 5px;
+  cursor: row-resize;
+  background: transparent;
+  z-index: 10;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.resizer-horizontal:hover, .resizer-horizontal:active {
+  background: var(--accent);
 }
 
 /* ============================================================

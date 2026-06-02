@@ -11,6 +11,7 @@ const COMPONENT_META = {
   rigidbody: { label: 'RigidBody', icon: '⚙️' },
   animator: { label: 'Animator', icon: '🎬' },
   script: { label: 'Script', icon: '🐍' },
+  ui: { label: 'UI Element', icon: '📱' },
 }
 
 // ---------------------------------------------------------------------------
@@ -478,6 +479,7 @@ function AddComponentDropdown({ existingComponents, onAdd, onAddScript }) {
     rigidbody: { bodyType: 'Static', mass: 1.0, drag: 0, gravityScale: 1.0 },
     animator: { speed: 1.0, loop: true },
     script: { path: '', class: '', properties: {} },
+    ui: { type: 'Panel', position: [0, 0], size: [100, 40], backgroundColor: [0.5, 0.5, 0.5, 1.0] },
   }
 
   return (
@@ -514,6 +516,104 @@ function AddComponentDropdown({ existingComponents, onAdd, onAddScript }) {
         </div>
       )}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Color Input Component
+// ---------------------------------------------------------------------------
+const rgbToHex = (r, g, b) => {
+  const toHex = c => Math.max(0, Math.min(255, Math.round(c * 255))).toString(16).padStart(2, '0')
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+const hexToRgb = (hex) => {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  return [r, g, b]
+}
+
+function ColorInput({ label, value, onChange, hasAlpha = true }) {
+  const [r=1, g=1, b=1, a=1] = value || []
+  const hex = rgbToHex(r, g, b)
+
+  return (
+    <div className="field-row">
+      <label>{label}</label>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
+        <input 
+          type="color" 
+          value={hex} 
+          onChange={e => {
+            const [nr, ng, nb] = hexToRgb(e.target.value)
+            if (hasAlpha) onChange([nr, ng, nb, a])
+            else onChange([nr, ng, nb])
+          }}
+          style={{ padding: 0, width: '40px', height: '24px', border: 'none', background: 'none', cursor: 'pointer' }}
+        />
+        {hasAlpha && (
+          <input 
+            type="number" 
+            step="0.05" 
+            min="0" 
+            max="1" 
+            value={a} 
+            onChange={e => {
+              const na = Math.max(0, Math.min(1, parseFloat(e.target.value) || 0))
+              onChange([r, g, b, na])
+            }}
+            title="Alpha (Opacity)"
+            style={{ width: '60px' }}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// UI Editor
+// ---------------------------------------------------------------------------
+function UIEditor({ data, onChange, onRemove }) {
+  return (
+    <ComponentSection title="UI Element" icon="🖥️" removable onRemove={onRemove}>
+      <SelectInput label="Type" value={data.type || 'Panel'} options={['Panel', 'Text', 'Button', 'Input']} onChange={v => onChange({ ...data, type: v })} />
+      
+      <NumberInput label="Position X" value={data.position?.[0] || 0} onChange={v => onChange({ ...data, position: [v, data.position?.[1] || 0] })} step={10} />
+      <NumberInput label="Position Y" value={data.position?.[1] || 0} onChange={v => onChange({ ...data, position: [data.position?.[0] || 0, v] })} step={10} />
+      
+      <NumberInput label="Size W" value={data.size?.[0] || 100} onChange={v => onChange({ ...data, size: [v, data.size?.[1] || 40] })} step={10} />
+      <NumberInput label="Size H" value={data.size?.[1] || 40} onChange={v => onChange({ ...data, size: [data.size?.[0] || 100, v] })} step={10} />
+
+      <ColorInput 
+        label="Bg Color" 
+        value={data.backgroundColor || [0.5, 0.5, 0.5, 1.0]} 
+        onChange={v => onChange({ ...data, backgroundColor: v })} 
+        hasAlpha={true} 
+      />
+
+      {(data.type === 'Text' || data.type === 'Button' || data.type === 'Input') && (
+        <>
+          <TextInput label="Text" value={data.text || ''} onChange={v => onChange({ ...data, text: v })} />
+          <ColorInput 
+            label="Text Color" 
+            value={data.textColor || [1, 1, 1]} 
+            onChange={v => onChange({ ...data, textColor: v })} 
+            hasAlpha={false} 
+          />
+        </>
+      )}
+
+      {data.type === 'Button' && (
+        <>
+          <SelectInput label="Action" value={data.action || ''} options={['', 'Host', 'Join', 'ToggleActive']} onChange={v => onChange({ ...data, action: v })} />
+          {(data.action === 'Join' || data.action === 'ToggleActive') && (
+            <TextInput label="Action Target (ID)" value={data.actionTarget || ''} onChange={v => onChange({ ...data, actionTarget: v })} placeholder="e.g. ui_xyz123" />
+          )}
+        </>
+      )}
+    </ComponentSection>
   )
 }
 
@@ -615,6 +715,13 @@ export default function Inspector({ entity, entityIndex, onUpdate, assets, scrip
           onChange={d => updateComponent('script', d)}
           onRemove={() => updateComponent('script', null)}
           scripts={scripts}
+        />
+      )}
+      {entity.components?.ui && (
+        <UIEditor
+          data={entity.components.ui}
+          onChange={d => updateComponent('ui', d)}
+          onRemove={() => updateComponent('ui', null)}
         />
       )}
 

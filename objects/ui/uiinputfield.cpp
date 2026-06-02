@@ -1,5 +1,6 @@
 #include "uiinputfield.h"
 #include "uitext.h"
+#include "../../levels/scene.h"
 #include <GLFW/glfw3.h> // For keycodes
 
 UIInputField::UIInputField(Scene* scene, const std::string& name, EventService* eventService, FontEngine* fontEngine)
@@ -40,10 +41,34 @@ void UIInputField::OnEvent(Event& e)
         currParent = currParent->GetParent();
     }
 
+    auto mapMouseCoords = [this](double& mx, double& my) {
+        if (!m_Scene) return;
+        float vw = m_Scene->GetViewportWidth();
+        float vh = m_Scene->GetViewportHeight();
+        if (vw <= 0 || vh <= 0) return;
+        
+        float refWidth = 1280.0f;
+        float refHeight = 720.0f;
+        float scaleX = vw / refWidth;
+        float scaleY = vh / refHeight;
+        float scale = std::min(scaleX, scaleY);
+        if (scale > 1.0f) scale = 1.0f;
+        
+        float actualWidth = refWidth * scale;
+        float actualHeight = refHeight * scale;
+        float offsetX = (vw - actualWidth) / 2.0f;
+        float offsetY = (vh - actualHeight) / 2.0f;
+        
+        mx = (mx - offsetX) / scale;
+        my = (my - offsetY) / scale;
+    };
+
     if (e.type == EventType::MousePressed) {
         auto& me = static_cast<MouseEvent&>(e);
-        bool inBounds = (me.x >= absPos.x && me.x <= absPos.x + Size.x &&
-                         me.y >= absPos.y && me.y <= absPos.y + Size.y);
+        double mx = me.x, my = me.y;
+        mapMouseCoords(mx, my);
+        bool inBounds = (mx >= absPos.x && mx <= absPos.x + Size.x &&
+                         my >= absPos.y && my <= absPos.y + Size.y);
         
         if (inBounds) {
             m_Focused = true;

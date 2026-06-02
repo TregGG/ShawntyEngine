@@ -17,7 +17,7 @@ const COMPONENT_BADGES = {
   script: '🐍',
 }
 
-export default function Hierarchy({ entities, relationships = [], selectedIndex, onSelect, onDelete, onDuplicate, onAdd, onAddChild, onParent }) {
+export default function Hierarchy({ entities, relationships = [], selectedIndex, onSelect, onDelete, onDuplicate, onAdd, onAddChild, onParent, uiMode }) {
   const [contextMenu, setContextMenu] = useState(null)
   const [expanded, setExpanded] = useState({}) // { editorId: boolean }
   const [draggedIndex, setDraggedIndex] = useState(null)
@@ -109,6 +109,10 @@ export default function Hierarchy({ entities, relationships = [], selectedIndex,
   // Recursive render function
   const renderEntity = (index, depth = 0) => {
     const entity = entities[index]
+    const isUIEntity = entity.category === 'UI'
+    if (uiMode && !isUIEntity) return null
+    if (!uiMode && isUIEntity) return null
+
     const icon = CATEGORY_ICONS[entity.category] || '📦'
     const components = entity.components ? Object.keys(entity.components) : []
     const isSelected = index === selectedIndex

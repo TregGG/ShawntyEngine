@@ -8,7 +8,7 @@ const CATEGORY_COLORS = {
   UI: '#8b5cf6',
 }
 
-export default function Viewport({ entities, selectedIndex, onSelect, onEntityMove, camera, onCameraChange }) {
+export default function Viewport({ entities, selectedIndex, onSelect, onEntityMove, camera, onCameraChange, uiMode }) {
   const canvasRef = useRef(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
@@ -41,20 +41,35 @@ export default function Viewport({ entities, selectedIndex, onSelect, onEntityMo
   const findEntityAt = useCallback((sx, sy, canvas) => {
     for (let i = entities.length - 1; i >= 0; i--) {
       const entity = entities[i]
-      const t = entity.components?.transform
+      const isUIEntity = entity.category === 'UI'
+      if (uiMode && !isUIEntity) continue
+      if (!uiMode && isUIEntity) continue
+      const t = entity.components?.transform || entity.components?.ui
       if (!t) continue
 
       const pos = t.position || [0, 0]
       const size = t.size || [1, 1]
 
       // Entity bounds in world space (centered)
-      const halfW = size[0] / 2
-      const halfH = size[1] / 2
+      let topLeft, bottomRight;
+      
+      if (isUIEntity) {
+        const UI_PPU = 40
+        const REF_W = 1280
+        const REF_H = 720
+        const worldTopLeftX = -(REF_W / 2) / UI_PPU + (pos[0] / UI_PPU)
+        const worldTopLeftY = (REF_H / 2) / UI_PPU - (pos[1] / UI_PPU)
+        topLeft = worldToScreen(worldTopLeftX, worldTopLeftY, canvas)
+        bottomRight = worldToScreen(worldTopLeftX + (size[0] / UI_PPU), worldTopLeftY - (size[1] / UI_PPU), canvas)
+      } else {
+        const halfW = size[0] / 2
+        const halfH = size[1] / 2
+        topLeft = worldToScreen(pos[0] - halfW, pos[1] + halfH, canvas)
+        bottomRight = worldToScreen(pos[0] + halfW, pos[1] - halfH, canvas)
+      }
 
-      const topLeft = worldToScreen(pos[0] - halfW, pos[1] + halfH, canvas)
-      const bottomRight = worldToScreen(pos[0] + halfW, pos[1] - halfH, canvas)
-
-      if (sx >= topLeft.x && sx <= bottomRight.x && sy >= topLeft.y && sy <= bottomRight.y) {
+      if (sx >= topLeft.x && sx <= bottomRight.x &&
+          sy >= topLeft.y && sy <= bottomRight.y) {
         return i
       }
     }
@@ -118,31 +133,86 @@ export default function Viewport({ entities, selectedIndex, onSelect, onEntityMo
     ctx.lineTo(Math.round(origin.x) + 0.5, h)
     ctx.stroke()
 
+    // Draw Canvas Guide if in UI mode
+    if (uiMode) {
+      const UI_PPU = 40
+      const REF_W = 1280
+      const REF_H = 720
+      const guideTopLeft = worldToScreen(-REF_W / 2 / UI_PPU, REF_H / 2 / UI_PPU, canvas)
+      const guideBottomRight = worldToScreen(REF_W / 2 / UI_PPU, -REF_H / 2 / UI_PPU, canvas)
+      ctx.strokeStyle = '#a855f7'
+      ctx.lineWidth = 2
+      ctx.setLineDash([8, 8])
+      ctx.strokeRect(
+        guideTopLeft.x, 
+        guideTopLeft.y, 
+        guideBottomRight.x - guideTopLeft.x, 
+        guideBottomRight.y - guideTopLeft.y
+      )
+      ctx.setLineDash([])
+      
+      ctx.fillStyle = '#a855f7'
+      ctx.font = '12px Inter'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'bottom'
+      ctx.fillText(`Screen Bounds (${REF_W}x${REF_H})`, guideTopLeft.x, guideTopLeft.y - 8)
+    }
+
     // Draw entities
     entities.forEach((entity, index) => {
-      const t = entity.components?.transform
+      const isUIEntity = entity.category === 'UI'
+      if (!uiMode && isUIEntity) return // Hide UI in normal mode
+
+      const t = entity.components?.transform || entity.components?.ui
       if (!t) return
 
       const pos = t.position || [0, 0]
       const size = t.size || [1, 1]
-      const color = CATEGORY_COLORS[entity.category] || '#6b7280'
+      const isUI = !!entity.components?.ui
+      const color = isUI && t.backgroundColor 
+        ? `rgba(${t.backgroundColor[0]*255}, ${t.backgroundColor[1]*255}, ${t.backgroundColor[2]*255}, ${t.backgroundColor[3]})`
+        : CATEGORY_COLORS[entity.category] || '#6b7280'
       const isSelected = index === selectedIndex
 
-      const halfW = size[0] / 2
-      const halfH = size[1] / 2
-      const topLeft = worldToScreen(pos[0] - halfW, pos[1] + halfH, canvas)
-      const bottomRight = worldToScreen(pos[0] + halfW, pos[1] - halfH, canvas)
-      const rectW = bottomRight.x - topLeft.x
-      const rectH = bottomRight.y - topLeft.y
+      let topLeft, rectW, rectH, centerTop;
+      
+      if (isUI) {
+        const UI_PPU = 40
+        const REF_W = 1280
+        const REF_H = 720
+        // Engine UI places (0,0) at top-left.
+        const worldTopLeftX = -(REF_W / 2) / UI_PPU + (pos[0] / UI_PPU)
+        const worldTopLeftY = (REF_H / 2) / UI_PPU - (pos[1] / UI_PPU)
+        
+        topLeft = worldToScreen(worldTopLeftX, worldTopLeftY, canvas)
+        const bottomRight = worldToScreen(worldTopLeftX + (size[0] / UI_PPU), worldTopLeftY - (size[1] / UI_PPU), canvas)
+        
+        rectW = bottomRight.x - topLeft.x
+        rectH = bottomRight.y - topLeft.y
+        centerTop = { x: topLeft.x + rectW/2, y: topLeft.y - 6 }
+      } else {
+        const halfW = size[0] / 2
+        const halfH = size[1] / 2
+        topLeft = worldToScreen(pos[0] - halfW, pos[1] + halfH, canvas)
+        const bottomRight = worldToScreen(pos[0] + halfW, pos[1] - halfH, canvas)
+        rectW = bottomRight.x - topLeft.x
+        rectH = bottomRight.y - topLeft.y
+        centerTop = worldToScreen(pos[0], pos[1] + halfH, canvas)
+      }
 
       // Fill
-      ctx.globalAlpha = 0.3
+      if (uiMode && !isUIEntity) {
+        ctx.globalAlpha = 0.1 // Dim game objects in UI mode
+      } else {
+        ctx.globalAlpha = isUI ? 1.0 : 0.3
+      }
       ctx.fillStyle = color
       ctx.fillRect(topLeft.x, topLeft.y, rectW, rectH)
       ctx.globalAlpha = 1.0
 
       // Border
-      ctx.strokeStyle = isSelected ? '#a78bfa' : color
+      ctx.globalAlpha = (uiMode && !isUIEntity) ? 0.1 : 1.0
+      ctx.strokeStyle = isSelected ? '#a78bfa' : (isUI ? '#ffffff40' : color)
       ctx.lineWidth = isSelected ? 2.5 : 1.5
       ctx.strokeRect(topLeft.x, topLeft.y, rectW, rectH)
 
@@ -155,12 +225,22 @@ export default function Viewport({ entities, selectedIndex, onSelect, onEntityMo
         ctx.setLineDash([])
       }
 
+      // UI Text
+      if (isUI && t.text) {
+        ctx.fillStyle = t.textColor ? `rgb(${t.textColor[0]*255},${t.textColor[1]*255},${t.textColor[2]*255})` : '#ffffff'
+        const fontSize = Math.max(8, rectH * 0.5) // Text takes up 50% of the button height
+        ctx.font = `${fontSize}px Inter, sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(t.text, topLeft.x + rectW / 2, topLeft.y + rectH / 2)
+      }
+
       // Label
-      const center = worldToScreen(pos[0], pos[1] + halfH, canvas)
       ctx.fillStyle = isSelected ? '#f0f0f5' : '#a0a0b8'
       ctx.font = `${Math.max(10, Math.min(13, zoom * 0.35))}px Inter, sans-serif`
       ctx.textAlign = 'center'
-      ctx.fillText(entity.name || 'Unnamed', center.x, topLeft.y - 6)
+      ctx.textBaseline = 'alphabetic'
+      ctx.fillText(entity.name || 'Unnamed', centerTop.x, centerTop.y)
 
       // Selection handles
       if (isSelected) {
@@ -176,6 +256,8 @@ export default function Viewport({ entities, selectedIndex, onSelect, onEntityMo
           ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize)
         })
       }
+      
+      ctx.globalAlpha = 1.0 // Reset alpha
     })
 
     // Coordinates under cursor (bottom-left HUD)
@@ -232,8 +314,9 @@ export default function Viewport({ entities, selectedIndex, onSelect, onEntityMo
       if (hitIndex >= 0) {
         setIsDragging(true)
         const entity = entities[hitIndex]
-        const pos = entity.components?.transform?.position || [0, 0]
-        dragStart.current = { sx, sy, wx: pos[0], wy: pos[1] }
+        const t = entity.components?.transform || entity.components?.ui
+        const pos = t?.position || [0, 0]
+        dragStart.current = { sx, sy, wx: pos[0], wy: pos[1], isUI: entity.category === 'UI' }
       }
     }
   }, [camera, findEntityAt, onSelect, entities])
@@ -257,10 +340,20 @@ export default function Viewport({ entities, selectedIndex, onSelect, onEntityMo
       const rect = canvas.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
-      const dx = (sx - dragStart.current.sx) / camera.zoom
-      const dy = -(sy - dragStart.current.sy) / camera.zoom
-      const newX = Math.round((dragStart.current.wx + dx) * 10) / 10
-      const newY = Math.round((dragStart.current.wy + dy) * 10) / 10
+      
+      let newX, newY
+      if (dragStart.current.isUI) {
+        const UI_PPU = 40
+        const dxUI = ((sx - dragStart.current.sx) / camera.zoom) * UI_PPU
+        const dyUI = ((sy - dragStart.current.sy) / camera.zoom) * UI_PPU
+        newX = Math.round(dragStart.current.wx + dxUI)
+        newY = Math.round(dragStart.current.wy + dyUI)
+      } else {
+        const dx = (sx - dragStart.current.sx) / camera.zoom
+        const dy = -(sy - dragStart.current.sy) / camera.zoom
+        newX = Math.round((dragStart.current.wx + dx) * 10) / 10
+        newY = Math.round((dragStart.current.wy + dy) * 10) / 10
+      }
       onEntityMove(selectedIndex, { x: newX, y: newY })
     }
   }, [isPanning, isDragging, selectedIndex, camera.zoom, onEntityMove, onCameraChange])

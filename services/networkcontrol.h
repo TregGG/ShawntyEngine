@@ -44,8 +44,10 @@ public:
     uint32_t GetClientTick() const { return m_ClientTick; }
 
     std::function<void(const std::string&)> OnServerCommandReceived;
+    std::function<void(const std::string&)> OnClientConnectedCallback;
     std::vector<EntityID> GetActivePlayerEntities() const;
     virtual void OnSceneChanged();
+    void SpawnLocalPlayer();
 
 protected:
     // Game-specific virtual callbacks

@@ -1,6 +1,7 @@
 #include "networkcontrol.h"
 #include "networkservice.h"
 #include "../levels/scene.h"
+#include "../levels/datadrivenscene.h"
 #include "../core/input.h"
 #include "../core/logger.h"
 #include "../objects/components/components.h"
@@ -209,6 +210,14 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
                 welcomePacket.header.type = PacketType::Connect;
                 welcomePacket.header.tick = m_ServerTick;
                 welcomePacket.clientEntityID = pID;
+                
+                std::string scenePath = "";
+                if (m_Scene && dynamic_cast<DataDrivenScene*>(m_Scene)) {
+                    scenePath = dynamic_cast<DataDrivenScene*>(m_Scene)->GetSceneFilePath();
+                }
+                strncpy(welcomePacket.sceneName, scenePath.c_str(), sizeof(welcomePacket.sceneName));
+                welcomePacket.sceneName[sizeof(welcomePacket.sceneName) - 1] = '\0';
+                
                 m_NetService->SendPacket(peer, 0, &welcomePacket, sizeof(welcomePacket), ENET_PACKET_FLAG_RELIABLE);
             }
             
@@ -219,6 +228,18 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
     } else if (m_NetService->GetMode() == NetworkMode::Client) {
         if (header->type == PacketType::Connect && size >= sizeof(ConnectPacket)) {
             ConnectPacket* connectPacket = reinterpret_cast<ConnectPacket*>(data);
+            
+            // Clean up old state completely, because this is a fresh connection or scene transition
+            m_ClientTick = 0;
+            m_ServerTick = 0;
+            m_MyLocalPlayerID = 0;
+            m_PeerToEntity.clear();
+            m_ServerToLocalEntity.clear();
+            m_BufferedPeerInputs.clear();
+            m_LastExecutedInputs.clear();
+            m_ClientStateHistory.clear();
+            m_ClientInputHistory.clear();
+
             m_MyServerPlayerID = connectPacket->clientEntityID;
             
             uint32_t serverTick = connectPacket->header.tick;
@@ -229,8 +250,12 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
             m_LatencyOffsetTicks = rttTicks + 5;
             m_ClientTick = serverTick + m_LatencyOffsetTicks;
             
-            m_MyLocalPlayerID = OnSpawnPlayer(nullptr, true);
-            m_ServerToLocalEntity[m_MyServerPlayerID] = m_MyLocalPlayerID;
+            std::string sceneName(connectPacket->sceneName);
+            if (OnClientConnectedCallback) {
+                OnClientConnectedCallback(sceneName);
+            } else {
+                SpawnLocalPlayer();
+            }
         } else if (header->type == PacketType::ServerUpdate) {
             size_t countOffset = sizeof(PacketHeader);
             if (size < countOffset + sizeof(uint32_t)) return;
@@ -356,7 +381,7 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
                                 }
                                 ENGINE_LOG("[Client] No history for tick %u and large desync (%.2f units). Snapping.", reconTick, dist);
                             } else {
-                                trans.position = glm::mix(trans.position, serverPos, 0.1f);
+                                trans.position = glm::mix(trans.position, serverPos, 0.4f);
                             }
                         }
                     } else {
@@ -365,7 +390,7 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
                         if (dist > 2.0f) {
                             trans.position = serverPos;
                         } else {
-                            trans.position = glm::mix(trans.position, serverPos, 0.15f);
+                            trans.position = glm::mix(trans.position, serverPos, 0.4f);
                         }
                     }
                 }
@@ -391,15 +416,19 @@ std::vector<EntityID> NetworkControl::GetActivePlayerEntities() const {
 }
 
 void NetworkControl::OnSceneChanged() {
+    m_MyLocalPlayerID = 0;
+    m_MyServerPlayerID = 0;
     m_PeerToEntity.clear();
+    m_ServerToLocalEntity.clear();
     m_BufferedPeerInputs.clear();
     m_LastExecutedInputs.clear();
-
-    m_ServerToLocalEntity.clear();
-    m_MyServerPlayerID = 0;
-    m_MyLocalPlayerID = 0;
     m_ClientStateHistory.clear();
     m_ClientInputHistory.clear();
 
     ENGINE_LOG("NetworkControl: Cleared connection entities and ticks for scene transition.");
+}
+
+void NetworkControl::SpawnLocalPlayer() {
+    m_MyLocalPlayerID = OnSpawnPlayer(nullptr, true);
+    m_ServerToLocalEntity[m_MyServerPlayerID] = m_MyLocalPlayerID;
 }

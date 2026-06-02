@@ -22,4 +22,6 @@ protected:
 private:
     AssetManager* m_Assets = nullptr;
     std::vector<std::unique_ptr<GameObject>> m_ManagedObjects;
+    bool m_IsFrozen = false;
+    std::unordered_map<EntityID, int> m_CoyoteTicks;
 };

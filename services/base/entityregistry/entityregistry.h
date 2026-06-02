@@ -72,7 +72,7 @@ public:
     template<typename T>
     T* FindUIElement(const std::string& name) const {
         for (const auto& el : m_UIElements) {
-            if (el->GetName() == name) return dynamic_cast<T*>(el.get());
+            if (GetName(el->GetID()) == name) return dynamic_cast<T*>(el.get());
             // Need a recursive search if elements have children, but UIObject doesn't expose children nicely
             // We'll implement a recursive search in cpp
         }

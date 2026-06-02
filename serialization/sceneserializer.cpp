@@ -234,7 +234,8 @@ std::unique_ptr<UIObject> LoadUIElement(const json& uiJson, Scene* scene, FontEn
     } else if (type == "Text") {
         auto t = std::make_unique<UIText>(scene, name, fontEngine);
         t->Text = uiJson.value("text", "Text");
-        t->TextColor = glm::vec3(uiJson.value("textColor", std::vector<float>{1.0f, 1.0f, 1.0f}).data());
+        auto colorVec = uiJson.value("textColor", std::vector<float>{1.0f, 1.0f, 1.0f});
+        t->TextColor = glm::vec3(colorVec[0], colorVec[1], colorVec[2]);
         el = std::move(t);
     } else if (type == "Button") {
         auto b = std::make_unique<UIButton>(scene, name, eventService);
@@ -243,6 +244,8 @@ std::unique_ptr<UIObject> LoadUIElement(const json& uiJson, Scene* scene, FontEn
         if (uiJson.contains("text")) {
             auto t = std::make_unique<UIText>(scene, name + "_text", fontEngine);
             t->Text = uiJson.value("text", "Button");
+            auto colorVec = uiJson.value("textColor", std::vector<float>{1.0f, 1.0f, 1.0f});
+            t->TextColor = glm::vec3(colorVec[0], colorVec[1], colorVec[2]);
             b->AddChild(std::move(t));
         }
         el = std::move(b);
@@ -250,6 +253,8 @@ std::unique_ptr<UIObject> LoadUIElement(const json& uiJson, Scene* scene, FontEn
         auto i = std::make_unique<UIInputField>(scene, name, eventService, fontEngine);
         if (i->GetTextElement()) {
             i->GetTextElement()->Text = uiJson.value("text", "");
+            auto colorVec = uiJson.value("textColor", std::vector<float>{1.0f, 1.0f, 1.0f});
+            i->GetTextElement()->TextColor = glm::vec3(colorVec[0], colorVec[1], colorVec[2]);
         }
         el = std::move(i);
     } else {
@@ -374,8 +379,8 @@ SceneSerializer::SceneLoadResult SceneSerializer::LoadScene(
         }
     }
 
-    // Load UI
-    if (sceneData.contains("ui") && sceneData["ui"].is_array()) {
+    // Load UI (skip in headless/server mode where fontEngine is not available)
+    if (fontEngine && sceneData.contains("ui") && sceneData["ui"].is_array()) {
         for (const auto& uiJson : sceneData["ui"]) {
             if (auto el = LoadUIElement(uiJson, scene, fontEngine, eventService)) {
                 scene->registry.AddUIElement(std::move(el));
@@ -536,9 +541,9 @@ bool SceneSerializer::SaveScene(const std::string& filepath, const Scene* scene)
     sceneData["relationships"] = relsArray;
 
     // Serialize UI
-    auto saveUIElement = [](const UIObject* el, auto& saveUIElementRef) -> json {
+    auto saveUIElement = [&scene](const UIObject* el, auto& saveUIElementRef) -> json {
         json uiJson;
-        uiJson["name"] = el->GetName();
+        uiJson["name"] = std::string(scene->registry.GetName(el->GetID()));
         uiJson["position"] = {el->Position.x, el->Position.y};
         uiJson["size"] = {el->Size.x, el->Size.y};
         uiJson["backgroundColor"] = {el->BackgroundColor.r, el->BackgroundColor.g, el->BackgroundColor.b, el->BackgroundColor.a};

@@ -38,6 +38,8 @@ void RenderManager::OnScreenChange(int width, int height)
 
     m_ViewportWidth = width;
     m_ViewportHeight = height;
+    
+    if (m_Scene) m_Scene->SetViewportSize(width, height);
 
     float aspect = static_cast<float>(width) / static_cast<float>(height);
 
@@ -199,12 +201,34 @@ void RenderManager::RenderUI()
 {
     if (!m_Scene || m_ViewportWidth == 0 || m_ViewportHeight == 0) return;
     
-    // Top-left is 0,0, bottom-right is width,height
+    float refWidth = 1280.0f;
+    float refHeight = 720.0f;
+    float scaleX = (float)m_ViewportWidth / refWidth;
+    float scaleY = (float)m_ViewportHeight / refHeight;
+    
+    // Preserve aspect ratio
+    float scale = std::min(scaleX, scaleY);
+    // "only shrink down"
+    if (scale > 1.0f) scale = 1.0f;
+    
+    float actualWidth = refWidth * scale;
+    float actualHeight = refHeight * scale;
+    float offsetX = ((float)m_ViewportWidth - actualWidth) / 2.0f;
+    float offsetY = ((float)m_ViewportHeight - actualHeight) / 2.0f;
+
+    // Base projection for the physical window
     glm::mat4 projection = glm::ortho(0.0f, (float)m_ViewportWidth, (float)m_ViewportHeight, 0.0f, -1.0f, 1.0f);
+    
+    // View matrix to scale and center the 1280x720 virtual canvas
+    glm::mat4 view = glm::mat4(1.0f);
+    view = glm::translate(view, glm::vec3(offsetX, offsetY, 0.0f));
+    view = glm::scale(view, glm::vec3(scale, scale, 1.0f));
+    
+    glm::mat4 vp = projection * view;
     
     const auto& uiElements = m_Scene->registry.GetUIElements();
     for (const auto& ui : uiElements) {
-        ui->Render(projection);
+        ui->Render(vp);
     }
 }
 

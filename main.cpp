@@ -1,7 +1,7 @@
 #include "core/engine.h"
-#include "core/game.h"
+#include "core/serverengine.h"
 #include "test/testgame.h"
-
+#include "test/servertestgame.h"
 
 #include <string.h>
 
@@ -14,14 +14,25 @@ int main(int argc, char** argv)
         }
     }
 
-    Engine engine;
-    TestGame game;
+    if (isServer) {
+        ServerEngine engine;
+        ServerTestGame game;
+        
+        if (!engine.Initialize(&game))
+            return -1;
+            
+        engine.Run();
+        engine.Shutdown();
+    } else {
+        Engine engine;
+        TestGame game;
 
-    if (!engine.Initialize(&game, isServer))
-        return -1;
+        if (!engine.Initialize(&game))
+            return -1;
 
-    engine.Run();
-    engine.Shutdown();
+        engine.Run();
+        engine.Shutdown();
+    }
 
     return 0;
 }

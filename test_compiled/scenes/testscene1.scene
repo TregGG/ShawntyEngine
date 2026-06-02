@@ -46,8 +46,8 @@
                 "components": {
                     "transform": {
                         "position": [
-                            0,
-                            2.8
+                            0.1,
+                            5.3
                         ],
                         "size": [
                             25,
@@ -96,6 +96,8 @@
                     }
                 }
             }
-        ]
+        ],
+        "relationships": [],
+        "ui": []
     }
 }

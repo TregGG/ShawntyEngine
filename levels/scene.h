@@ -55,11 +55,18 @@ public:
 
     EntityRegistryService registry; // The Database
 
+    void SetViewportSize(int w, int h) { m_ViewportWidth = w; m_ViewportHeight = h; }
+    int GetViewportWidth() const { return m_ViewportWidth; }
+    int GetViewportHeight() const { return m_ViewportHeight; }
+
 protected:
     AssetManager* m_Assets = nullptr;
     const Input* m_Input = nullptr;
     std::vector<std::unique_ptr<GameObject>> m_GameObjects;
     Camera m_Camera;
+
+    int m_ViewportWidth = 1280;
+    int m_ViewportHeight = 720;
 
 };
 

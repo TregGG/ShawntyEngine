@@ -89,10 +89,9 @@ bool WriteTestCompiledAssets(const std::string& compiledRoot)
 // Create the host/join UI on the active scene's registry
 // ============================================================
 void TestGame::CreateNetworkUI(Scene* scene) {
-    bool isServer = IsServer();
     bool isConnected = (m_NetService && m_NetService->IsConnected());
 
-    if (isServer || isConnected) return;
+    if (isConnected) return;
 
     // UI Panel Background
     auto panel = std::make_unique<UIPanel>(scene, "MainPanel");
@@ -202,54 +201,54 @@ bool TestGame::OnInit()
         return false;
     }
 
-    bool isServer = IsServer();
-    if (!m_AssetManager.Initialize(compiledRoot, isServer))
+    if (!m_AssetManager.Initialize(compiledRoot, false))
     {
         ENGINE_ERROR("AssetManager failed to initialize");
         return false;
     }
 
-    if (!isServer) {
-        ENGINE_LOG("AssetManager initialized, initializing RenderManager");
-        if (!m_RenderManager.Initialize())
-        {
-            ENGINE_ERROR("RenderManager failed to initialize");
-            return false;
-        }
-
-        ENGINE_LOG("RenderManager initialized, creating FontEngine");
-        m_FontEngine.Init();
-        m_FontEngine.LoadFont("assets/comic.ttf", 24);
-    } else {
-        ENGINE_LOG("Server mode: skipping RenderManager and FontEngine initialization");
+    ENGINE_LOG("AssetManager initialized, initializing RenderManager");
+    if (!m_RenderManager.Initialize())
+    {
+        ENGINE_ERROR("RenderManager failed to initialize");
+        return false;
     }
+
+    ENGINE_LOG("RenderManager initialized, creating FontEngine");
+    m_FontEngine.Init();
+    m_FontEngine.LoadFont("assets/comic.ttf", 24);
 
     // ---- Create DataDrivenScenes from JSON ----
     ENGINE_LOG("Creating DataDrivenScenes from JSON files");
-    m_DDScene1 = new DataDrivenScene(&m_AssetManager, "test_compiled/scenes/testscene1.scene");
-    m_DDScene2 = new DataDrivenScene(&m_AssetManager, "test_compiled/scenes/testscene2.scene");
+    m_DDSceneMainMenu = new DataDrivenScene(&m_AssetManager, "test_compiled/scenes/mainmenu.scene", &m_FontEngine, m_EventService);
+    m_DDScene1 = new DataDrivenScene(&m_AssetManager, "test_compiled/scenes/testscene1.scene", &m_FontEngine, m_EventService);
+    m_DDScene2 = new DataDrivenScene(&m_AssetManager, "test_compiled/scenes/testscene2.scene", &m_FontEngine, m_EventService);
 
-    m_SceneManager.SetInitialScene(m_DDScene1);
-
-    if (!isServer) {
-        m_RenderManager.BindScene(m_DDScene1);
-    }
+    m_SceneManager.SetInitialScene(m_DDSceneMainMenu);
+    m_RenderManager.BindScene(m_DDSceneMainMenu);
 
     // ---- Wire networking (Option C: game code handles this) ----
     if (m_NetControl) {
-        m_NetControl->BindScene(m_DDScene1, nullptr); // Input set later in OnInput
+        m_NetControl->BindScene(m_DDSceneMainMenu, nullptr); // Input set later in OnInput
+        
+        m_NetControl->OnClientConnectedCallback = [this](const std::string& sceneName) {
+            ENGINE_LOG("Connected! Server requests scene: %s", sceneName.c_str());
+            DataDrivenScene* targetScene = nullptr;
+            if (sceneName == "test_compiled/scenes/testscene1.scene") targetScene = m_DDScene1;
+            else if (sceneName == "test_compiled/scenes/testscene2.scene") targetScene = m_DDScene2;
+            
+            if (targetScene) {
+                this->SetScene(targetScene);
+                m_NetControl->BindScene(targetScene, nullptr);
+                m_NetControl->SpawnLocalPlayer();
+            } else {
+                ENGINE_ERROR("Unknown scene requested by server: %s", sceneName.c_str());
+            }
+        };
     }
 
-    // Look up the trigger entity from the loaded scene
-    m_TriggerID = m_DDScene1->GetEntityByEditorId("scene_trigger");
-    if (m_TriggerID == 0) {
-        ENGINE_WARN("Could not find 'scene_trigger' entity in scene");
-    }
-
-    // Create UI for host/join (on the scene's registry)
-    // CreateNetworkUI(m_DDScene1); // Comment out hardcoded UI to prefer Data-Driven UI
-
-    m_DDScene1->registry.SetUIActionCallback([this](const std::string& action, const std::string& target) {
+    if (m_DDSceneMainMenu) {
+    m_DDSceneMainMenu->registry.SetUIActionCallback([this](const std::string& action, const std::string& target) {
         if (action == "Host") {
             ENGINE_LOG("Host Action triggered. Launching dedicated server...");
 #ifdef _WIN32
@@ -262,8 +261,8 @@ bool TestGame::OnInit()
             if (m_NetService) m_NetService->Connect("127.0.0.1", 7777);
         } else if (action == "Join") {
             std::string ip = "127.0.0.1";
-            if (!target.empty() && m_DDScene1) {
-                if (auto inputF = m_DDScene1->registry.FindUIElementRecursive(target)) {
+            if (!target.empty() && m_DDSceneMainMenu) {
+                if (auto inputF = m_DDSceneMainMenu->registry.FindUIElementRecursive(target)) {
                     if (auto uiInput = dynamic_cast<UIInputField*>(inputF)) {
                         if (uiInput->GetTextElement()) ip = uiInput->GetTextElement()->Text;
                     }
@@ -271,37 +270,27 @@ bool TestGame::OnInit()
             }
             ENGINE_LOG("Join Action triggered. Connecting to %s:7777", ip.c_str());
             if (m_NetService) m_NetService->Connect(ip, 7777);
+        } else if (action == "Quit") {
+            ENGINE_LOG("Quit Action triggered.");
+            exit(0);
         } else if (action == "ToggleActive") {
-            if (m_DDScene1) {
-                EntityID eid = m_DDScene1->GetEntityByEditorId(target);
+            if (m_DDSceneMainMenu) {
+                EntityID eid = m_DDSceneMainMenu->GetEntityByEditorId(target);
                 if (eid != 0) {
-                    ENGINE_LOG("ToggleActive triggered for %s (Not yet implemented in core components)", target.c_str());
+                    ENGINE_LOG("ToggleActive triggered for %s", target.c_str());
                 }
             }
         }
     });
+    } // end if (m_DDSceneMainMenu)
 
-    // ---- Server: scene transition when all players in trigger ----
-    if (isServer && m_NetControl && m_TriggerID != 0) {
-        ENGINE_LOG("Server mode: trigger-based scene transition enabled");
-    }
-
-    // ---- Client: server command handler for scene transitions ----
+    // ---- Client: server command handler for other commands if needed ----
     if (m_NetControl) {
         m_NetControl->OnServerCommandReceived = [this](const std::string& command) {
-            if (command == "load_scene level2") {
-                ENGINE_LOG("Client: Switching scene to level 2 as commanded by server");
-                if (m_NetControl) {
-                    m_NetControl->OnSceneChanged();
-                }
-                this->SetScene(m_DDScene2);
-                // Rebind network to new scene
-                if (m_NetControl) {
-                    m_NetControl->BindScene(m_DDScene2, nullptr);
-                }
-            }
+            // Can add other commands here later
+            ENGINE_LOG("Received server command: %s", command.c_str());
         };
-        if (!isServer && std::getenv("ENGINE_BOT")) {
+        if (std::getenv("ENGINE_BOT")) {
             ENGINE_LOG("Bot mode: Auto-connecting to local server");
             m_NetService->Connect("127.0.0.1", 7777);
         }
@@ -345,6 +334,9 @@ void TestGame::OnInput(const Input& input)
 // ============================================================
 void TestGame::OnUpdate(float deltaTime)
 {
+    // Scene update (physics, animators, etc.)
+    m_SceneManager.Update(deltaTime);
+
     // --- Network ticks (moved from scene to game code) ---
     if (m_NetService && m_NetService->GetMode() != NetworkMode::Offline && m_NetControl) {
         // Ensure NetworkControl is bound to current scene with current input
@@ -353,7 +345,7 @@ void TestGame::OnUpdate(float deltaTime)
             m_NetControl->BindScene(activeScene, const_cast<Input*>(activeScene->GetInput()));
         }
 
-        float tickInterval = 1.0f / 60.0f;
+        float tickInterval = 1.0f / 60.0f; // 60 ticks per second for lower input latency
         m_NetworkTimeAccumulator += std::min(deltaTime, 0.1f);
         while (m_NetworkTimeAccumulator >= tickInterval) {
             m_NetControl->Tick(tickInterval);
@@ -366,37 +358,6 @@ void TestGame::OnUpdate(float deltaTime)
     if (activeDD && m_NetService) {
         activeDD->GetPhysics().SetPreventPlayerPlayerPushing(m_NetService->IsPlayerPushingPrevented());
         activeDD->GetPhysics().SetPlayersTransparent(m_NetService->IsPlayersTransparent());
-    }
-
-    // --- Scene update (physics, animators, etc.) ---
-    m_SceneManager.Update(deltaTime);
-
-    // --- Server: Check trigger zone for scene transition ---
-    if (m_NetService && m_NetService->GetMode() == NetworkMode::Server && m_NetControl && m_TriggerID != 0) {
-        if (activeDD) {
-            std::vector<EntityID> players = m_NetControl->GetActivePlayerEntities();
-            if (!players.empty()) {
-                bool allInTrigger = true;
-                for (EntityID pID : players) {
-                    if (!activeDD->GetPhysics().IsColliding(pID, m_TriggerID)) {
-                        allInTrigger = false;
-                        break;
-                    }
-                }
-                if (allInTrigger) {
-                    ENGINE_LOG("Server: All players are in the trigger zone! Transitioning...");
-                    ServerCommandPacket packet;
-                    packet.header.type = PacketType::ServerCommand;
-                    packet.header.tick = m_NetControl->GetServerTick();
-                    strncpy(packet.command, "load_scene level2", sizeof(packet.command));
-                    m_NetService->BroadcastPacket(0, &packet, sizeof(packet), ENET_PACKET_FLAG_RELIABLE);
-                    m_NetControl->OnSceneChanged();
-                    this->SetScene(m_DDScene2);
-                    m_NetControl->BindScene(m_DDScene2, nullptr);
-                    m_TriggerID = 0; // Disable trigger after transition
-                }
-            }
-        }
     }
 
     // --- Status text UI updates ---
@@ -442,11 +403,7 @@ void TestGame::OnRender()
 // ============================================================
 void TestGame::OnShutdown()
 {
-    bool isServer = IsServer();
-
-    if (!isServer) {
-        m_RenderManager.Shutdown();
-    }
+    m_RenderManager.Shutdown();
     m_SceneManager.Shutdown();
 
     if (m_DDScene1)
@@ -462,8 +419,6 @@ void TestGame::OnShutdown()
 
     m_AssetManager.Shutdown();
 
-    if (!isServer) {
-        m_FontEngine.Shutdown();
-    }
+    m_FontEngine.Shutdown();
     ENGINE_LOG("Shutdown");
 }

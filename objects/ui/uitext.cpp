@@ -1,7 +1,9 @@
 #include "uitext.h"
 
 UIText::UIText(Scene* scene, const std::string& name, FontEngine* fontEngine)
-    : UIObject(scene, name), m_FontEngine(fontEngine) {}
+    : UIObject(scene, name), m_FontEngine(fontEngine) {
+    Size = glm::vec2(0.0f, 0.0f);
+}
 
 void UIText::Render(const glm::mat4& projection)
 {

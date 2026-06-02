@@ -107,9 +107,35 @@ int main() {
 }
 ```
 
+## Using the Web Editor
+
+ShawntyEngine includes a fully-featured React + FastAPI web editor for visually editing scenes and managing assets, removing the need to write JSON by hand!
+
+### 1. Start the Backend
+The backend runs on Python and manages file reads/writes for your project.
+```bash
+cd editor/backend
+source venv/bin/activate
+python main.py
+```
+*(Runs on localhost:8000)*
+
+### 2. Start the Frontend
+The frontend is a modern React/Vite application.
+```bash
+cd editor
+npm run dev
+```
+*(Runs on localhost:5173)*
+
+### 3. Edit Live
+Open `http://localhost:5173` in your browser. You can select your `level1.scene`, drag entities around, upload `.tga` textures, and define animations visually. When you save, the JSON is updated immediately, and the C++ engine will hot-reload the changes!
+
 ## Documentation
 
 Want to learn more? Check out the detailed guides in the `documentation/` folder:
+
+- **[Web Editor Guide](documentation/editor.md)**: How to set up and use the visual level editor.
 
 - **[Python Scripting](documentation/scripting_guide.md)**: How to write gameplay logic in Python.
 - **[Multiplayer Architecture](documentation/multiplayer/architecture_physics_scenes.md)**: How client-server state sync works.

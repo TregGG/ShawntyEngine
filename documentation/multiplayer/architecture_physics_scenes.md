@@ -45,7 +45,7 @@ Every frame, the client generates an input mask representing keypresses. It send
 
 ## 3. Server Tick & Physics Simulation
 
-The server operates a fixed 60Hz tick loop:
+The server and clients operate on a unified fixed 60Hz tick loop (`0.0166f`):
 
 1. **Input Buffering**: Incoming client packets are placed in `m_BufferedPeerInputs` indexed by their client tick.
 2. **Simulation Step**:
@@ -114,22 +114,23 @@ ShawntyEngine implements a reliable scene transition workflow that cleans up old
 sequenceDiagram
     participant Server
     participant Clients
-    Note over Server: Check triggers. All players in zone.
-    Server->>Clients: ServerCommandPacket ("load_scene level2")
-    Server->>Server: OnSceneChanged() & Reload/LoadScene("testscene2.scene")
-    Note over Clients: ServerCommandPacket received.
-    Clients->>Clients: OnSceneChanged() & Reload/LoadScene("testscene2.scene")
-    Note over Clients: Next client Tick runs on the new scene.<br/>Local player ID is 0.
+    Note over Server: Server triggers transition.
+    Server->>Server: OnSceneChanged() & LoadScene("testscene2.scene")
+    Note over Clients: Client actively sends input for tick N
     Clients->>Server: ClientInputPacket
-    Note over Server: Server receives input.<br/>Spawns player in the new scene.
-    Server->>Clients: ConnectPacket (clientEntityID = NewID)
+    Note over Server: Server receives input from unknown peer.<br/>Spawns player in the new scene.
+    Server->>Clients: ConnectPacket (sceneName = "testscene2.scene", clientEntityID = NewID)
+    Note over Clients: ConnectPacket received.
+    Clients->>Clients: OnSceneChanged() & LoadScene("testscene2.scene")
     Clients->>Clients: Spawn player locally in the new scene
 ```
 
-1. **Trigger Condition Met**: When all active players enter the trigger zone simultaneously, the server initiates the transition.
-2. **Command Broadcast**: The server broadcasts a reliable `ServerCommandPacket` with `"load_scene level2"`.
-3. **State Reset (`OnSceneChanged()`)**:
-   - Both the server and clients call `OnSceneChanged()`, which clears connection maps (`m_PeerToEntity`, `m_ServerToLocalEntity`), state history, and resets local/server player IDs to 0.
-   - `TestNetworkControl::OnSceneChanged()` clears `m_ManagedObjects` to destroy player unique pointers from the old scene, avoiding memory leaks.
-4. **Load Scene**: Both server and clients call `DataDrivenScene::Reload()` or load the new JSON scene file. The old scene's registries are destroyed (`OnExit()`), Python scripts are detached, and the new scene is initialized (`OnEnter()`).
-5. **Self-Healing Spawning**: On the next client update tick, the client continues sending inputs. The server receives the packet from the client's peer (which is now missing from its cleared maps), spawns a new player in the new scene, and sends back a `ConnectPacket`. The client receives the welcome packet and spawns its local player in the new scene automatically.
+1. **State Reset (`OnSceneChanged()`)**:
+   - When the server decides to change scenes, it calls `OnSceneChanged()`, which cleanly flushes its active connection state (`m_PeerToEntity`). Crucially, **the server and client tick rates do not reset**, preventing timeline desyncs across levels.
+   - The server loads the new JSON scene file.
+2. **Organic Re-Connection**:
+   - Because the client was never disconnected, it inevitably sends its next `ClientInputPacket` a split second later.
+   - The server receives this input from a peer that is no longer in its active connections map. The server handles this organically as a "new connection" and automatically re-spawns the player in the new scene.
+3. **Client Transition**:
+   - The server replies with a fresh `ConnectPacket` containing the new `sceneName` and the player's new `clientEntityID`.
+   - The client receives this packet, detects the scene change, entirely flushes its old prediction history and entity mappings, and natively loads the new scene.

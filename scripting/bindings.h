@@ -38,3 +38,12 @@ struct AnimatorProxy {
 struct InputProxy {
     const Input* input = nullptr;
 };
+
+#include <functional>
+#include <string>
+
+class NetworkService;
+class NetworkControl;
+
+void SetNetworkBindings(NetworkService* ns, NetworkControl* nc);
+extern std::function<void(const std::string&)> g_ChangeSceneCallback;

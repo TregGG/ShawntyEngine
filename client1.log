@@ -1,0 +1,115 @@
+[32m[17:52:27][LOG][Thread 140634471491520][System][Initialize:77] Initializing system...[0m
+[32m[17:52:27][LOG][Thread 140634471491520][System][Initialize:87] Initializing window 800x600[0m
+[32m[17:52:27][LOG][Thread 140634471491520][System][Initialize:124] OpenGL Vendor: Intel[0m
+[32m[17:52:27][LOG][Thread 140634471491520][System][Initialize:125] OpenGL Renderer: Mesa Intel(R) Graphics (ADL GT2)[0m
+[32m[17:52:27][LOG][Thread 140634471491520][System][Initialize:126] OpenGL Version: 4.6 (Compatibility Profile) Mesa 26.1.1-arch1.2[0m
+[32m[17:52:27][LOG][Thread 140634471491520][System][Initialize:128] Window initialized[0m
+[32m[17:52:27][LOG][Thread 140634471491520][OpenGLClass][Initialize:45] Initialize passed[0m
+[32m[17:52:27][LOG][Thread 140634471491520][NetworkService][Init:16] NetworkService Initialized (Offline Mode)[0m
+[32m[17:52:27][LOG][Thread 140634471491520][NetworkControl][Init:19] NetworkControl Initialized[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ENGINE][OnInit:221] OnInit[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ENGINE][WriteTestCompiledAssets:80] Wrote test compiled assets to test_compiled[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ENGINE][OnInit:236] AssetManager initialized, initializing RenderManager[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ENGINE][OnInit:243] RenderManager initialized, creating FontEngine[0m
+[32m[17:52:27][LOG][Thread 140634471491520][FontEngine][LoadFont:99] Loaded Font: assets/comic.ttf[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ENGINE][GetOrCreateScene:196] Loading dynamic scene on client: test_compiled/scenes/mainmenu.scene[0m
+[32m[17:52:27][LOG][Thread 140634471491520][PhysicsSystem][Init:133] Quadtree initialized for spatial partitioning[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Title' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'HostButton' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'HostButton_text' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'IpInput' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'IpInput_text' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'JoinButton' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'JoinButton_text' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'QuitButton' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'QuitButton_text' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][SceneSerializer][LoadScene:395] Scene loaded from 'test_compiled/scenes/mainmenu.scene': 0 entities[0m
+[32m[17:52:27][LOG][Thread 140634471491520][DataDrivenScene][OnEnter:37] DataDrivenScene entered: test_compiled/scenes/mainmenu.scene (0 entities loaded)[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ScriptEngine][Init:62] Python interpreter initialized (Python 3.14.5 (main, May 10 2026, 18:26:20) [GCC 16.1.1 20260430])[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ScriptEngine][Init:70] ScriptEngine initialized[0m
+[32m[17:52:27][LOG][Thread 140634471491520][RenderManager][OnScreenChange:53] OnScreenChange 1x1 -> view 10.00x10.00[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ENGINE][OnInit:334] Bot mode: Auto-connecting to local server[0m
+[32m[17:52:27][LOG][Thread 140634471491520][NetworkService][Connect:67] Connecting to 127.0.0.1:7777...[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ENGINE][OnInit:339] OnInit completed[0m
+[32m[17:52:27][LOG][Thread 140634471491520][Engine][Initialize:98] Engine initialized[0m
+[32m[17:52:27][LOG][Thread 140634471491520][RenderManager][OnScreenChange:53] OnScreenChange 1280x720 -> view 17.78x10.00[0m
+[32m[17:52:27][LOG][Thread 140634471491520][System][OnWindowResized:211] Window resized to 885x980[0m
+[32m[17:52:27][LOG][Thread 140634471491520][System][OnWindowResized:211] Window resized to 869x974[0m
+[32m[17:52:27][LOG][Thread 140634471491520][RenderManager][OnScreenChange:53] OnScreenChange 869x974 -> view 8.92x10.00[0m
+[32m[17:52:27][LOG][Thread 140634471491520][NetworkService][PollEvents:139] A new client connected.[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ENGINE][operator():274] Connected! Server requests scene: test_compiled/scenes/testscene1.scene[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ENGINE][GetOrCreateScene:196] Loading dynamic scene on client: test_compiled/scenes/testscene1.scene[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ScriptEngine][Shutdown:80] ScriptEngine shut down[0m
+[32m[17:52:27][LOG][Thread 140634471491520][PhysicsSystem][Init:133] Quadtree initialized for spatial partitioning[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Ground' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Ground (Copy)' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'SceneTrigger' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Entity 4' of category 0 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][SceneSerializer][LoadScene:395] Scene loaded from 'test_compiled/scenes/testscene1.scene': 4 entities[0m
+[32m[17:52:27][LOG][Thread 140634471491520][DataDrivenScene][OnEnter:37] DataDrivenScene entered: test_compiled/scenes/testscene1.scene (4 entities loaded)[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ScriptEngine][Init:70] ScriptEngine initialized[0m
+[32m[17:52:27][LOG][Thread 140634471491520][ScriptEngine][AttachScript:187] Script attached: test_compiled/scripts/scene_trigger.py.SceneTrigger -> entity 3[0m
+[32m[17:52:27][LOG][Thread 140634471491520][RenderManager][OnScreenChange:53] OnScreenChange 869x974 -> view 17.84x20.00[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Player' of category 3 by 'Scene'[0m
+[32m[17:52:27][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Weapon' of category 0 by 'Scene'[0m
+[32m[17:52:28][LOG][Thread 140634471491520][System][OnWindowResized:211] Window resized to 869x474[0m
+[32m[17:52:28][LOG][Thread 140634471491520][RenderManager][OnScreenChange:53] OnScreenChange 869x474 -> view 36.67x20.00[0m
+[32m[17:52:28][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Player' of category 3 by 'Scene'[0m
+[32m[17:52:28][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Weapon' of category 0 by 'Scene'[0m
+[32m[17:52:28][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (0.00, 1.97) | proj: (0.00, 1.86) | serverPos: (0.00, 1.89) | vel: (0.00, -0.92) | dist: 0.111 | ticksAhead: 2[0m
+[32m[17:52:28][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (0.00, 1.17) | proj: (0.00, 0.73) | serverPos: (0.00, 0.95) | vel: (0.00, -4.33) | dist: 0.440 | ticksAhead: 3[0m
+[32m[17:52:28][LOG][Thread 140634471491520][NetworkService][Update:93] [Client] Packets received in last second: 58[0m
+[32m[17:52:28][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (0.00, -0.38) | proj: (0.00, -0.88) | serverPos: (0.00, -0.56) | vel: (0.00, -6.39) | dist: 0.500 | ticksAhead: 3[0m
+[32m[17:52:29][LOG][Thread 140634471491520][NetworkService][Update:93] [Client] Packets received in last second: 61[0m
+[32m[17:52:30][LOG][Thread 140634471491520][NetworkService][Update:93] [Client] Packets received in last second: 62[0m
+[32m[17:52:31][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (0.00, -1.06) | proj: (0.00, -1.21) | serverPos: (0.00, -1.15) | vel: (0.00, -1.20) | dist: 0.159 | ticksAhead: 3[0m
+[32m[17:52:31][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (0.08, -1.83) | proj: (0.50, -2.29) | serverPos: (0.33, -2.14) | vel: (5.00, -4.50) | dist: 0.620 | ticksAhead: 2[0m
+[32m[17:52:31][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (1.58, -2.00) | proj: (1.79, -2.00) | serverPos: (1.54, -2.00) | vel: (5.00, 0.00) | dist: 0.207 | ticksAhead: 3[0m
+[32m[17:52:31][LOG][Thread 140634471491520][NetworkService][Update:93] [Client] Packets received in last second: 61[0m
+[32m[17:52:31][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (2.91, -2.00) | proj: (3.00, -2.00) | serverPos: (2.75, -2.00) | vel: (5.00, 0.00) | dist: 0.082 | ticksAhead: 3[0m
+[32m[17:52:32][LOG][Thread 140634471491520][ENGINE][operator():274] Connected! Server requests scene: test_compiled/scenes/testscene2.scene[0m
+[32m[17:52:32][LOG][Thread 140634471491520][ENGINE][GetOrCreateScene:196] Loading dynamic scene on client: test_compiled/scenes/testscene2.scene[0m
+[32m[17:52:32][LOG][Thread 140634471491520][ScriptEngine][Shutdown:80] ScriptEngine shut down[0m
+[32m[17:52:32][LOG][Thread 140634471491520][PhysicsSystem][Init:133] Quadtree initialized for spatial partitioning[0m
+[32m[17:52:32][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Ground' of category 0 by 'Scene'[0m
+[32m[17:52:32][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Trampoline' of category 0 by 'Scene'[0m
+[32m[17:52:32][LOG][Thread 140634471491520][SceneSerializer][LoadScene:395] Scene loaded from 'test_compiled/scenes/testscene2.scene': 2 entities[0m
+[32m[17:52:32][LOG][Thread 140634471491520][DataDrivenScene][OnEnter:37] DataDrivenScene entered: test_compiled/scenes/testscene2.scene (2 entities loaded)[0m
+[32m[17:52:32][LOG][Thread 140634471491520][ScriptEngine][Init:70] ScriptEngine initialized[0m
+[32m[17:52:32][LOG][Thread 140634471491520][RenderManager][OnScreenChange:53] OnScreenChange 869x474 -> view 36.67x20.00[0m
+[32m[17:52:32][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Player' of category 3 by 'Scene'[0m
+[32m[17:52:32][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Weapon' of category 0 by 'Scene'[0m
+[32m[17:52:32][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Player' of category 3 by 'Scene'[0m
+[32m[17:52:32][LOG][Thread 140634471491520][EntityRegistryService][Create:60] Registered entity 'Weapon' of category 0 by 'Scene'[0m
+[32m[17:52:32][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (0.00, 2.50) | proj: (0.00, 2.99) | serverPos: (0.00, 2.99) | vel: (0.00, 0.00) | dist: 0.497 | ticksAhead: 2[0m
+[32m[17:52:32][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (1.17, 2.16) | proj: (1.63, 2.00) | serverPos: (1.38, 2.19) | vel: (5.00, -3.78) | dist: 0.486 | ticksAhead: 3[0m
+[32m[17:52:32][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (2.52, 0.92) | proj: (2.75, 0.57) | serverPos: (2.58, 0.77) | vel: (5.00, -6.05) | dist: 0.427 | ticksAhead: 2[0m
+[32m[17:52:32][LOG][Thread 140634471491520][NetworkService][Update:93] [Client] Packets received in last second: 63[0m
+[32m[17:52:32][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (3.94, -1.01) | proj: (4.04, -1.40) | serverPos: (3.79, -1.03) | vel: (5.00, -7.42) | dist: 0.407 | ticksAhead: 3[0m
+[32m[17:52:33][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (5.23, -1.01) | proj: (5.25, -1.01) | serverPos: (5.00, -1.01) | vel: (5.00, 0.00) | dist: 0.016 | ticksAhead: 3[0m
+[32m[17:52:33][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (5.57, -1.01) | proj: (5.07, -1.01) | serverPos: (5.07, -1.01) | vel: (0.00, 0.00) | dist: 0.502 | ticksAhead: 3[0m
+[32m[17:52:33][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.70, -1.01) | proj: (3.93, -1.01) | serverPos: (4.18, -1.01) | vel: (-5.00, 0.00) | dist: 0.779 | ticksAhead: 3[0m
+[32m[17:52:33][LOG][Thread 140634471491520][NetworkService][Update:93] [Client] Packets received in last second: 61[0m
+[32m[17:52:33][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.31, -1.01) | proj: (4.07, -1.59) | serverPos: (4.07, -1.46) | vel: (0.00, -2.49) | dist: 0.630 | ticksAhead: 3[0m
+[32m[17:52:34][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.14, -1.95) | proj: (4.07, -2.00) | serverPos: (4.07, -2.00) | vel: (0.00, 0.00) | dist: 0.085 | ticksAhead: 3[0m
+[32m[17:52:34][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.11, -1.97) | proj: (4.07, -2.00) | serverPos: (4.07, -2.00) | vel: (0.00, 0.00) | dist: 0.048 | ticksAhead: 2[0m
+[32m[17:52:34][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.09, -1.98) | proj: (4.07, -2.00) | serverPos: (4.07, -2.00) | vel: (0.00, 0.00) | dist: 0.027 | ticksAhead: 3[0m
+[32m[17:52:34][LOG][Thread 140634471491520][NetworkService][Update:93] [Client] Packets received in last second: 61[0m
+[32m[17:52:34][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.08, -1.99) | proj: (4.07, -2.00) | serverPos: (4.07, -2.00) | vel: (0.00, 0.00) | dist: 0.016 | ticksAhead: 3[0m
+[32m[17:52:35][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.49, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.415 | ticksAhead: 2[0m
+[32m[17:52:35][LOG][Thread 140634471491520][NetworkService][Update:93] [Client] Packets received in last second: 61[0m
+[32m[17:52:35][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.57, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.499 | ticksAhead: 3[0m
+[32m[17:52:36][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.49, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.416 | ticksAhead: 2[0m
+[32m[17:52:36][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.57, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.499 | ticksAhead: 3[0m
+[32m[17:52:36][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.49, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.416 | ticksAhead: 2[0m
+[32m[17:52:36][LOG][Thread 140634471491520][NetworkService][Update:93] [Client] Packets received in last second: 62[0m
+[32m[17:52:36][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.57, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.499 | ticksAhead: 3[0m
+[32m[17:52:36][LOG][Thread 140634471491520][System][OnWindowResized:211] Window resized to 869x974[0m
+[32m[17:52:36][LOG][Thread 140634471491520][RenderManager][OnScreenChange:53] OnScreenChange 869x974 -> view 17.84x20.00[0m
+[32m[17:52:37][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.57, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.499 | ticksAhead: 3[0m
+[32m[17:52:37][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.49, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.416 | ticksAhead: 2[0m
+[32m[17:52:37][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.57, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.499 | ticksAhead: 3[0m
+[32m[17:52:37][LOG][Thread 140634471491520][NetworkService][Update:93] [Client] Packets received in last second: 61[0m
+[32m[17:52:37][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.49, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.416 | ticksAhead: 2[0m
+[32m[17:52:38][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.57, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.499 | ticksAhead: 3[0m
+[32m[17:52:38][LOG][Thread 140634471491520][NetworkControl][OnPacketReceived:405] [RemotePlayer Sync] trans: (4.07, -2.00) | proj: (4.57, -2.00) | serverPos: (4.32, -2.00) | vel: (5.00, 0.00) | dist: 0.499 | ticksAhead: 3[0m

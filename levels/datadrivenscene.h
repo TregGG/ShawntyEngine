@@ -33,10 +33,22 @@ public:
     PhysicsSystem& GetPhysics() { return m_Physics; }
     const PhysicsSystem& GetPhysics() const { return m_Physics; }
 
+    // Access scripting system
+    ScriptEngine& GetScriptEngine() { return m_ScriptEngine; }
+    const ScriptEngine& GetScriptEngine() const { return m_ScriptEngine; }
+
     // Get the scene file path
     const std::string& GetSceneFilePath() const { return m_SceneFilePath; }
 
+    // UDP Listener controls
+    void SetUdpListenerEnabled(bool enabled);
+    std::function<void()> OnSceneReloadedCallback;
+
 private:
+    void InitUdpListener();
+    void ShutdownUdpListener();
+    void PollUdpReload();
+
     std::string m_SceneFilePath;
     PhysicsSystem m_Physics;
     ScriptEngine m_ScriptEngine;
@@ -46,4 +58,8 @@ private:
 
     FontEngine* m_FontEngine = nullptr;
     EventService* m_EventService = nullptr;
+
+    // UDP Live Sync Socket
+    int m_UdpSocket = -1;
+    bool m_UdpListenerEnabled = false;
 };

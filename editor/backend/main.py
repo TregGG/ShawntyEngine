@@ -32,6 +32,15 @@ OBJECTS_DIR = os.path.join(PROJECT_ROOT, "objects")
 for d in [SCENES_DIR, PREFABS_DIR, SCRIPTS_DIR, OBJECTS_DIR]:
     os.makedirs(d, exist_ok=True)
 
+def _send_reload_packet():
+    import socket
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(b"reload", ("127.0.0.1", 9090))
+        sock.close()
+    except Exception:
+        pass
+
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
@@ -125,6 +134,7 @@ async def update_scene(name: str, request: Request):
         json.dump(body, f, indent=4)
     # Notify connected clients
     await manager.broadcast({"type": "scene_updated", "name": name})
+    _send_reload_packet()
     return {"status": "ok", "name": name}
 
 @app.post("/api/scenes")
@@ -145,6 +155,7 @@ async def create_scene(request: Request):
     with open(filepath, "w") as f:
         json.dump(scene_data, f, indent=4)
     await manager.broadcast({"type": "scene_created", "name": name})
+    _send_reload_packet()
     return {"status": "ok", "name": name}
 
 @app.delete("/api/scenes/{name}")
@@ -154,6 +165,7 @@ async def delete_scene(name: str):
         raise HTTPException(404, f"Scene '{name}' not found")
     os.remove(filepath)
     await manager.broadcast({"type": "scene_deleted", "name": name})
+    _send_reload_packet()
     return {"status": "ok", "name": name}
 
 # ---------------------------------------------------------------------------
@@ -178,6 +190,7 @@ async def update_prefab(name: str, request: Request):
     with open(filepath, "w") as f:
         json.dump(body, f, indent=4)
     await manager.broadcast({"type": "prefab_updated", "name": name})
+    _send_reload_packet()
     return {"status": "ok", "name": name}
 
 @app.post("/api/prefabs")
@@ -200,6 +213,7 @@ async def create_prefab(request: Request):
     with open(filepath, "w") as f:
         json.dump(prefab_data, f, indent=4)
     await manager.broadcast({"type": "prefab_created", "name": name})
+    _send_reload_packet()
     return {"status": "ok", "name": name}
 
 # ---------------------------------------------------------------------------
@@ -239,6 +253,7 @@ async def update_script(name: str, request: Request):
     with open(filepath, "w") as f:
         f.write(content)
     await manager.broadcast({"type": "script_updated", "name": name})
+    _send_reload_packet()
     return {"status": "ok", "name": name}
 
 @app.post("/api/scripts")
@@ -256,6 +271,7 @@ async def create_script(request: Request):
     with open(filepath, "w") as f:
         f.write(content)
     await manager.broadcast({"type": "script_created", "name": name})
+    _send_reload_packet()
     return {"status": "ok", "name": name}
 
 # ---------------------------------------------------------------------------
@@ -290,6 +306,7 @@ async def upload_texture(file: UploadFile = File(...)):
         f.write(content)
     name = Path(file.filename).stem
     await manager.broadcast({"type": "texture_uploaded", "name": name})
+    _send_reload_packet()
     return {"status": "ok", "name": name, "filename": file.filename}
 
 @app.get("/api/textures")
@@ -329,6 +346,7 @@ async def create_spritesheet(request: Request):
             idx += 1
     with open(filepath, "w") as f:
         f.write("\n".join(lines) + "\n")
+    _send_reload_packet()
     return {"status": "ok", "name": name, "frameCount": idx}
 
 # --- Animation CRUD ---
@@ -379,6 +397,7 @@ async def update_animation(name: str, request: Request):
     with open(filepath, "w") as f:
         f.write("\n".join(lines) + "\n")
     await manager.broadcast({"type": "animation_updated", "name": name})
+    _send_reload_packet()
     return {"status": "ok", "name": name}
 
 @app.post("/api/animations")
@@ -396,6 +415,7 @@ async def create_animation(request: Request):
             lines.append(f"{i}: frame={frame.get('frame', i)} duration={frame.get('duration', 0.1)}")
     with open(filepath, "w") as f:
         f.write("\n".join(lines) + "\n")
+    _send_reload_packet()
     return {"status": "ok", "name": name}
 
 # --- Object asset CRUD ---
@@ -423,6 +443,7 @@ async def create_object(request: Request):
     with open(filepath, "w") as f:
         f.write(f"spritesheet:{spritesheet}\n")
         f.write(f"animations:{animations}\n")
+    _send_reload_packet()
     return {"status": "ok", "name": name}
 
 # ---------------------------------------------------------------------------

@@ -10,6 +10,8 @@ class EventService;
 class NetworkService;
 class NetworkControl;
 
+#include "../scripting/bindings.h"
+
 class ServerGame
 {
 public:
@@ -23,7 +25,12 @@ public:
     virtual NetworkControl* CreateNetworkControl() { return nullptr; }
 
     void SetEventService(EventService* es) { m_EventService = es; }
-    void SetNetworkServices(NetworkService* ns, NetworkControl* nc) { m_NetService = ns; m_NetControl = nc; }
+
+    void SetNetworkServices(NetworkService* ns, NetworkControl* nc) { 
+        m_NetService = ns; 
+        m_NetControl = nc; 
+        SetNetworkBindings(ns, nc);
+    }
 
 protected:
     SceneManager m_SceneManager;

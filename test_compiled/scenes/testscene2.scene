@@ -3,8 +3,11 @@
     "scene": {
         "name": "TestScene2",
         "camera": {
-            "position": [0.0, 0.0],
-            "scale": 2.0
+            "position": [
+                0,
+                0
+            ],
+            "scale": 2
         },
         "entities": [
             {
@@ -13,8 +16,14 @@
                 "category": "Environment",
                 "components": {
                     "transform": {
-                        "position": [0.0, -3.0],
-                        "size": [15.0, 1.0]
+                        "position": [
+                            0,
+                            -3
+                        ],
+                        "size": [
+                            15,
+                            1
+                        ]
                     },
                     "sprite": {
                         "objectId": "testobj",
@@ -26,7 +35,7 @@
                     },
                     "rigidbody": {
                         "bodyType": "Static",
-                        "elasticity": 0.0
+                        "elasticity": 0
                     }
                 }
             },
@@ -36,8 +45,14 @@
                 "category": "Environment",
                 "components": {
                     "transform": {
-                        "position": [0.0, -1.0],
-                        "size": [3.0, 0.5]
+                        "position": [
+                            0,
+                            -4
+                        ],
+                        "size": [
+                            3,
+                            0.5
+                        ]
                     },
                     "sprite": {
                         "objectId": "testobj",
@@ -53,6 +68,8 @@
                     }
                 }
             }
-        ]
+        ],
+        "relationships": [],
+        "ui": []
     }
 }

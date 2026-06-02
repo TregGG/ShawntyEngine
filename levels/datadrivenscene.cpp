@@ -6,6 +6,11 @@
 #include "../objects/components/scriptcomponent.h"
 #include <algorithm>
 #include <GLFW/glfw3.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <cstring>
 
 #define ENGINE_CLASS "DataDrivenScene"
 #include "../core/enginedebug.h"
@@ -72,10 +77,14 @@ void DataDrivenScene::OnEnter()
 
     // Call OnStart on all attached scripts
     m_ScriptEngine.StartPendingScripts();
+
+    // Start listening for UDP hot-reload triggers if enabled
+    InitUdpListener();
 }
 
 void DataDrivenScene::OnExit()
 {
+    ShutdownUdpListener();
     m_ScriptEngine.Shutdown();
     m_EditorIdMap.clear();
     m_GameObjects.clear();
@@ -85,6 +94,8 @@ void DataDrivenScene::OnExit()
 
 void DataDrivenScene::Update(float deltatime)
 {
+    PollUdpReload();
+
     deltatime = std::min(deltatime, 0.1f);
 
     // Update script engine input pointer (may change between frames)
@@ -132,6 +143,9 @@ void DataDrivenScene::Reload()
     OnExit();
     OnEnter();
     ENGINE_LOG("Scene reloaded successfully");
+    if (OnSceneReloadedCallback) {
+        OnSceneReloadedCallback();
+    }
 }
 
 EntityID DataDrivenScene::GetEntityByEditorId(const std::string& editorId) const
@@ -166,4 +180,76 @@ void DataDrivenScene::BuildDebugLines(std::vector<DebugLine>& outDebugLines) con
     // Draw crosshair at origin
     outDebugLines.push_back({glm::vec2(-0.5f, 0.0f), glm::vec2(0.5f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f)});
     outDebugLines.push_back({glm::vec2(0.0f, -0.5f), glm::vec2(0.0f, 0.5f), glm::vec3(0.0f, 1.0f, 0.0f)});
+}
+
+void DataDrivenScene::SetUdpListenerEnabled(bool enabled)
+{
+    if (m_UdpListenerEnabled != enabled) {
+        m_UdpListenerEnabled = enabled;
+        if (m_UdpListenerEnabled) {
+            InitUdpListener();
+        } else {
+            ShutdownUdpListener();
+        }
+    }
+}
+
+void DataDrivenScene::InitUdpListener()
+{
+    if (!m_UdpListenerEnabled) return;
+    if (m_UdpSocket >= 0) return; // Already listening!
+
+    m_UdpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (m_UdpSocket >= 0) {
+        // Set non-blocking
+        int flags = fcntl(m_UdpSocket, F_GETFL, 0);
+        fcntl(m_UdpSocket, F_SETFL, flags | O_NONBLOCK);
+
+        // Allow address reuse
+        int opt = 1;
+        setsockopt(m_UdpSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+        struct sockaddr_in addr;
+        std::memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(9090);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1 (localhost only)
+
+        if (bind(m_UdpSocket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+            ENGINE_WARN("UDP live sync listener failed to bind to 127.0.0.1:9090 (Port likely in use).");
+            close(m_UdpSocket);
+            m_UdpSocket = -1;
+        } else {
+            ENGINE_LOG("UDP live sync listener bound to 127.0.0.1:9090");
+        }
+    } else {
+        ENGINE_ERROR("Failed to create UDP socket for live sync");
+    }
+}
+
+void DataDrivenScene::ShutdownUdpListener()
+{
+    if (m_UdpSocket >= 0) {
+        close(m_UdpSocket);
+        m_UdpSocket = -1;
+        ENGINE_LOG("UDP live sync listener closed");
+    }
+}
+
+void DataDrivenScene::PollUdpReload()
+{
+    if (m_UdpSocket < 0) return;
+
+    char buffer[64];
+    struct sockaddr_in senderAddr;
+    socklen_t senderLen = sizeof(senderAddr);
+    ssize_t len = recvfrom(m_UdpSocket, buffer, sizeof(buffer) - 1, 0, (struct sockaddr*)&senderAddr, &senderLen);
+    if (len > 0) {
+        buffer[len] = '\0';
+        std::string msg(buffer);
+        if (msg == "reload") {
+            ENGINE_LOG("UDP trigger packet received: reloading scene!");
+            Reload();
+        }
+    }
 }

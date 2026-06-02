@@ -15,6 +15,8 @@ class EventService;
 class NetworkService;
 class NetworkControl;
 
+#include "../scripting/bindings.h"
+
 class Game
 {
 public:
@@ -33,7 +35,12 @@ public:
     void OnResize(int width, int height) {m_RenderManager.OnScreenChange(width, height);}
     void SetScene(Scene* scene) {m_SceneManager.SetActiveScene(scene);m_RenderManager.BindScene(scene);}
     void SetEventService(EventService* es) { m_EventService = es; }
-    void SetNetworkServices(NetworkService* ns, NetworkControl* nc) { m_NetService = ns; m_NetControl = nc; }
+
+    void SetNetworkServices(NetworkService* ns, NetworkControl* nc) { 
+        m_NetService = ns; 
+        m_NetControl = nc; 
+        SetNetworkBindings(ns, nc);
+    }
 
 protected:
     SceneManager m_SceneManager;

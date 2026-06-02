@@ -8,6 +8,9 @@
 class Scene;
 class DataDrivenScene;
 
+#include <unordered_map>
+#include <string>
+
 class ServerTestGame : public ServerGame
 {
 public:
@@ -17,13 +20,12 @@ public:
 
     NetworkControl* CreateNetworkControl() override;
 
-private:
-    // Data-driven scenes
-    DataDrivenScene* m_DDScene1 = nullptr;
-    DataDrivenScene* m_DDScene2 = nullptr;
+    bool RunTransitionTest();
 
-    // Track the scene trigger entity for scene transition
-    EntityID m_TriggerID = 0;
+private:
+    // Dynamic scene management
+    std::unordered_map<std::string, DataDrivenScene*> m_Scenes;
+    DataDrivenScene* GetOrCreateScene(const std::string& path);
 
     // Fixed timestep accumulator for networking ticks
     float m_NetworkTimeAccumulator = 0.0f;

@@ -10,7 +10,7 @@
 #include "../core/enginedebug.h"
 
 TestPlayer::TestPlayer(Scene* scene, const std::string& name, const SpriteSheetAsset* sheet)
-    : GameObject(scene, name)
+    : GameObject(scene, name, EntityCategory::Player)
 {
     EntityID pID = m_ID;
 
@@ -121,7 +121,7 @@ void TestPlayer::Update(float deltaTime)
     }
 
     // Apply input-driven movement to Player
-    if (m_Scene->registry.HasComponent<RigidBodyComponent>(m_ID))
+    if (m_Input && m_Scene->registry.HasComponent<RigidBodyComponent>(m_ID))
     {
         auto& rb = m_Scene->registry.GetComponent<RigidBodyComponent>(m_ID);
         glm::vec2 currentVel = rb.GetVelocity();

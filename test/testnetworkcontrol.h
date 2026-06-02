@@ -12,6 +12,9 @@ public:
     TestNetworkControl(AssetManager* assets);
     ~TestNetworkControl() override;
     void OnSceneChanged() override;
+    void AddMockPlayer(ENetPeer* peer, EntityID entityId) {
+        m_PeerToEntity[peer] = entityId;
+    }
 
 protected:
     EntityID OnSpawnPlayer(ENetPeer* peer, bool isLocal) override;

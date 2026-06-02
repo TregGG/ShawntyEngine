@@ -187,6 +187,32 @@ void TestGame::CreateNetworkUI(Scene* scene) {
     scene->registry.AddUIElement(std::move(panel));
 }
 
+DataDrivenScene* TestGame::GetOrCreateScene(const std::string& path) {
+    auto it = m_Scenes.find(path);
+    if (it != m_Scenes.end()) {
+        return it->second;
+    }
+
+    ENGINE_LOG("Loading dynamic scene on client: %s", path.c_str());
+    DataDrivenScene* scene = new DataDrivenScene(&m_AssetManager, path, &m_FontEngine, m_EventService);
+    scene->OnSceneReloadedCallback = [this, path, scene]() {
+        this->HandleSceneReloaded(path, scene);
+    };
+
+    m_Scenes[path] = scene;
+    return scene;
+}
+
+void TestGame::HandleSceneReloaded(const std::string& path, DataDrivenScene* scene) {
+    ENGINE_LOG("Client: Scene '%s' reloaded locally!", path.c_str());
+    if (m_NetControl && m_SceneManager.GetActiveScene() == scene) {
+        m_NetControl->OnSceneChanged();
+        if (m_NetService && m_NetService->GetMode() == NetworkMode::Offline) {
+            m_NetControl->SpawnLocalPlayer();
+        }
+    }
+}
+
 // ============================================================
 // OnInit
 // ============================================================
@@ -218,27 +244,41 @@ bool TestGame::OnInit()
     m_FontEngine.Init();
     m_FontEngine.LoadFont("assets/comic.ttf", 24);
 
-    // ---- Create DataDrivenScenes from JSON ----
-    ENGINE_LOG("Creating DataDrivenScenes from JSON files");
-    m_DDSceneMainMenu = new DataDrivenScene(&m_AssetManager, "test_compiled/scenes/mainmenu.scene", &m_FontEngine, m_EventService);
-    m_DDScene1 = new DataDrivenScene(&m_AssetManager, "test_compiled/scenes/testscene1.scene", &m_FontEngine, m_EventService);
-    m_DDScene2 = new DataDrivenScene(&m_AssetManager, "test_compiled/scenes/testscene2.scene", &m_FontEngine, m_EventService);
+    // Register global change scene callback for Python scripts
+    g_ChangeSceneCallback = [this](const std::string& scenePath) {
+        DataDrivenScene* targetScene = GetOrCreateScene(scenePath);
+        if (targetScene) {
+            if (m_SceneManager.GetActiveScene() == targetScene) {
+                targetScene->Reload();
+            } else {
+                this->SetScene(targetScene);
+                if (m_NetControl) {
+                    m_NetControl->OnSceneChanged();
+                    m_NetControl->BindScene(targetScene, nullptr);
+                    m_NetControl->SpawnLocalPlayer();
+                }
+            }
+        }
+    };
 
-    m_SceneManager.SetInitialScene(m_DDSceneMainMenu);
-    m_RenderManager.BindScene(m_DDSceneMainMenu);
+    // ---- Create Initial Scene from JSON ----
+    DataDrivenScene* initialScene = GetOrCreateScene("test_compiled/scenes/mainmenu.scene");
+    m_SceneManager.SetInitialScene(initialScene);
+    m_RenderManager.BindScene(initialScene);
 
     // ---- Wire networking (Option C: game code handles this) ----
     if (m_NetControl) {
-        m_NetControl->BindScene(m_DDSceneMainMenu, nullptr); // Input set later in OnInput
+        m_NetControl->BindScene(initialScene, nullptr); // Input set later in OnInput
         
         m_NetControl->OnClientConnectedCallback = [this](const std::string& sceneName) {
             ENGINE_LOG("Connected! Server requests scene: %s", sceneName.c_str());
-            DataDrivenScene* targetScene = nullptr;
-            if (sceneName == "test_compiled/scenes/testscene1.scene") targetScene = m_DDScene1;
-            else if (sceneName == "test_compiled/scenes/testscene2.scene") targetScene = m_DDScene2;
-            
+            DataDrivenScene* targetScene = GetOrCreateScene(sceneName);
             if (targetScene) {
-                this->SetScene(targetScene);
+                if (m_SceneManager.GetActiveScene() == targetScene) {
+                    targetScene->Reload();
+                } else {
+                    this->SetScene(targetScene);
+                }
                 m_NetControl->BindScene(targetScene, nullptr);
                 m_NetControl->SpawnLocalPlayer();
             } else {
@@ -247,8 +287,8 @@ bool TestGame::OnInit()
         };
     }
 
-    if (m_DDSceneMainMenu) {
-    m_DDSceneMainMenu->registry.SetUIActionCallback([this](const std::string& action, const std::string& target) {
+    if (initialScene) {
+    initialScene->registry.SetUIActionCallback([this, initialScene](const std::string& action, const std::string& target) {
         if (action == "Host") {
             ENGINE_LOG("Host Action triggered. Launching dedicated server...");
 #ifdef _WIN32
@@ -261,8 +301,8 @@ bool TestGame::OnInit()
             if (m_NetService) m_NetService->Connect("127.0.0.1", 7777);
         } else if (action == "Join") {
             std::string ip = "127.0.0.1";
-            if (!target.empty() && m_DDSceneMainMenu) {
-                if (auto inputF = m_DDSceneMainMenu->registry.FindUIElementRecursive(target)) {
+            if (!target.empty() && initialScene) {
+                if (auto inputF = initialScene->registry.FindUIElementRecursive(target)) {
                     if (auto uiInput = dynamic_cast<UIInputField*>(inputF)) {
                         if (uiInput->GetTextElement()) ip = uiInput->GetTextElement()->Text;
                     }
@@ -274,15 +314,15 @@ bool TestGame::OnInit()
             ENGINE_LOG("Quit Action triggered.");
             exit(0);
         } else if (action == "ToggleActive") {
-            if (m_DDSceneMainMenu) {
-                EntityID eid = m_DDSceneMainMenu->GetEntityByEditorId(target);
+            if (initialScene) {
+                EntityID eid = initialScene->GetEntityByEditorId(target);
                 if (eid != 0) {
                     ENGINE_LOG("ToggleActive triggered for %s", target.c_str());
                 }
             }
         }
     });
-    } // end if (m_DDSceneMainMenu)
+    } // end if (initialScene)
 
     // ---- Client: server command handler for other commands if needed ----
     if (m_NetControl) {
@@ -358,6 +398,9 @@ void TestGame::OnUpdate(float deltaTime)
     if (activeDD && m_NetService) {
         activeDD->GetPhysics().SetPreventPlayerPlayerPushing(m_NetService->IsPlayerPushingPrevented());
         activeDD->GetPhysics().SetPlayersTransparent(m_NetService->IsPlayersTransparent());
+        
+        // Enable UDP hot reload listener only when offline (single player)
+        activeDD->SetUdpListenerEnabled(m_NetService->GetMode() == NetworkMode::Offline);
     }
 
     // --- Status text UI updates ---
@@ -406,16 +449,10 @@ void TestGame::OnShutdown()
     m_RenderManager.Shutdown();
     m_SceneManager.Shutdown();
 
-    if (m_DDScene1)
-    {
-        delete m_DDScene1;
-        m_DDScene1 = nullptr;
+    for (auto& [path, scene] : m_Scenes) {
+        delete scene;
     }
-    if (m_DDScene2)
-    {
-        delete m_DDScene2;
-        m_DDScene2 = nullptr;
-    }
+    m_Scenes.clear();
 
     m_AssetManager.Shutdown();
 

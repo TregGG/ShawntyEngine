@@ -16,7 +16,7 @@ public:
     Engine();
     ~Engine();
 
-    bool Initialize(Game* game, bool isServer = false);
+    bool Initialize(Game* game);
     void Run();
     void Shutdown();
 
@@ -33,7 +33,6 @@ private:
     EventService* m_EventService;
     NetworkService* m_NetworkService = nullptr;
     NetworkControl* m_NetworkControl = nullptr;
-    bool m_IsServer = false;
     //Not owned by engine
     Game* m_Game;
     OpenGLClass* m_OpenGL=nullptr;

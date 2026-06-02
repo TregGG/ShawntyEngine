@@ -5,6 +5,9 @@
 #include "../render/rendermanager.h"
 #include "../assets/assetmanager.h"
 
+#include <unordered_map>
+#include <string>
+
 class Scene;
 class DataDrivenScene;
 
@@ -23,16 +26,15 @@ private:
     // Helper: Create UI for host/join (called after scene enters)
     void CreateNetworkUI(Scene* scene);
 
-    DataDrivenScene* m_DDScene1 = nullptr;
-    DataDrivenScene* m_DDScene2 = nullptr;
+    // Dynamic scene management
+    std::unordered_map<std::string, DataDrivenScene*> m_Scenes;
+    DataDrivenScene* GetOrCreateScene(const std::string& path);
+    void HandleSceneReloaded(const std::string& path, DataDrivenScene* scene);
 
     // Networking UI state
     class UIText* m_StatusText = nullptr;
     bool m_UIHidden = false;
-
-    // Track the scene trigger entity for scene transition
-    EntityID m_TriggerID = 0;
-
+    
     // Fixed timestep accumulator for networking ticks
     float m_NetworkTimeAccumulator = 0.0f;
 };

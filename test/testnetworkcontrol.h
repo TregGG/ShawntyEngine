@@ -12,6 +12,9 @@ public:
     TestNetworkControl(AssetManager* assets);
     ~TestNetworkControl() override;
     void OnSceneChanged() override;
+    void AddMockPlayer(ENetPeer* peer, EntityID entityId) {
+        m_PeerToEntity[peer] = entityId;
+    }
 
 protected:
     EntityID OnSpawnPlayer(ENetPeer* peer, bool isLocal) override;
@@ -22,4 +25,6 @@ protected:
 private:
     AssetManager* m_Assets = nullptr;
     std::vector<std::unique_ptr<GameObject>> m_ManagedObjects;
+    bool m_IsFrozen = false;
+    std::unordered_map<EntityID, int> m_CoyoteTicks;
 };

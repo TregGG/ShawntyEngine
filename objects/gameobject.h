@@ -17,7 +17,7 @@ protected:
 public:
     virtual ~GameObject() = default;
     
-    GameObject(Scene* scene, const std::string& name);
+    GameObject(Scene* scene, const std::string& name, EntityCategory category = EntityCategory::Environment);
 
     EntityID GetID() const { return m_ID; }
     Scene* GetScene() const { return m_Scene; }

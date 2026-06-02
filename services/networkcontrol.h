@@ -33,7 +33,8 @@ public:
     // Client/Host calls this when user types in console/UI
     virtual void ProcessCommandString(const std::string& command);
 
-    // NetworkService calls this when an ENet packet is received
+    // Remote interpolation data
+    std::unordered_map<EntityID, glm::vec2> m_VelocityCorrections;
     virtual void OnPacketReceived(ENetPeer* peer, void* data, size_t size);
     
     // NetworkService calls this when a client disconnects
@@ -44,8 +45,10 @@ public:
     uint32_t GetClientTick() const { return m_ClientTick; }
 
     std::function<void(const std::string&)> OnServerCommandReceived;
+    std::function<void(const std::string&)> OnClientConnectedCallback;
     std::vector<EntityID> GetActivePlayerEntities() const;
     virtual void OnSceneChanged();
+    void SpawnLocalPlayer();
 
 protected:
     // Game-specific virtual callbacks

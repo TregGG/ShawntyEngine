@@ -21,6 +21,7 @@ public:
     unsigned int BackgroundTexture = 0;
 
     UIObject* GetParent() const { return m_Parent; }
+    const std::vector<std::unique_ptr<UIObject>>& GetChildren() const { return m_Children; }
 
 protected:
     UIObject* m_Parent = nullptr;

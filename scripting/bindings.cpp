@@ -11,12 +11,24 @@
 #include "../objects/components/collidercomponent.h"
 #include "../objects/components/animator.h"
 #include "../core/input.h"
+#include "../services/networkservice.h"
+#include "../services/networkcontrol.h"
 
 #include <GLFW/glfw3.h>
 #include <string>
 #include <cmath>
 
 namespace py = pybind11;
+
+static NetworkService* s_NetService = nullptr;
+static NetworkControl* s_NetControl = nullptr;
+
+std::function<void(const std::string&)> g_ChangeSceneCallback;
+
+void SetNetworkBindings(NetworkService* ns, NetworkControl* nc) {
+    s_NetService = ns;
+    s_NetControl = nc;
+}
 
 // ============================================================
 // The "shawnty" embedded Python module
@@ -270,6 +282,16 @@ PYBIND11_EMBEDDED_MODULE(shawnty, m) {
         .def("is_alive", [](const EntityHandle& e) -> bool {
             return e.registry && e.registry->IsAlive(e.entityId);
         })
+        .def("get_category", [](const EntityHandle& e) -> std::string {
+            if (!e.registry || !e.registry->IsAlive(e.entityId)) return "Unknown";
+            EntityCategory cat = e.registry->GetCategory(e.entityId);
+            if (cat == EntityCategory::Player) return "Player";
+            if (cat == EntityCategory::Environment) return "Environment";
+            if (cat == EntityCategory::Enemy) return "Enemy";
+            if (cat == EntityCategory::Projectile) return "Projectile";
+            if (cat == EntityCategory::UI) return "UI";
+            return "Unknown";
+        })
         .def("get_transform", [](const EntityHandle& e) -> py::object {
             if (!e.registry || !e.registry->HasComponent<TransformComponent>(e.entityId))
                 return py::none();
@@ -333,4 +355,31 @@ PYBIND11_EMBEDDED_MODULE(shawnty, m) {
     m.attr("MOUSE_LEFT") = GLFW_MOUSE_BUTTON_LEFT;
     m.attr("MOUSE_RIGHT") = GLFW_MOUSE_BUTTON_RIGHT;
     m.attr("MOUSE_MIDDLE") = GLFW_MOUSE_BUTTON_MIDDLE;
+
+    // Global Functions
+    m.def("is_server", []() -> bool {
+        if (s_NetService) {
+            return s_NetService->GetMode() == NetworkMode::Server;
+        }
+        return false;
+    });
+
+    m.def("get_active_players", [](const EntityHandle& e) -> py::list {
+        py::list result;
+        if (s_NetControl && e.registry) {
+            std::vector<EntityID> players = s_NetControl->GetActivePlayerEntities();
+            for (EntityID id : players) {
+                if (e.registry->IsAlive(id)) {
+                    result.append(EntityHandle{e.registry, id});
+                }
+            }
+        }
+        return result;
+    });
+
+    m.def("change_scene", [](const std::string& scenePath) {
+        if (g_ChangeSceneCallback) {
+            g_ChangeSceneCallback(scenePath);
+        }
+    });
 }

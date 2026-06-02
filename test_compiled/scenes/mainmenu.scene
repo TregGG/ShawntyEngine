@@ -1,0 +1,65 @@
+{
+    "version": 1,
+    "scene": {
+        "name": "MainMenu",
+        "camera": {
+            "position": [0, 0],
+            "scale": 1
+        },
+        "entities": [],
+        "relationships": [],
+        "ui": [
+            {
+                "name": "Title",
+                "type": "Panel",
+                "position": [440, 100],
+                "size": [400, 80],
+                "backgroundColor": [0, 0, 0, 0],
+                "text": "MY AWESOME GAME",
+                "textColor": [1.0, 1.0, 1.0]
+            },
+            {
+                "name": "HostButton",
+                "type": "Button",
+                "position": [540, 250],
+                "size": [200, 60],
+                "backgroundColor": [0.2, 0.6, 0.2, 1.0],
+                "text": "HOST GAME",
+                "textColor": [1.0, 1.0, 1.0],
+                "action": "Host",
+                "actionTarget": ""
+            },
+            {
+                "name": "IpInput",
+                "type": "Input",
+                "position": [540, 350],
+                "size": [200, 40],
+                "backgroundColor": [0.1, 0.1, 0.1, 1.0],
+                "text": "127.0.0.1",
+                "textColor": [1.0, 1.0, 1.0]
+            },
+            {
+                "name": "JoinButton",
+                "type": "Button",
+                "position": [540, 400],
+                "size": [200, 60],
+                "backgroundColor": [0.2, 0.4, 0.8, 1.0],
+                "text": "JOIN GAME",
+                "textColor": [1.0, 1.0, 1.0],
+                "action": "Join",
+                "actionTarget": "IpInput"
+            },
+            {
+                "name": "QuitButton",
+                "type": "Button",
+                "position": [540, 500],
+                "size": [200, 60],
+                "backgroundColor": [0.8, 0.2, 0.2, 1.0],
+                "text": "QUIT",
+                "textColor": [1.0, 1.0, 1.0],
+                "action": "Quit",
+                "actionTarget": ""
+            }
+        ]
+    }
+}

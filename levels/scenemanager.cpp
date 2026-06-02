@@ -35,9 +35,13 @@ void SceneManager::SetInitialScene(Scene* scene)
 
 void SceneManager::SetActiveScene(Scene* scene)
 {
+    if (scene == m_ActiveScene)
+        return;
+        
     if(m_ActiveScene)
         m_ActiveScene->OnExit();
-    if(!scene|| scene==m_ActiveScene)
+        
+    if(!scene)
     {
         ENGINE_WARN("Failed to set active scene: invalid scene");
         m_ActiveScene=nullptr;

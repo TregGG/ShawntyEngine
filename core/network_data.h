@@ -25,6 +25,7 @@ struct PacketHeader {
 struct ConnectPacket {
     PacketHeader header;
     uint32_t clientEntityID;
+    char sceneName[64];
 };
 
 // Client -> Server: Sent continuously

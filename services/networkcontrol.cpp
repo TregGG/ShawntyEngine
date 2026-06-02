@@ -1,6 +1,7 @@
 #include "networkcontrol.h"
 #include "networkservice.h"
 #include "../levels/scene.h"
+#include "../levels/datadrivenscene.h"
 #include "../core/input.h"
 #include "../core/logger.h"
 #include "../objects/components/components.h"
@@ -31,6 +32,28 @@ void NetworkControl::SetNetworkService(NetworkService* netService) {
 }
 
 void NetworkControl::Update(float dt) {
+    if (m_NetService && m_NetService->GetMode() == NetworkMode::Client && m_Scene) {
+        for (auto const& [sID, localID] : m_ServerToLocalEntity) {
+            if (localID != m_MyLocalPlayerID) {
+                if (m_Scene->registry.HasComponent<TransformComponent>(localID)) {
+                    
+                    auto& trans = m_Scene->registry.GetComponent<TransformComponent>(localID);
+                    
+                    auto it = m_VelocityCorrections.find(localID);
+                    if (it != m_VelocityCorrections.end()) {
+                        // Apply the correction velocity to the physical position
+                        trans.position += it->second * dt;
+                        
+                        // Decay the correction so it smoothly stops
+                        it->second *= std::exp(-5.0f * dt);
+                        if (glm::length(it->second) < 0.01f) {
+                            it->second = glm::vec2(0.0f);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 void NetworkControl::Tick(float tickInterval) {
@@ -209,6 +232,14 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
                 welcomePacket.header.type = PacketType::Connect;
                 welcomePacket.header.tick = m_ServerTick;
                 welcomePacket.clientEntityID = pID;
+                
+                std::string scenePath = "";
+                if (m_Scene && dynamic_cast<DataDrivenScene*>(m_Scene)) {
+                    scenePath = dynamic_cast<DataDrivenScene*>(m_Scene)->GetSceneFilePath();
+                }
+                strncpy(welcomePacket.sceneName, scenePath.c_str(), sizeof(welcomePacket.sceneName));
+                welcomePacket.sceneName[sizeof(welcomePacket.sceneName) - 1] = '\0';
+                
                 m_NetService->SendPacket(peer, 0, &welcomePacket, sizeof(welcomePacket), ENET_PACKET_FLAG_RELIABLE);
             }
             
@@ -219,6 +250,18 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
     } else if (m_NetService->GetMode() == NetworkMode::Client) {
         if (header->type == PacketType::Connect && size >= sizeof(ConnectPacket)) {
             ConnectPacket* connectPacket = reinterpret_cast<ConnectPacket*>(data);
+            
+            // Clean up old state completely, because this is a fresh connection or scene transition
+            m_ClientTick = 0;
+            m_ServerTick = 0;
+            m_MyLocalPlayerID = 0;
+            m_PeerToEntity.clear();
+            m_ServerToLocalEntity.clear();
+            m_BufferedPeerInputs.clear();
+            m_LastExecutedInputs.clear();
+            m_ClientStateHistory.clear();
+            m_ClientInputHistory.clear();
+
             m_MyServerPlayerID = connectPacket->clientEntityID;
             
             uint32_t serverTick = connectPacket->header.tick;
@@ -229,8 +272,12 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
             m_LatencyOffsetTicks = rttTicks + 5;
             m_ClientTick = serverTick + m_LatencyOffsetTicks;
             
-            m_MyLocalPlayerID = OnSpawnPlayer(nullptr, true);
-            m_ServerToLocalEntity[m_MyServerPlayerID] = m_MyLocalPlayerID;
+            std::string sceneName(connectPacket->sceneName);
+            if (OnClientConnectedCallback) {
+                OnClientConnectedCallback(sceneName);
+            } else {
+                SpawnLocalPlayer();
+            }
         } else if (header->type == PacketType::ServerUpdate) {
             size_t countOffset = sizeof(PacketHeader);
             if (size < countOffset + sizeof(uint32_t)) return;
@@ -356,16 +403,39 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
                                 }
                                 ENGINE_LOG("[Client] No history for tick %u and large desync (%.2f units). Snapping.", reconTick, dist);
                             } else {
-                                trans.position = glm::mix(trans.position, serverPos, 0.1f);
+                                trans.position = glm::mix(trans.position, serverPos, 0.4f);
                             }
                         }
                     } else {
-                        // Soft position reconciliation for remote players (proxies)
-                        float dist = glm::distance(trans.position, serverPos);
+                        // Project server position to current client tick
+                        int ticksAhead = (int)m_ClientTick - (int)(serverUpdateTick + 3);
+                        glm::vec2 projectedPos = serverPos;
+                        glm::vec2 clientVel(0.0f);
+                        if (m_Scene->registry.HasComponent<RigidBodyComponent>(localID)) {
+                            auto& rb = m_Scene->registry.GetComponent<RigidBodyComponent>(localID);
+                            clientVel = rb.GetVelocity();
+                            if (ticksAhead != 0) {
+                                projectedPos += clientVel * ((float)ticksAhead / 60.0f);
+                            }
+                        }
+
+                        // Compare projected position with current position
+                        glm::vec2 error = projectedPos - trans.position;
+                        float dist = glm::length(error);
+                        
+                        // If completely desynced or first spawn, snap instantly
                         if (dist > 2.0f) {
-                            trans.position = serverPos;
+                            trans.position = projectedPos;
+                            m_VelocityCorrections[localID] = glm::vec2(0.0f);
                         } else {
-                            trans.position = glm::mix(trans.position, serverPos, 0.15f);
+                            // If they stopped moving and the error is just a small latency overshoot,
+                            // DO NOT moonwalk them backward. Hide the error until they start moving again!
+                            if (glm::length(clientVel) < 0.1f && dist < 0.5f) {
+                                m_VelocityCorrections[localID] = glm::vec2(0.0f);
+                            } else {
+                                // Otherwise calculate a velocity to smoothly close the gap over ~0.2s
+                                m_VelocityCorrections[localID] = error * 5.0f;
+                            }
                         }
                     }
                 }
@@ -391,15 +461,19 @@ std::vector<EntityID> NetworkControl::GetActivePlayerEntities() const {
 }
 
 void NetworkControl::OnSceneChanged() {
+    m_MyLocalPlayerID = 0;
+    m_MyServerPlayerID = 0;
     m_PeerToEntity.clear();
+    m_ServerToLocalEntity.clear();
     m_BufferedPeerInputs.clear();
     m_LastExecutedInputs.clear();
-
-    m_ServerToLocalEntity.clear();
-    m_MyServerPlayerID = 0;
-    m_MyLocalPlayerID = 0;
     m_ClientStateHistory.clear();
     m_ClientInputHistory.clear();
-
+    m_VelocityCorrections.clear();
     ENGINE_LOG("NetworkControl: Cleared connection entities and ticks for scene transition.");
+}
+
+void NetworkControl::SpawnLocalPlayer() {
+    m_MyLocalPlayerID = OnSpawnPlayer(nullptr, true);
+    m_ServerToLocalEntity[m_MyServerPlayerID] = m_MyLocalPlayerID;
 }

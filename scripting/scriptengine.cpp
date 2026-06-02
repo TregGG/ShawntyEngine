@@ -115,6 +115,17 @@ void ScriptEngine::AttachScript(EntityID entity, const ScriptComponent& scriptCo
         // Make module name unique per entity to allow multiple instances of same script
         moduleName += "_ent" + std::to_string(entity);
 
+        // Force eviction of previous cached module from Python's sys.modules if it exists
+        try {
+            py::module_ sys = py::module_::import("sys");
+            py::dict modules = sys.attr("modules");
+            if (modules.contains(moduleName)) {
+                modules.attr("pop")(moduleName);
+            }
+        } catch (...) {
+            // Ignore any cache eviction failures
+        }
+
         // Resolve to absolute path for importlib
         std::string absPath = scriptComp.scriptPath;
         if (!std::filesystem::path(absPath).is_absolute()) {

@@ -12,12 +12,12 @@ ShawntyEngine is built on a server-authoritative Entity Component System (ECS) r
 | :--- | :--- | :--- |
 | **Ground / Environment** | Authoritative Static Colliders | Replicated Colliders + Visual Sprites |
 | **Local Player** | Simulated Rigid Body (Authoritative) | Dynamic Rigid Body (Locally Predicted) |
-| **Remote Players** | Simulated Rigid Body (Authoritative) | Kinematic Rigid Body (Interpolated Proxies) |
+| **Remote Players** | Simulated Rigid Body (Authoritative) | Kinematic Rigid Body (Dead Reckoning + Velocity Corrections) |
 | **Visual Sprites / UI** | Stripped (Headless Execution) | Rendered Sprites + HUD |
 
 All player positioning and velocity data are owned by the server. The client registry contains:
 1. **Local Player (`m_MyLocalPlayerID`)**: Runs local input predictions to eliminate responsiveness lag.
-2. **Remote Player Proxies**: Replicated entities controlled by server position updates. Their gravity, drag, and forces are disabled client-side (set to Kinematic mode) to prevent local physics drift.
+2. **Remote Player Proxies**: Replicated entities controlled by server position updates. Their gravity and drag are disabled client-side, but they remain **Kinematic** rigid bodies. This allows the local physics engine to process their velocities (Dead Reckoning) and enforce solid ground collisions, preventing them from falling through floors during latency windows.
 
 ---
 
@@ -45,7 +45,7 @@ Every frame, the client generates an input mask representing keypresses. It send
 
 ## 3. Server Tick & Physics Simulation
 
-The server operates a fixed 60Hz tick loop:
+The server and clients operate on a unified fixed 60Hz tick loop (`0.0166f`):
 
 1. **Input Buffering**: Incoming client packets are placed in `m_BufferedPeerInputs` indexed by their client tick.
 2. **Simulation Step**:
@@ -101,8 +101,9 @@ if (historyIt != m_ClientStateHistory.end()) {
 }
 ```
 
-* **Hard Snap**: If the position error is greater than $1.5\text{ units}$, the client snap-teleports the player to the server position to correct collision penetration.
-* **Soft Correction**: If the error is small, the client blends $50\%$ of the error into the current position and offsets the historical prediction states to prevent visual stuttering.
+* **Hard Snap**: If the position error is greater than $2.0\text{ units}$, the client snap-teleports the player to the server position to correct massive desyncs (e.g. teleporting through a portal).
+* **Soft Correction**: For local players, the client blends $50\%$ of the error into the current position and offsets the historical prediction states to prevent visual stuttering.
+* **Remote Player Dead Reckoning**: For remote proxies, the server sends high-frequency velocity updates. The client extrapolates their position based on velocity and latency. When a `StateSync` arrives, the client computes an error offset. If the player is stationary and the error is small (typical latency overshoot), the correction is suppressed to prevent "moonwalking". If moving, a **Correction Velocity** is calculated and applied smoothly over $0.2\text{s}$ alongside the normal physics integration.
 
 ---
 
@@ -114,22 +115,23 @@ ShawntyEngine implements a reliable scene transition workflow that cleans up old
 sequenceDiagram
     participant Server
     participant Clients
-    Note over Server: Check triggers. All players in zone.
-    Server->>Clients: ServerCommandPacket ("load_scene level2")
-    Server->>Server: OnSceneChanged() & Reload/LoadScene("testscene2.scene")
-    Note over Clients: ServerCommandPacket received.
-    Clients->>Clients: OnSceneChanged() & Reload/LoadScene("testscene2.scene")
-    Note over Clients: Next client Tick runs on the new scene.<br/>Local player ID is 0.
+    Note over Server: Server triggers transition.
+    Server->>Server: OnSceneChanged() & LoadScene("testscene2.scene")
+    Note over Clients: Client actively sends input for tick N
     Clients->>Server: ClientInputPacket
-    Note over Server: Server receives input.<br/>Spawns player in the new scene.
-    Server->>Clients: ConnectPacket (clientEntityID = NewID)
+    Note over Server: Server receives input from unknown peer.<br/>Spawns player in the new scene.
+    Server->>Clients: ConnectPacket (sceneName = "testscene2.scene", clientEntityID = NewID)
+    Note over Clients: ConnectPacket received.
+    Clients->>Clients: OnSceneChanged() & LoadScene("testscene2.scene")
     Clients->>Clients: Spawn player locally in the new scene
 ```
 
-1. **Trigger Condition Met**: When all active players enter the trigger zone simultaneously, the server initiates the transition.
-2. **Command Broadcast**: The server broadcasts a reliable `ServerCommandPacket` with `"load_scene level2"`.
-3. **State Reset (`OnSceneChanged()`)**:
-   - Both the server and clients call `OnSceneChanged()`, which clears connection maps (`m_PeerToEntity`, `m_ServerToLocalEntity`), state history, and resets local/server player IDs to 0.
-   - `TestNetworkControl::OnSceneChanged()` clears `m_ManagedObjects` to destroy player unique pointers from the old scene, avoiding memory leaks.
-4. **Load Scene**: Both server and clients call `DataDrivenScene::Reload()` or load the new JSON scene file. The old scene's registries are destroyed (`OnExit()`), Python scripts are detached, and the new scene is initialized (`OnEnter()`).
-5. **Self-Healing Spawning**: On the next client update tick, the client continues sending inputs. The server receives the packet from the client's peer (which is now missing from its cleared maps), spawns a new player in the new scene, and sends back a `ConnectPacket`. The client receives the welcome packet and spawns its local player in the new scene automatically.
+1. **State Reset (`OnSceneChanged()`)**:
+   - When the server decides to change scenes, it calls `OnSceneChanged()`, which cleanly flushes its active connection state (`m_PeerToEntity`). Crucially, **the server and client tick rates do not reset**, preventing timeline desyncs across levels.
+   - The server loads the new JSON scene file.
+2. **Organic Re-Connection**:
+   - Because the client was never disconnected, it inevitably sends its next `ClientInputPacket` a split second later.
+   - The server receives this input from a peer that is no longer in its active connections map. The server handles this organically as a "new connection" and automatically re-spawns the player in the new scene.
+3. **Client Transition**:
+   - The server replies with a fresh `ConnectPacket` containing the new `sceneName` and the player's new `clientEntityID`.
+   - The client receives this packet, detects the scene change, entirely flushes its old prediction history and entity mappings, and natively loads the new scene.

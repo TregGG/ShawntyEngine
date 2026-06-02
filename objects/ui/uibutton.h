@@ -12,6 +12,9 @@ public:
     
     std::function<void()> OnClickCallback;
 
+    std::string ActionType;
+    std::string ActionTarget;
+
     glm::vec4 NormalColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
     glm::vec4 HoverColor = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f);
     glm::vec4 PressedColor = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);

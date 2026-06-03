@@ -64,7 +64,7 @@ function App() {
   const convertUIToEntities = (uiArray, entitiesOut, relsOut, parentId = null) => {
     if (!uiArray) return
     for (const ui of uiArray) {
-      const editorId = `ui_${Math.random().toString(36).substr(2, 9)}`
+      const editorId = ui.editorId || `ui_${Math.random().toString(36).substr(2, 9)}`
       const entity = {
         editorId,
         name: ui.name || 'UIElement',
@@ -72,6 +72,7 @@ function App() {
         components: {
           ui: {
             type: ui.type || 'Panel',
+            active: ui.active !== false,
             position: ui.position || [0, 0],
             size: ui.size || [100, 100],
             backgroundColor: ui.backgroundColor || [1, 1, 1, 1],
@@ -344,7 +345,7 @@ function App() {
       const buildUI = (editorId) => {
         const entity = uiEntities.find(e => e.editorId === editorId)
         if (!entity) return null
-        const uiObj = { name: entity.name, ...entity.components.ui }
+        const uiObj = { editorId: entity.editorId, name: entity.name, ...entity.components.ui }
         const rel = relationships.find(r => r.parent === editorId)
         if (rel && rel.children) {
           uiObj.children = rel.children.map(buildUI).filter(Boolean)

@@ -41,6 +41,9 @@ export default function Hierarchy({ entities, relationships = [], selectedIndex,
 
   const handleDragStart = (e, index) => {
     e.dataTransfer.setData('text/plain', index)
+    if (entities[index]?.editorId) {
+      e.dataTransfer.setData('application/x-editor-id', entities[index].editorId)
+    }
     setDraggedIndex(index)
   }
 

@@ -199,6 +199,43 @@ DataDrivenScene* TestGame::GetOrCreateScene(const std::string& path) {
         this->HandleSceneReloaded(path, scene);
     };
 
+    scene->registry.SetUIActionCallback([this, scene](const std::string& action, const std::string& target) {
+        if (action == "Host") {
+            ENGINE_LOG("Host Action triggered. Launching dedicated server...");
+#ifdef _WIN32
+            std::system("start bin\\framework.exe --server");
+#elif defined(__APPLE__)
+            std::system("open -n ./bin/framework --args --server");
+#else
+            std::system("./bin/framework --server &");
+#endif
+            if (m_NetService) m_NetService->Connect("127.0.0.1", 7777);
+        } else if (action == "Join") {
+            std::string ip = "127.0.0.1";
+            if (!target.empty() && scene) {
+                if (auto inputF = scene->registry.FindUIElementRecursive(target)) {
+                    if (auto uiInput = dynamic_cast<UIInputField*>(inputF)) {
+                        if (uiInput->GetTextElement()) ip = uiInput->GetTextElement()->Text;
+                    }
+                }
+            }
+            ENGINE_LOG("Join Action triggered. Connecting to %s:7777", ip.c_str());
+            if (m_NetService) m_NetService->Connect(ip, 7777);
+        } else if (action == "Quit") {
+            ENGINE_LOG("Quit Action triggered.");
+            exit(0);
+        } else if (action == "ToggleActive") {
+            if (scene) {
+                if (auto targetElement = scene->registry.FindUIElementRecursive(target)) {
+                    targetElement->Active = !targetElement->Active;
+                    ENGINE_LOG("ToggleActive triggered for %s. Active is now %d", target.c_str(), targetElement->Active);
+                } else {
+                    ENGINE_LOG("ToggleActive failed: Could not find UI element with Editor ID %s", target.c_str());
+                }
+            }
+        }
+    });
+
     m_Scenes[path] = scene;
     return scene;
 }
@@ -282,42 +319,7 @@ bool TestGame::OnInit()
         };
     }
 
-    if (initialScene) {
-    initialScene->registry.SetUIActionCallback([this, initialScene](const std::string& action, const std::string& target) {
-        if (action == "Host") {
-            ENGINE_LOG("Host Action triggered. Launching dedicated server...");
-#ifdef _WIN32
-            std::system("start bin\\framework.exe --server");
-#elif defined(__APPLE__)
-            std::system("open -n ./bin/framework --args --server");
-#else
-            std::system("./bin/framework --server &");
-#endif
-            if (m_NetService) m_NetService->Connect("127.0.0.1", 7777);
-        } else if (action == "Join") {
-            std::string ip = "127.0.0.1";
-            if (!target.empty() && initialScene) {
-                if (auto inputF = initialScene->registry.FindUIElementRecursive(target)) {
-                    if (auto uiInput = dynamic_cast<UIInputField*>(inputF)) {
-                        if (uiInput->GetTextElement()) ip = uiInput->GetTextElement()->Text;
-                    }
-                }
-            }
-            ENGINE_LOG("Join Action triggered. Connecting to %s:7777", ip.c_str());
-            if (m_NetService) m_NetService->Connect(ip, 7777);
-        } else if (action == "Quit") {
-            ENGINE_LOG("Quit Action triggered.");
-            exit(0);
-        } else if (action == "ToggleActive") {
-            if (initialScene) {
-                EntityID eid = initialScene->GetEntityByEditorId(target);
-                if (eid != 0) {
-                    ENGINE_LOG("ToggleActive triggered for %s", target.c_str());
-                }
-            }
-        }
-    });
-    } // end if (initialScene)
+    // UI Actions are now registered in GetOrCreateScene
 
     // ---- Client: server command handler for other commands if needed ----
     if (m_NetControl) {

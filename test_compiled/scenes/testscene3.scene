@@ -11,17 +11,17 @@
         },
         "entities": [
             {
-                "editorId": "entity_1780482484920",
+                "editorId": "entity_1780501067773",
                 "name": "Entity 1",
                 "category": "Environment",
                 "components": {
                     "transform": {
                         "position": [
-                            0,
-                            -3
+                            -0.2,
+                            -3.4
                         ],
                         "size": [
-                            15,
+                            5,
                             1
                         ],
                         "rotation": 0
@@ -32,13 +32,124 @@
                     },
                     "sprite": {
                         "layer": "Foreground",
-                        "objectId": "testobj",
+                        "objectId": "ground_2",
+                        "frameIndex": 0
+                    }
+                }
+            },
+            {
+                "editorId": "entity_1780501067773_copy_1780501215024",
+                "name": "Entity 1 (Copy)",
+                "category": "Environment",
+                "components": {
+                    "transform": {
+                        "position": [
+                            5.8,
+                            -1.2
+                        ],
+                        "size": [
+                            5,
+                            1
+                        ],
+                        "rotation": 0
+                    },
+                    "collider": {
+                        "autoBounds": true,
+                        "isTrigger": false
+                    },
+                    "sprite": {
+                        "layer": "Foreground",
+                        "objectId": "ground_2",
+                        "frameIndex": 0
+                    }
+                }
+            },
+            {
+                "editorId": "entity_1780501067773_copy_1780501215024_copy_1780501227912",
+                "name": "Entity 1 (Copy) (Copy)",
+                "category": "Environment",
+                "components": {
+                    "transform": {
+                        "position": [
+                            -6.2,
+                            -1.3
+                        ],
+                        "size": [
+                            5,
+                            1
+                        ],
+                        "rotation": 0
+                    },
+                    "collider": {
+                        "autoBounds": true,
+                        "isTrigger": false
+                    },
+                    "sprite": {
+                        "layer": "Foreground",
+                        "objectId": "ground_2",
                         "frameIndex": 0
                     }
                 }
             }
         ],
         "relationships": [],
-        "ui": []
+        "ui": [
+            {
+                "editorId": "ui_4cvdyyxom",
+                "name": "Button",
+                "type": "Button",
+                "active": true,
+                "position": [
+                    157,
+                    233
+                ],
+                "size": [
+                    100,
+                    40
+                ],
+                "backgroundColor": [
+                    0.5,
+                    0.5,
+                    0.5,
+                    1
+                ],
+                "text": "Press",
+                "textColor": [
+                    1,
+                    1,
+                    1
+                ],
+                "action": "ToggleActive",
+                "actionTarget": "ui_cpbicgsmh"
+            },
+            {
+                "editorId": "ui_cpbicgsmh",
+                "name": "Entity 6",
+                "type": "Panel",
+                "active": true,
+                "position": [
+                    130,
+                    68
+                ],
+                "size": [
+                    100,
+                    40
+                ],
+                "backgroundColor": [
+                    0.5,
+                    0.5,
+                    0.5,
+                    1
+                ],
+                "text": "",
+                "textColor": [
+                    1,
+                    1,
+                    1
+                ],
+                "action": "",
+                "actionTarget": ""
+            }
+        ]
     }
 }

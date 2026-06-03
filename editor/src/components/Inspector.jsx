@@ -982,6 +982,7 @@ function UIEditor({ data, onChange, onRemove }) {
   return (
     <ComponentSection title="UI Element" icon="🖥️" removable onRemove={onRemove}>
       <SelectInput label="Type" value={data.type || 'Panel'} options={['Panel', 'Text', 'Button', 'Input']} onChange={v => onChange({ ...data, type: v })} />
+      <CheckboxInput label="Is Active" checked={data.active !== false} onChange={v => onChange({ ...data, active: v })} />
       
       <NumberInput label="Position X" value={data.position?.[0] || 0} onChange={v => onChange({ ...data, position: [v, data.position?.[1] || 0] })} step={10} />
       <NumberInput label="Position Y" value={data.position?.[1] || 0} onChange={v => onChange({ ...data, position: [data.position?.[0] || 0, v] })} step={10} />
@@ -1012,7 +1013,25 @@ function UIEditor({ data, onChange, onRemove }) {
         <>
           <SelectInput label="Action" value={data.action || ''} options={['', 'Host', 'Join', 'ToggleActive']} onChange={v => onChange({ ...data, action: v })} />
           {(data.action === 'Join' || data.action === 'ToggleActive') && (
-            <TextInput label="Action Target (ID)" value={data.actionTarget || ''} onChange={v => onChange({ ...data, actionTarget: v })} placeholder="e.g. ui_xyz123" />
+            <div 
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => {
+                const id = e.dataTransfer.getData('application/x-editor-id')
+                if (id) {
+                  e.preventDefault()
+                  onChange({ ...data, actionTarget: id })
+                }
+              }}
+              style={{
+                border: '1px dashed transparent',
+                transition: 'border 0.2s ease'
+              }}
+              onDragEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+              onDragLeave={e => e.currentTarget.style.borderColor = 'transparent'}
+              title="You can drag and drop an entity here from the Hierarchy"
+            >
+              <TextInput label="Action Target (ID)" value={data.actionTarget || ''} onChange={v => onChange({ ...data, actionTarget: v })} placeholder="e.g. ui_xyz123" />
+            </div>
           )}
         </>
       )}

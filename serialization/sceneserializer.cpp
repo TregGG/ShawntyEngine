@@ -263,6 +263,12 @@ std::unique_ptr<UIObject> LoadUIElement(const json& uiJson, Scene* scene, FontEn
 
     el->Position = ReadVec2(uiJson, "position");
     el->Size = ReadVec2(uiJson, "size", {100.0f, 40.0f});
+    el->Active = uiJson.value("active", true);
+
+    std::string editorId = uiJson.value("editorId", "");
+    if (!editorId.empty()) {
+        scene->registry.SetEditorId(el->GetID(), editorId);
+    }
     
     if (uiJson.contains("backgroundColor") && uiJson["backgroundColor"].is_array() && uiJson["backgroundColor"].size() >= 4) {
         el->BackgroundColor = glm::vec4(
@@ -544,8 +550,10 @@ bool SceneSerializer::SaveScene(const std::string& filepath, const Scene* scene)
     auto saveUIElement = [&scene](const UIObject* el, auto& saveUIElementRef) -> json {
         json uiJson;
         uiJson["name"] = std::string(scene->registry.GetName(el->GetID()));
+        uiJson["editorId"] = std::string(scene->registry.GetEditorId(el->GetID()));
         uiJson["position"] = {el->Position.x, el->Position.y};
         uiJson["size"] = {el->Size.x, el->Size.y};
+        uiJson["active"] = el->Active;
         uiJson["backgroundColor"] = {el->BackgroundColor.r, el->BackgroundColor.g, el->BackgroundColor.b, el->BackgroundColor.a};
 
         if (dynamic_cast<const UIPanel*>(el)) uiJson["type"] = "Panel";

@@ -214,10 +214,10 @@ const std::vector<std::unique_ptr<UIObject>>& EntityRegistryService::GetUIElemen
     return m_UIElements;
 }
 
-static UIObject* RecursiveFind(UIObject* root, const std::string& name, const EntityRegistryService* registry) {
-    if (registry->GetName(root->GetID()) == name) return root;
+static UIObject* RecursiveFind(UIObject* root, const std::string& query, const EntityRegistryService* registry) {
+    if (registry->GetEditorId(root->GetID()) == query || registry->GetName(root->GetID()) == query) return root;
     for (const auto& child : root->GetChildren()) {
-        UIObject* found = RecursiveFind(child.get(), name, registry);
+        UIObject* found = RecursiveFind(child.get(), query, registry);
         if (found) return found;
     }
     return nullptr;

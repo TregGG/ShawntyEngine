@@ -71,6 +71,7 @@ UIObject::UIObject(Scene* scene, const std::string& name)
 
 void UIObject::Update(float dt)
 {
+    if (!Active) return;
     for (auto& child : m_Children) {
         child->Update(dt);
     }
@@ -78,6 +79,7 @@ void UIObject::Update(float dt)
 
 void UIObject::Render(const glm::mat4& projection)
 {
+    if (!Active) return;
     RenderBackground(projection);
     for (auto& child : m_Children) {
         child->Render(projection);

@@ -64,7 +64,7 @@
                     },
                     "rigidbody": {
                         "bodyType": "Static",
-                        "elasticity": 2.5
+                        "elasticity": 3.5
                     }
                 }
             },

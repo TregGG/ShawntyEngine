@@ -92,6 +92,7 @@ public:
     EntityID Create(EntityCategory category, std::string_view name, std::string_view registeredBy);
 
     void Destroy(EntityID entity);
+    void DestroyRecursive(EntityID entity);
     bool IsAlive(EntityID entity) const;
 
     // Category queries

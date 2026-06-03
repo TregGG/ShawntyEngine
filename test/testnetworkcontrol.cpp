@@ -31,17 +31,6 @@ EntityID TestNetworkControl::OnSpawnPlayer(ENetPeer* peer, bool isLocal) {
 }
 
 void TestNetworkControl::OnDestroyPlayer(EntityID entity) {
-    EntityID weaponID = 0;
-    
-    for (auto const& obj : m_ManagedObjects) {
-        if (obj->GetID() == entity) {
-            if (auto* player = dynamic_cast<TestPlayer*>(obj.get())) {
-                weaponID = player->GetWeaponID();
-            }
-            break;
-        }
-    }
-    
     auto it = std::remove_if(m_ManagedObjects.begin(), m_ManagedObjects.end(), [entity](const std::unique_ptr<GameObject>& obj) {
         return obj->GetID() == entity;
     });
@@ -50,10 +39,7 @@ void TestNetworkControl::OnDestroyPlayer(EntityID entity) {
     }
     
     if (m_Scene) {
-        m_Scene->registry.Destroy(entity);
-        if (weaponID != 0) {
-            m_Scene->registry.Destroy(weaponID);
-        }
+        m_Scene->registry.DestroyRecursive(entity);
     }
 }
 

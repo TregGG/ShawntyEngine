@@ -4,8 +4,8 @@
         "components": {
             "transform": {
                 "position": [
-                    -0.3,
-                    2.3
+                    -0.1,
+                    -0.3
                 ],
                 "size": [
                     1,
@@ -27,6 +27,32 @@
                 "gravityScale": 2
             }
         },
-        "children": []
+        "children": [
+            {
+                "editorId": "entity_1780510095704",
+                "name": "Child Entity",
+                "category": "Player",
+                "components": {
+                    "transform": {
+                        "position": [
+                            1.5,
+                            -0.3
+                        ],
+                        "size": [
+                            1,
+                            1
+                        ],
+                        "rotation": 0
+                    },
+                    "sprite": {
+                        "layer": "Foreground",
+                        "objectId": "ground_2",
+                        "frameIndex": 0
+                    }
+                }
+            }
+        ],
+        "category": "Player",
+        "name": "Player"
     }
 }

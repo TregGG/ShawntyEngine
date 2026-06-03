@@ -97,7 +97,7 @@ void LoadComponents(const json& compJson, EntityID entityId,
         const auto& t = compJson["transform"];
         TransformComponent tc;
         tc.position = ReadVec2(t, "position");
-        tc.localPosition = ReadVec2(t, "localPosition");
+        tc.localPosition = ReadVec2(t, "localPosition", tc.position);
         tc.size = ReadVec2(t, "size", {1.0f, 1.0f});
         tc.rotation = t.value("rotation", 0.0f);
         registry.AddComponent<TransformComponent>(entityId, tc);
@@ -607,7 +607,8 @@ bool SceneSerializer::SaveScene(const std::string& filepath, const Scene* scene)
 // ============================================================
 EntityID SceneSerializer::InstantiatePrefab(
     const std::string& filepath, Scene* scene, AssetManager* assets,
-    const glm::vec2& position, std::unordered_map<std::string, EntityID>* outEditorIdMap) {
+    const glm::vec2& position, std::unordered_map<std::string, EntityID>* outEditorIdMap,
+    EntityID existingRootId) {
 
     // Read file
     std::ifstream file(filepath);
@@ -632,11 +633,16 @@ EntityID SceneSerializer::InstantiatePrefab(
     const auto& prefabData = prefabJson["prefab"];
     std::unordered_map<std::string, EntityID> localEditorIdMap;
 
-    // Create root entity
     std::string name = prefabData.value("name", "PrefabEntity");
-    EntityCategory category = ParseCategory(prefabData.value("category", "Environment"));
 
-    EntityID rootId = scene->CreateEntity(category, name);
+    // Create or reuse root entity
+    EntityID rootId;
+    if (existingRootId != 0) {
+        rootId = existingRootId;
+    } else {
+        EntityCategory category = ParseCategory(prefabData.value("category", "Environment"));
+        rootId = scene->CreateEntity(category, name);
+    }
 
     // Load components
     if (prefabData.contains("components")) {

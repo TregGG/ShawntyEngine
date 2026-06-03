@@ -35,5 +35,6 @@ public:
                                       Scene* scene,
                                       AssetManager* assets,
                                       const glm::vec2& position = {0.0f, 0.0f},
-                                      std::unordered_map<std::string, EntityID>* outEditorIdMap = nullptr);
+                                      std::unordered_map<std::string, EntityID>* outEditorIdMap = nullptr,
+                                      EntityID existingRootId = 0);
 };

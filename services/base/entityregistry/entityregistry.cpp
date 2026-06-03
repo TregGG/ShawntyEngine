@@ -80,6 +80,24 @@ void EntityRegistryService::Destroy(EntityID entity)
     m_PendingDestroy.push_back(index);
 }
 
+void EntityRegistryService::DestroyRecursive(EntityID entity)
+{
+    if (!IsAlive(entity)) return;
+
+    if (HasComponent<RelationshipComponent>(entity))
+    {
+        const auto& rel = GetComponent<RelationshipComponent>(entity);
+        // Copy children vector because DestroyRecursive might invalidate iterators
+        std::vector<EntityID> children = rel.children;
+        for (EntityID child : children)
+        {
+            DestroyRecursive(child);
+        }
+    }
+    
+    Destroy(entity);
+}
+
 bool EntityRegistryService::IsAlive(EntityID entity) const
 {
     std::uint32_t index = EntityIndex(entity);

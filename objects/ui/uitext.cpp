@@ -7,6 +7,7 @@ UIText::UIText(Scene* scene, const std::string& name, FontEngine* fontEngine)
 
 void UIText::Render(const glm::mat4& projection)
 {
+    if (!Active) return;
     // Draw background (if any) first
     RenderBackground(projection);
     

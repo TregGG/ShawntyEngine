@@ -1,13 +1,11 @@
 {
     "version": 1,
     "prefab": {
-        "name": "Player",
-        "category": "Player",
         "components": {
             "transform": {
                 "position": [
-                    0,
-                    5
+                    -0.3,
+                    2.3
                 ],
                 "size": [
                     1,
@@ -29,30 +27,6 @@
                 "gravityScale": 2
             }
         },
-        "children": [
-            {
-                "editorId": "entity_1780433673135",
-                "name": "Child Entity",
-                "category": "Environment",
-                "components": {
-                    "transform": {
-                        "position": [
-                            0,
-                            0
-                        ],
-                        "size": [
-                            1,
-                            1
-                        ],
-                        "rotation": 0
-                    },
-                    "sprite": {
-                        "layer": "Foreground",
-                        "objectId": "testobj",
-                        "frameIndex": 0
-                    }
-                }
-            }
-        ]
+        "children": []
     }
 }

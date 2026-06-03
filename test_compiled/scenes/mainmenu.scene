@@ -13,8 +13,10 @@
         "relationships": [],
         "ui": [
             {
+                "editorId": "ui_vqsv62oai",
                 "name": "Title",
                 "type": "Panel",
+                "active": true,
                 "position": [
                     440,
                     100
@@ -39,8 +41,10 @@
                 "actionTarget": ""
             },
             {
+                "editorId": "ui_e68qvg9cx",
                 "name": "HostButton",
                 "type": "Button",
+                "active": true,
                 "position": [
                     540,
                     250
@@ -65,8 +69,10 @@
                 "actionTarget": ""
             },
             {
+                "editorId": "ui_zwnap6wqm",
                 "name": "IpInput",
                 "type": "Input",
+                "active": true,
                 "position": [
                     540,
                     350
@@ -91,8 +97,10 @@
                 "actionTarget": ""
             },
             {
+                "editorId": "ui_el2gm1782",
                 "name": "JoinButton",
                 "type": "Button",
+                "active": true,
                 "position": [
                     540,
                     400
@@ -117,8 +125,10 @@
                 "actionTarget": "IpInput"
             },
             {
+                "editorId": "ui_eocgzksyg",
                 "name": "QuitButton",
                 "type": "Button",
+                "active": true,
                 "position": [
                     540,
                     500

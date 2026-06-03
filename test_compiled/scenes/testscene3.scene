@@ -95,57 +95,57 @@
         "relationships": [],
         "ui": [
             {
-                "editorId": "ui_4cvdyyxom",
+                "editorId": "entity_1780509056870",
                 "name": "Button",
                 "type": "Button",
                 "active": true,
                 "position": [
-                    157,
-                    233
+                    316,
+                    155
                 ],
                 "size": [
                     100,
                     40
                 ],
                 "backgroundColor": [
-                    0.5,
-                    0.5,
-                    0.5,
+                    0.1411764705882353,
+                    0.12156862745098039,
+                    0.19215686274509805,
                     1
                 ],
                 "text": "Press",
                 "textColor": [
-                    1,
-                    1,
-                    1
+                    0.8627450980392157,
+                    0.5411764705882353,
+                    0.8666666666666667
                 ],
                 "action": "ToggleActive",
-                "actionTarget": "ui_cpbicgsmh"
+                "actionTarget": "entity_1780509097369"
             },
             {
-                "editorId": "ui_cpbicgsmh",
-                "name": "Entity 6",
-                "type": "Panel",
-                "active": true,
+                "editorId": "entity_1780509097369",
+                "name": "Entity 5",
+                "type": "Text",
+                "active": false,
                 "position": [
-                    130,
-                    68
+                    869,
+                    161
                 ],
                 "size": [
                     100,
                     40
                 ],
                 "backgroundColor": [
-                    0.5,
-                    0.5,
-                    0.5,
+                    0.1411764705882353,
+                    0.12156862745098039,
+                    0.19215686274509805,
                     1
                 ],
-                "text": "",
+                "text": "TEXT",
                 "textColor": [
-                    1,
-                    1,
-                    1
+                    0.5607843137254902,
+                    0.9411764705882353,
+                    0.6431372549019608
                 ],
                 "action": "",
                 "actionTarget": ""

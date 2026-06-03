@@ -29,6 +29,7 @@ void UIButton::OnClick()
 
 void UIButton::OnEvent(Event& e)
 {
+    if (!Active) return;
     glm::vec2 absPos = Position;
     UIObject* currParent = m_Parent;
     while (currParent) {

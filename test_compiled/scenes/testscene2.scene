@@ -46,8 +46,8 @@
                 "components": {
                     "transform": {
                         "position": [
-                            0,
-                            -4
+                            0.2,
+                            -0.2
                         ],
                         "size": [
                             3,
@@ -65,6 +65,35 @@
                     "rigidbody": {
                         "bodyType": "Static",
                         "elasticity": 2.5
+                    }
+                }
+            },
+            {
+                "editorId": "entity_1780433074414",
+                "name": "Entity 3",
+                "category": "Environment",
+                "components": {
+                    "transform": {
+                        "position": [
+                            4.9,
+                            -1.5
+                        ],
+                        "size": [
+                            1,
+                            1
+                        ],
+                        "rotation": 0
+                    },
+                    "collider": {
+                        "autoBounds": true,
+                        "isTrigger": true
+                    },
+                    "script": {
+                        "path": "test_compiled/scripts/scene_trigger.py",
+                        "class": "SceneTrigger",
+                        "properties": {
+                            "next_scene": "test_compiled/scenes/testscene3.scene"
+                        }
                     }
                 }
             }

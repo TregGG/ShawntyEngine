@@ -560,6 +560,7 @@ function App() {
               assets={assets}
               refreshAssets={refreshAssets}
               scripts={scriptsList}
+              scenes={scenes || []}
             />
           </div>
         ) : (
@@ -570,6 +571,7 @@ function App() {
             assets={assets}
             refreshAssets={refreshAssets}
             scripts={scriptsList}
+            scenes={scenes || []}
           />
         )}
       </div>

@@ -765,9 +765,22 @@ function AnimatorEditor({ data, onChange, onRemove, assets }) {
 // ---------------------------------------------------------------------------
 // Script Editor
 // ---------------------------------------------------------------------------
-function ScriptEditor({ data, onChange, onRemove, scripts }) {
+function ScriptEditor({ data, onChange, onRemove, scripts, scenes }) {
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
+  const [metadata, setMetadata] = useState({})
+  
+  useEffect(() => {
+    if (data.path) {
+      const scriptName = data.path.split('/').pop()
+      fetch(`/api/scripts/${scriptName}/metadata`, { cache: 'no-store' })
+        .then(res => res.ok ? res.json() : {})
+        .then(setMetadata)
+        .catch(console.error)
+    } else {
+      setMetadata({})
+    }
+  }, [data.path])
 
   const addProperty = () => {
     if (!newKey.trim()) return
@@ -806,21 +819,42 @@ function ScriptEditor({ data, onChange, onRemove, scripts }) {
       <TextInput label="Class" value={data.class} onChange={v => onChange({ ...data, class: v })} />
 
       <div className="field-group-header">Properties</div>
-      {data.properties && Object.entries(data.properties).map(([key, val]) => (
-        <div key={key} className="field-row property-row">
-          <span className="property-key">{key}</span>
-          <input
-            type="text"
-            value={typeof val === 'string' ? val : JSON.stringify(val)}
-            onChange={e => {
-              const props = { ...(data.properties || {}) }
-              props[key] = e.target.value
-              onChange({ ...data, properties: props })
-            }}
-          />
-          <button className="btn-remove-sm" onClick={() => removeProperty(key)}>✕</button>
-        </div>
-      ))}
+      {Array.from(new Set([...Object.keys(data.properties || {}), ...Object.keys(metadata || {})])).map(key => {
+        const val = data.properties?.[key]
+        const meta = metadata[key]
+        return (
+          <div key={key} className="field-row property-row">
+            <span className="property-key">{key}</span>
+            {meta && meta.type === 'enum' ? (
+              <select
+                value={val || ''}
+                onChange={e => {
+                  const props = { ...(data.properties || {}) }
+                  props[key] = e.target.value
+                  onChange({ ...data, properties: props })
+                }}
+                style={{ flex: 1 }}
+              >
+                <option value="">(select option)</option>
+                {(meta.options?.[0] === 'scenes' ? (scenes || []).map(s => `test_compiled/scenes/${s}.scene`) : (meta.options || [])).map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={typeof val === 'string' ? val : JSON.stringify(val)}
+                onChange={e => {
+                  const props = { ...(data.properties || {}) }
+                  props[key] = e.target.value
+                  onChange({ ...data, properties: props })
+                }}
+              />
+            )}
+            <button className="btn-remove-sm" onClick={() => removeProperty(key)}>✕</button>
+          </div>
+        )
+      })}
       <div className="field-row add-property">
         <input type="text" placeholder="key" value={newKey} onChange={e => setNewKey(e.target.value)} />
         <input type="text" placeholder="value" value={newValue} onChange={e => setNewValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && addProperty()} />
@@ -989,7 +1023,7 @@ function UIEditor({ data, onChange, onRemove }) {
 // ---------------------------------------------------------------------------
 // Main Inspector
 // ---------------------------------------------------------------------------
-export default function Inspector({ entity, entityIndex, onUpdate, assets, refreshAssets, scripts }) {
+export default function Inspector({ entity, entityIndex, onUpdate, assets, refreshAssets, scripts, scenes }) {
   if (!entity) {
     return (
       <div className="inspector">
@@ -1085,6 +1119,7 @@ export default function Inspector({ entity, entityIndex, onUpdate, assets, refre
           onChange={d => updateComponent('script', d)}
           onRemove={() => updateComponent('script', null)}
           scripts={scripts}
+          scenes={scenes}
         />
       )}
       {entity.components?.ui && (

@@ -26,20 +26,49 @@ export default function Toolbar({
     }
   }
 
+  const handleDeleteScene = async () => {
+    if (!currentScene) return
+    if (!window.confirm(`Are you sure you want to delete the scene '${currentScene}'? This cannot be undone.`)) return
+    
+    try {
+      const res = await fetch(`/api/scenes/${currentScene}`, { method: 'DELETE' })
+      if (res.ok) {
+        refreshScenes()
+        // Selection of a new scene will be handled by the App.jsx hook when scenes change
+      } else {
+        alert('Failed to delete scene')
+      }
+    } catch (err) {
+      console.error('Failed to delete scene:', err)
+      alert('Failed to delete scene')
+    }
+  }
+
   return (
     <div className="toolbar">
       <div className="toolbar-left">
         <span className="toolbar-brand">🎮 ShawntyEngine</span>
 
-        <select
-          className="scene-selector"
-          value={currentScene || ''}
-          onChange={(e) => onSceneChange(e.target.value)}
-        >
-          {scenes.map(s => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <select
+            className="scene-selector"
+            value={currentScene || ''}
+            onChange={(e) => onSceneChange(e.target.value)}
+          >
+            {scenes.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <button 
+            className="btn-secondary btn-sm" 
+            onClick={handleDeleteScene}
+            title="Delete current scene"
+            disabled={!currentScene}
+            style={{ padding: '0 6px', color: '#ff5555' }}
+          >
+            🗑️
+          </button>
+        </div>
 
         {showNewScene ? (
           <div className="toolbar-inline-form">

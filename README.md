@@ -6,6 +6,7 @@ Welcome to the Shawnty Engine! This is a lightweight 2D game engine written in C
 
 ### Prerequisites
 
+#### For the C++ Game Engine:
 You need a C++17 compatible compiler and standard OpenGL/GLFW libraries installed.
 
 **On Ubuntu/Debian:**
@@ -17,6 +18,11 @@ sudo apt-get install build-essential libglfw3-dev libgl1-mesa-dev pkg-config lib
 ```bash
 sudo pacman -S base-devel glfw-x11 freetype2
 ```
+
+#### For the Web Editor:
+You will need Node.js/npm and Python `pip` installed to run the visual editor.
+- **Node.js & npm** (v16+ recommended): [Download here](https://nodejs.org/) or install via your package manager (e.g., `sudo apt install nodejs npm`).
+- **Python 3 `venv`**: Included with most Python 3 installations. On Ubuntu, you may need `sudo apt install python3-venv`.
 
 ### Building the Engine
 You can compile the engine using `make`.
@@ -111,25 +117,28 @@ int main() {
 
 ShawntyEngine includes a fully-featured React + FastAPI web editor for visually editing scenes and managing assets, removing the need to write JSON by hand!
 
-### 1. Start the Backend
-The backend runs on Python and manages file reads/writes for your project.
+### 1. Set Up and Start the Backend
+The backend runs on Python and manages file reads/writes for your project. You must create a virtual environment and install dependencies first:
 ```bash
 cd editor/backend
+python3 -m venv venv
 source venv/bin/activate
+pip install -r requirements.txt
 python main.py
 ```
-*(Runs on localhost:8000)*
+*(Runs on http://localhost:8000)*
 
-### 2. Start the Frontend
-The frontend is a modern React/Vite application.
+### 2. Set Up and Start the Frontend
+The frontend is a modern React/Vite application. You must install the Node dependencies first:
 ```bash
 cd editor
+npm install
 npm run dev
 ```
-*(Runs on localhost:5173)*
+*(Runs on http://localhost:3000)*
 
 ### 3. Edit Live
-Open `http://localhost:5173` in your browser. You can select your `level1.scene`, drag entities around, upload `.tga` textures, and define animations visually. When you save, the JSON is updated immediately, and the C++ engine will hot-reload the changes!
+Open `http://localhost:3000` in your browser. You can select your `level1.scene`, drag entities around, upload `.tga` textures, and define animations visually. When you save, the JSON is updated immediately, and the C++ engine will hot-reload the changes!
 
 ## Documentation
 

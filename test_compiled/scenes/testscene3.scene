@@ -1,0 +1,44 @@
+{
+    "version": 1,
+    "scene": {
+        "name": "testscene3",
+        "camera": {
+            "position": [
+                0,
+                0
+            ],
+            "scale": 1
+        },
+        "entities": [
+            {
+                "editorId": "entity_1780482484920",
+                "name": "Entity 1",
+                "category": "Environment",
+                "components": {
+                    "transform": {
+                        "position": [
+                            0,
+                            -3
+                        ],
+                        "size": [
+                            15,
+                            1
+                        ],
+                        "rotation": 0
+                    },
+                    "collider": {
+                        "autoBounds": true,
+                        "isTrigger": false
+                    },
+                    "sprite": {
+                        "layer": "Foreground",
+                        "objectId": "testobj",
+                        "frameIndex": 0
+                    }
+                }
+            }
+        ],
+        "relationships": [],
+        "ui": []
+    }
+}

@@ -31,28 +31,25 @@
         },
         "children": [
             {
-                "editorId": "weapon",
-                "name": "Weapon",
+                "editorId": "entity_1780433673135",
+                "name": "Child Entity",
                 "category": "Environment",
                 "components": {
                     "transform": {
-                        "localPosition": [
-                            1,
-                            -0.3
+                        "position": [
+                            0,
+                            0
                         ],
                         "size": [
-                            0.5,
-                            0.5
-                        ]
+                            1,
+                            1
+                        ],
+                        "rotation": 0
                     },
                     "sprite": {
+                        "layer": "Foreground",
                         "objectId": "testobj",
-                        "frameIndex": 0,
-                        "layer": "Player"
-                    },
-                    "collider": {
-                        "autoBounds": true,
-                        "isTrigger": true
+                        "frameIndex": 0
                     }
                 }
             }

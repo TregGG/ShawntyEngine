@@ -285,6 +285,38 @@ input.get_mouse_position()             # Vec2(x, y) in screen coords
 
 ---
 
+## Editor Integration (Metadata / Enums)
+
+You can expose script properties as dropdown menus in the ShawntyEngine editor Inspector by adding a special `# @export_enum` comment directly above the variable assignment in your script.
+
+### General Options Dropdown
+To create a dropdown with specific string options, list them separated by commas inside the parentheses:
+
+```python
+class MyScript:
+    def OnStart(self, entity, input):
+        # @export_enum(Red, Green, Blue) my_color
+        if not hasattr(self, "my_color"):
+            self.my_color = "Red"
+```
+*In the editor Inspector, `my_color` will now be a dropdown containing "Red", "Green", and "Blue".*
+
+### Scene Selection Dropdown
+To create a dropdown that automatically populates with a list of all existing `.scene` files in your project, use the special keyword `scenes`:
+
+```python
+class SceneTrigger:
+    def OnStart(self, entity, input):
+        # @export_enum(scenes) next_scene
+        if not hasattr(self, "next_scene"):
+            self.next_scene = "test_compiled/scenes/testscene2.scene"
+```
+*In the editor Inspector, `next_scene` will now be a dropdown listing all available scenes in your workspace, allowing you to easily link scenes without typing full paths.*
+
+> **Syntax Note:** The syntax strictly requires the format `# @export_enum(options) variable_name` on a single line. The backend parser extracts this metadata without executing the Python code.
+
+---
+
 ## Scene JSON Script Format
 
 ```json

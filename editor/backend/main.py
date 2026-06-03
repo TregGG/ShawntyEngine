@@ -238,6 +238,36 @@ class {classname}:
 async def list_scripts():
     return _list_files_full(SCRIPTS_DIR, ".py")
 
+import re
+
+@app.get("/api/scripts/{name}/metadata")
+async def get_script_metadata(name: str):
+    filepath = os.path.join(SCRIPTS_DIR, name)
+    if not os.path.exists(filepath):
+        raise HTTPException(404, f"Script '{name}' not found")
+    with open(filepath, "r") as f:
+        content = f.read()
+    
+    metadata = {}
+    # Find patterns like: # @export_enum(scenes) var_name
+    pattern = re.compile(r'#\s*@export_enum\(([^)]+)\)\s+([a-zA-Z0-9_]+)')
+    for match in pattern.finditer(content):
+        options_raw = match.group(1).strip()
+        var_name = match.group(2).strip()
+        
+        # Parse options
+        if options_raw == "scenes":
+            options = ["scenes"] # Special keyword for frontend
+        else:
+            options = [opt.strip() for opt in options_raw.split(",")]
+            
+        metadata[var_name] = {
+            "type": "enum",
+            "options": options
+        }
+        
+    return metadata
+
 @app.get("/api/scripts/{name}")
 async def get_script(name: str):
     filepath = os.path.join(SCRIPTS_DIR, name)

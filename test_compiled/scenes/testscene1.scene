@@ -106,8 +106,8 @@
                 "components": {
                     "transform": {
                         "position": [
-                            -4,
-                            4
+                            -6,
+                            3.8
                         ],
                         "size": [
                             1,

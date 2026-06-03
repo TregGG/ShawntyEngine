@@ -16,7 +16,7 @@ class SceneTrigger:
         """Called once when the scene loads."""
         self.entity_name = entity.get_name()
         self.players_in_trigger = set()
-        # next_scene should be populated by JSON properties. Fallback to testscene2.scene.
+        # @export_enum(scenes) next_scene
         if not hasattr(self, "next_scene"):
             self.next_scene = "test_compiled/scenes/testscene2.scene"
         print(f"[SceneTrigger] Script started on: {self.entity_name}, target scene: {self.next_scene}")

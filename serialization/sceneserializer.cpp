@@ -336,6 +336,14 @@ SceneSerializer::SceneLoadResult SceneSerializer::LoadScene(
         scene->GetCamera().SetScale(camScale);
     }
 
+    // Scene settings (per-scene overrides)
+    if (sceneData.contains("settings")) {
+        const auto& settings = sceneData["settings"];
+        if (settings.contains("playerPrefab") && settings["playerPrefab"].is_string()) {
+            scene->SetPlayerPrefab(settings["playerPrefab"].get<std::string>());
+        }
+    }
+
     // Load entities
     if (sceneData.contains("entities") && sceneData["entities"].is_array()) {
         for (const auto& entityJson : sceneData["entities"]) {

@@ -6,7 +6,8 @@ import Viewport from './components/Viewport'
 import ScriptBrowser from './components/ScriptBrowser'
 import PrefabBrowser from './components/PrefabBrowser'
 import TextureBrowser from './components/TextureBrowser'
-import { useScenes, useScene, saveScene, useAssets, useScripts } from './hooks/useApi'
+import ProjectSettingsModal from './components/ProjectSettingsModal'
+import { useScenes, useScene, saveScene, useAssets, useScripts, usePrefabs } from './hooks/useApi'
 import { useWebSocket } from './hooks/useWebSocket'
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
   const [saveStatus, setSaveStatus] = useState(null)
   const [editingPrefab, setEditingPrefab] = useState(null) // { name, data }
   const [uiMode, setUiMode] = useState(false) // Toggle to show/edit only UI entities
+  const [showProjectSettings, setShowProjectSettings] = useState(false) // Modal state
 
   // Layout sizes
   const [hierarchyW, setHierarchyW] = useState(240)
@@ -57,6 +59,7 @@ function App() {
   const { scene, loading: sceneLoading, refresh: refreshScene } = useScene(currentSceneName)
   const { assets, refresh: refreshAssets } = useAssets()
   const { scripts: scriptsList } = useScripts()
+  const { prefabs } = usePrefabs()
 
   // Local copy of scene data for editing
   const [sceneData, setSceneData] = useState(null)
@@ -453,6 +456,13 @@ function App() {
         refreshScenes={refreshScenes}
         uiMode={uiMode}
         setUiMode={setUiMode}
+        onOpenProjectSettings={() => setShowProjectSettings(true)}
+      />
+
+      <ProjectSettingsModal 
+        show={showProjectSettings} 
+        onClose={() => setShowProjectSettings(false)} 
+        prefabs={prefabs} 
       />
 
       <div className="panel hierarchy-panel">
@@ -573,6 +583,17 @@ function App() {
             refreshAssets={refreshAssets}
             scripts={scriptsList}
             scenes={scenes || []}
+            prefabs={prefabs || []}
+            sceneSettings={sceneData?.scene?.settings || {}}
+            onSceneSettingsChange={(newSettings) => {
+              setSceneData(prev => ({
+                ...prev,
+                scene: {
+                  ...prev.scene,
+                  settings: newSettings
+                }
+              }))
+            }}
           />
         )}
       </div>

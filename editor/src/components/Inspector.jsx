@@ -1042,12 +1042,39 @@ function UIEditor({ data, onChange, onRemove }) {
 // ---------------------------------------------------------------------------
 // Main Inspector
 // ---------------------------------------------------------------------------
-export default function Inspector({ entity, entityIndex, onUpdate, assets, refreshAssets, scripts, scenes }) {
+export default function Inspector({ entity, entityIndex, onUpdate, assets, refreshAssets, scripts, scenes, prefabs, sceneSettings, onSceneSettingsChange }) {
   if (!entity) {
     return (
       <div className="inspector">
-        <div className="panel-header"><span>Inspector</span></div>
-        <div className="empty-state">Select an entity to inspect</div>
+        <div className="panel-header"><span>⚙️ Scene Settings</span></div>
+        <div style={{ padding: '12px' }}>
+          <div className="component-section">
+            <div className="component-header">
+              <span className="component-icon">🎮</span>
+              <span className="component-title">Player Spawn</span>
+            </div>
+            <div className="component-body">
+              <div className="field-row">
+                <label>Player Prefab</label>
+                <select
+                  value={sceneSettings?.playerPrefab || ''}
+                  onChange={e => onSceneSettingsChange && onSceneSettingsChange({
+                    ...sceneSettings,
+                    playerPrefab: e.target.value || undefined
+                  })}
+                >
+                  <option value="">(Use Project Default)</option>
+                  {(prefabs || []).map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ fontSize: '11px', color: '#666', padding: '4px 0' }}>
+                Override the default player prefab for this scene. Leave empty to use the project default.
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }

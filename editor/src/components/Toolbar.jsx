@@ -2,7 +2,8 @@ import { useState } from 'react'
 
 export default function Toolbar({
   scenes, currentScene, onSceneChange, onSave, onAddEntity,
-  saveStatus, connected, refreshScenes, uiMode, setUiMode
+  saveStatus, connected, refreshScenes, uiMode, setUiMode,
+  onOpenProjectSettings
 }) {
   const [showNewScene, setShowNewScene] = useState(false)
   const [newSceneName, setNewSceneName] = useState('')
@@ -69,6 +70,10 @@ export default function Toolbar({
             🗑️
           </button>
         </div>
+
+        <button className="btn-secondary btn-sm" onClick={onOpenProjectSettings} style={{ marginLeft: '8px' }}>
+          ⚙️ Settings
+        </button>
 
         {showNewScene ? (
           <div className="toolbar-inline-form">

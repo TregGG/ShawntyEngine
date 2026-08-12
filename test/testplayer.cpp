@@ -18,8 +18,44 @@ using json = nlohmann::json;
 TestPlayer::TestPlayer(Scene* scene, const std::string& name, const SpriteSheetAsset* sheet, AssetManager* assets)
     : GameObject(scene, name, EntityCategory::Player)
 {
-    // Try loading player.prefab dynamically using the SceneSerializer onto our existing Player category entity
-    EntityID newID = SceneSerializer::InstantiatePrefab("test_compiled/prefabs/player.prefab", scene, assets, {0.0f, 0.0f}, nullptr, m_ID);
+    // Determine which prefab to use via cascading fallback:
+    //   1. Per-scene override (from scene JSON settings.playerPrefab)
+    //   2. Project default  (from test_compiled/project.json -> defaultPlayerPrefab)
+    //   3. Hardcoded fallback ("player")
+    std::string prefabName;
+
+    // 1. Check scene-level override
+    if (!scene->GetPlayerPrefab().empty()) {
+        prefabName = scene->GetPlayerPrefab();
+        ENGINE_LOG("Using scene-level player prefab: %s", prefabName.c_str());
+    } else {
+        // 2. Check project.json
+        std::ifstream projFile("test_compiled/project.json");
+        if (projFile.is_open()) {
+            try {
+                json projSettings = json::parse(projFile);
+                if (projSettings.contains("defaultPlayerPrefab") &&
+                    projSettings["defaultPlayerPrefab"].is_string() &&
+                    !projSettings["defaultPlayerPrefab"].get<std::string>().empty()) {
+                    prefabName = projSettings["defaultPlayerPrefab"].get<std::string>();
+                    ENGINE_LOG("Using project default player prefab: %s", prefabName.c_str());
+                }
+            } catch (const json::parse_error& e) {
+                ENGINE_WARN("Failed to parse project.json: %s", e.what());
+            }
+        }
+
+        // 3. Fallback
+        if (prefabName.empty()) {
+            prefabName = "player";
+            ENGINE_LOG("Using fallback player prefab: %s", prefabName.c_str());
+        }
+    }
+
+    std::string prefabPath = "test_compiled/prefabs/" + prefabName + ".prefab";
+
+    // Try loading the prefab dynamically using the SceneSerializer onto our existing Player category entity
+    EntityID newID = SceneSerializer::InstantiatePrefab(prefabPath, scene, assets, {0.0f, 0.0f}, nullptr, m_ID);
     
     if (newID != 0) {
         m_ID = newID;

@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <vector>
+#include <string>
 #include "../render/camera.h"
 #include "../assets/assetdatastruct.h"
 #include "../objects/gameobject.h"
@@ -59,6 +60,10 @@ public:
     int GetViewportWidth() const { return m_ViewportWidth; }
     int GetViewportHeight() const { return m_ViewportHeight; }
 
+    // Per-scene player prefab override (empty = use project default)
+    void SetPlayerPrefab(const std::string& prefab) { m_PlayerPrefabOverride = prefab; }
+    const std::string& GetPlayerPrefab() const { return m_PlayerPrefabOverride; }
+
 protected:
     AssetManager* m_Assets = nullptr;
     const Input* m_Input = nullptr;
@@ -67,6 +72,7 @@ protected:
 
     int m_ViewportWidth = 1280;
     int m_ViewportHeight = 720;
+    std::string m_PlayerPrefabOverride;
 
 };
 

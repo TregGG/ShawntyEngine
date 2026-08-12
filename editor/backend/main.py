@@ -28,6 +28,7 @@ SCENES_DIR = os.path.join(PROJECT_ROOT, "scenes")
 PREFABS_DIR = os.path.join(PROJECT_ROOT, "prefabs")
 SCRIPTS_DIR = os.path.join(PROJECT_ROOT, "scripts")
 OBJECTS_DIR = os.path.join(PROJECT_ROOT, "objects")
+PROJECT_SETTINGS_FILE = os.path.join(PROJECT_ROOT, "project.json")
 
 # Ensure directories exist
 for d in [SCENES_DIR, PREFABS_DIR, SCRIPTS_DIR, OBJECTS_DIR]:
@@ -304,6 +305,26 @@ async def create_script(request: Request):
     await manager.broadcast({"type": "script_created", "name": name})
     _send_reload_packet()
     return {"status": "ok", "name": name}
+
+# ---------------------------------------------------------------------------
+# Project Settings
+# ---------------------------------------------------------------------------
+@app.get("/api/project/settings")
+async def get_project_settings():
+    if not os.path.exists(PROJECT_SETTINGS_FILE):
+        return {"defaultPlayerPrefab": "player"}
+    with open(PROJECT_SETTINGS_FILE, "r") as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {"defaultPlayerPrefab": "player"}
+
+@app.put("/api/project/settings")
+async def update_project_settings(request: Request):
+    settings = await request.json()
+    with open(PROJECT_SETTINGS_FILE, "w") as f:
+        json.dump(settings, f, indent=4)
+    return {"status": "ok"}
 
 # ---------------------------------------------------------------------------
 # Asset management — textures, spritesheets, animations, objects

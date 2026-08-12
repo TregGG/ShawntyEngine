@@ -109,6 +109,22 @@ export async function deleteScene(name) {
 }
 
 // ---------------------------------------------------------------------------
+// Project Settings
+// ---------------------------------------------------------------------------
+
+export function useProjectSettings() {
+  const { data: settings, loading, error, refresh } = useList('/project/settings');
+  return { settings, loading, error, refresh };
+}
+
+export async function saveProjectSettings(settings) {
+  return apiFetch('/project/settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Prefab hooks
 // ---------------------------------------------------------------------------
 

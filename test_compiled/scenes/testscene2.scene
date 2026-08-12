@@ -46,8 +46,8 @@
                 "components": {
                     "transform": {
                         "position": [
-                            0.2,
-                            -0.2
+                            -3.2,
+                            1.8
                         ],
                         "size": [
                             3,

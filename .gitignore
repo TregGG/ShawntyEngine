@@ -10,3 +10,21 @@ framework.layout
 .engine_internals.md
 __pycache__/
 *.pyc
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+.env
+.env.*
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cloud specific
+cloud/backend/node_modules/
+cloud/frontend/node_modules/
+cloud/frontend/dist/

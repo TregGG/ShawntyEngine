@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import SpriteEditor from './SpriteEditor'
+import AnimatorEditor from './AnimatorEditor'
 
 const LAYERS = ['Background', 'Foreground', 'Player', 'UI']
 const BODY_TYPES = ['Static', 'Dynamic', 'Kinematic']
 
-function ComponentSection({ title, defaultExpanded = true, onRemove, children, icon = '▶' }) {
+export function ComponentSection({ title, defaultExpanded = true, onRemove, children, icon = '▶' }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   return (
     <div className={`component-section ${!expanded ? 'collapsed' : ''}`}>
@@ -21,7 +23,7 @@ function ComponentSection({ title, defaultExpanded = true, onRemove, children, i
   )
 }
 
-function NumberInput({ label, value, onChange, step = 1 }) {
+export function NumberInput({ label, value, onChange, step = 1 }) {
   return (
     <div className="field-row">
       <label>{label}</label>
@@ -30,7 +32,7 @@ function NumberInput({ label, value, onChange, step = 1 }) {
   )
 }
 
-function TextInput({ label, value, onChange, placeholder = "" }) {
+export function TextInput({ label, value, onChange, placeholder = "" }) {
   return (
     <div className="field-row">
       <label>{label}</label>
@@ -39,7 +41,7 @@ function TextInput({ label, value, onChange, placeholder = "" }) {
   )
 }
 
-function SelectInput({ label, value, options, onChange }) {
+export function SelectInput({ label, value, options, onChange }) {
   return (
     <div className="field-row">
       <label>{label}</label>
@@ -50,7 +52,7 @@ function SelectInput({ label, value, options, onChange }) {
   )
 }
 
-function CheckboxInput({ label, checked, onChange }) {
+export function CheckboxInput({ label, checked, onChange }) {
   return (
     <div className="field-row">
       <label>{label}</label>
@@ -59,7 +61,23 @@ function CheckboxInput({ label, checked, onChange }) {
   )
 }
 
-export default function Inspector({ entity, onUpdate }) {
+export default function Inspector({ entity, onUpdate, projectId, token }) {
+  const [objects, setObjects] = useState([])
+
+  const fetchObjects = useCallback(() => {
+    if (!projectId || !token) return
+    fetch(`http://localhost:3001/api/projects/${projectId}/objects`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setObjects(data.map(o => o.name)))
+      .catch(err => console.error(err))
+  }, [projectId, token])
+
+  useEffect(() => {
+    fetchObjects()
+  }, [fetchObjects])
+
   if (!entity) return <div className="inspector"><div className="empty-state">No entity selected</div></div>
 
   const updateEntity = (updates) => onUpdate({ ...entity, ...updates })
@@ -114,19 +132,20 @@ export default function Inspector({ entity, onUpdate }) {
         })()}
 
         {components.sprite && (
-          <ComponentSection title="Sprite" icon="🖼️" removable onRemove={() => removeComponent('sprite')}>
-            <TextInput label="Object ID" value={components.sprite.objectId} onChange={objectId => updateComponent('sprite', { objectId })} />
-            <NumberInput label="Frame" value={components.sprite.frameIndex} onChange={frameIndex => updateComponent('sprite', { frameIndex })} />
-            <SelectInput label="Layer" value={components.sprite.layer || 'Foreground'} options={LAYERS} onChange={layer => updateComponent('sprite', { layer })} />
-            
-            {/* Mock Upload UI to match original */}
-            <div className="field-row" style={{ marginTop: '8px' }}>
-              <label>Append Frame</label>
-              <label className="btn-secondary btn-sm upload-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }} onClick={() => alert("Cloud asset uploading is coming soon in the next backend update!")}>
-                ➕ Upload & Append Image
-              </label>
-            </div>
-          </ComponentSection>
+          <SpriteEditor
+            data={components.sprite}
+            onChange={data => updateComponent('sprite', data)}
+            onRemove={() => removeComponent('sprite')}
+            projectId={projectId}
+            token={token}
+            objects={objects}
+            ComponentSection={ComponentSection}
+            NumberInput={NumberInput}
+            SelectInput={SelectInput}
+            TextInput={TextInput}
+            LAYERS={LAYERS}
+            refreshAssets={fetchObjects}
+          />
         )}
 
         {components.collider && (() => {
@@ -160,12 +179,19 @@ export default function Inspector({ entity, onUpdate }) {
         )}
 
         {components.animator && (
-          <ComponentSection title="Animator" icon="🎬" removable onRemove={() => removeComponent('animator')}>
-            <TextInput label="Object ID" value={components.animator.objectId} onChange={objectId => updateComponent('animator', { objectId })} />
-            <TextInput label="Default Clip" value={components.animator.defaultClip} onChange={defaultClip => updateComponent('animator', { defaultClip })} />
-            <NumberInput label="Speed" value={components.animator.speed ?? 1.0} onChange={speed => updateComponent('animator', { speed })} step={0.1} />
-            <CheckboxInput label="Loop" checked={components.animator.loop ?? true} onChange={loop => updateComponent('animator', { loop })} />
-          </ComponentSection>
+          <AnimatorEditor
+            data={components.animator}
+            onChange={data => updateComponent('animator', data)}
+            onRemove={() => removeComponent('animator')}
+            projectId={projectId}
+            token={token}
+            objects={objects}
+            ComponentSection={ComponentSection}
+            NumberInput={NumberInput}
+            SelectInput={SelectInput}
+            TextInput={TextInput}
+            CheckboxInput={CheckboxInput}
+          />
         )}
 
         {components.script && (

@@ -1,0 +1,59 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>Shawnty Engine Product Overview</title>
+<style>
+  body { font-family: Arial, sans-serif; line-height: 1.6; margin: 40px; }
+  h1 { color: #2c3e50; }
+  h2 { color: #34495e; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+  h3 { color: #2980b9; }
+  ul { margin-bottom: 20px; }
+  li { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Shawnty Engine: Product Overview</h1>
+
+<h2>What is Shawnty Engine?</h2>
+<p><strong>Shawnty Engine</strong> is a lightweight, high-performance 2D game engine designed to make game development faster, cleaner, and more accessible. It bridges the gap between raw execution speed and developer-friendly tools.</p>
+<p>At its core, the engine enforces a strict separation between game logic and graphics rendering. This philosophy ensures that your game code remains clean, modular, and safe from visual glitches, allowing developers to focus purely on what makes their game fun.</p>
+
+<h2>Key Features & Capabilities</h2>
+
+<h3>1. Visual Web Editor (No-Code Scene Building)</h3>
+<p>Shawnty Engine comes with a modern, built-in visual editor powered by React and FastAPI. You don't need to write layout code or configure coordinates manually.</p>
+<ul>
+  <li><strong>Drag-and-Drop:</strong> Visually place characters, enemies, and items into your level.</li>
+  <li><strong>Asset Management:</strong> Easily upload and manage textures and animations directly from your browser.</li>
+  <li><strong>Hot-Reloading:</strong> Any changes saved in the web editor instantly update in the running game, providing real-time feedback.</li>
+</ul>
+
+<h3>2. Python-Powered Gameplay</h3>
+<p>While the engine itself runs on lightning-fast C++, you don't need to be a C++ expert to make games.</p>
+<ul>
+  <li>All gameplay logic, character movement, and physics interactions are written in <strong>Python</strong>.</li>
+  <li>Python's simplicity allows beginners to pick it up quickly, while giving experienced developers the power to prototype features rapidly.</li>
+</ul>
+
+<h3>3. Data-Driven Design</h3>
+<p>Say goodbye to hardcoding levels in source code. Shawnty Engine uses simple, human-readable configuration files to define scenes and entities. This allows designers to tweak the game without needing a programmer to recompile the code.</p>
+
+<h3>4. High-Performance Core</h3>
+<p>Under the hood, the engine is built using C++17 and standard OpenGL graphics.</p>
+<ul>
+  <li>It handles heavy lifting like physics, rendering pipelines, and memory management with maximum efficiency.</li>
+  <li>Your games will run smoothly even on lower-end hardware, and the engine allows you to compile a "Release" version stripped of debug overhead for ultimate performance.</li>
+</ul>
+
+<h3>5. Multiplayer Ready</h3>
+<p>The engine was built with the future in mind. It includes a robust architecture for client-server state synchronization, making it significantly easier to develop multiplayer games compared to traditional engines.</p>
+
+<h3>6. Entity-Component System (ECS)</h3>
+<p>Shawnty Engine uses an industry-standard ECS architecture. Instead of complex inheritance trees, game objects are built by combining simple modular "components" (like a Transform for position, a Rigidbody for physics, or a Sprite for visuals). This makes adding new features to game objects incredibly flexible.</p>
+
+<h2>Who is it for?</h2>
+<p>Shawnty Engine is perfect for <strong>indie game developers, hobbyists, and students</strong> who want the blazing-fast performance of a C++ engine combined with the user-friendly experience of a drag-and-drop web editor and Python scripting. It removes the friction from 2D game creation so you can bring your ideas to life faster.</p>
+
+</body>
+</html>

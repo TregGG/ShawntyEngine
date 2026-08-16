@@ -390,6 +390,8 @@ function Editor() {
           entity={selectedEntity}
           entityIndex={selectedEntityIndex}
           onUpdate={(updated) => updateEntity(selectedEntityIndex, updated)}
+          projectId={projectId}
+          token={getCookie('token') || localStorage.getItem('token')}
         />
       </div>
 

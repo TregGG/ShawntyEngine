@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const projectRoutes = require('./routes/projects');
+const assetRoutes = require('./routes/assets');
 const setupEditorSocket = require('./socket/editor');
 
 const app = express();
@@ -18,6 +19,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/projects', assetRoutes);
 
 // Setup Socket.io
 const io = new Server(server, {

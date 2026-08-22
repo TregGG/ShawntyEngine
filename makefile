@@ -23,7 +23,13 @@ OBJ_DIR := obj
 BIN_DIR := bin
 endif
 
-BIN := $(BIN_DIR)/$(TARGET)
+ifeq ($(OS),Windows_NT)
+TARGET_EXT := .exe
+else
+TARGET_EXT :=
+endif
+
+BIN := $(BIN_DIR)/$(TARGET)$(TARGET_EXT)
 
 # --------------------------------------------------
 # Source files
@@ -66,8 +72,13 @@ else
 CXXFLAGS := $(BASE_FLAGS) -DENGINE_DEBUG -DENGINE_LOG_BOTH
 endif
 
+ifeq ($(OS),Windows_NT)
+LDFLAGS := $(shell pkg-config --cflags --libs glfw3 freetype2) -lopengl32 -lws2_32 -lwinmm \
+           $(shell pkg-config --libs python3-embed)
+else
 LDFLAGS := $(shell pkg-config --cflags --libs glfw3 freetype2) -lGL \
            $(shell pkg-config --libs python3-embed)
+endif
 
 # --------------------------------------------------
 # Default target

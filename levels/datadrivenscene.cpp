@@ -6,11 +6,19 @@
 #include "../objects/components/scriptcomponent.h"
 #include <algorithm>
 #include <GLFW/glfw3.h>
+#include <cstring>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define CLOSE_SOCKET closesocket
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <cstring>
+#define CLOSE_SOCKET close
+#endif
 
 #define ENGINE_CLASS "DataDrivenScene"
 #include "../core/enginedebug.h"
@@ -205,11 +213,20 @@ void DataDrivenScene::InitUdpListener()
     m_UdpSocket = socket(AF_INET, SOCK_DGRAM, 0);
     if (m_UdpSocket >= 0) {
         // Set non-blocking
+#ifdef _WIN32
+        u_long mode = 1;
+        ioctlsocket(m_UdpSocket, FIONBIO, &mode);
+#else
         int flags = fcntl(m_UdpSocket, F_GETFL, 0);
         fcntl(m_UdpSocket, F_SETFL, flags | O_NONBLOCK);
+#endif
 
         // Allow address reuse
+#ifdef _WIN32
+        const char opt = 1;
+#else
         int opt = 1;
+#endif
         setsockopt(m_UdpSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
         struct sockaddr_in addr;
@@ -220,7 +237,7 @@ void DataDrivenScene::InitUdpListener()
 
         if (bind(m_UdpSocket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
             ENGINE_WARN("UDP live sync listener failed to bind to 127.0.0.1:9090 (Port likely in use).");
-            close(m_UdpSocket);
+            CLOSE_SOCKET(m_UdpSocket);
             m_UdpSocket = -1;
         } else {
             ENGINE_LOG("UDP live sync listener bound to 127.0.0.1:9090");
@@ -233,7 +250,7 @@ void DataDrivenScene::InitUdpListener()
 void DataDrivenScene::ShutdownUdpListener()
 {
     if (m_UdpSocket >= 0) {
-        close(m_UdpSocket);
+        CLOSE_SOCKET(m_UdpSocket);
         m_UdpSocket = -1;
         ENGINE_LOG("UDP live sync listener closed");
     }

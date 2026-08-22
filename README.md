@@ -19,6 +19,16 @@ sudo apt-get install build-essential libglfw3-dev libgl1-mesa-dev pkg-config lib
 sudo pacman -S base-devel glfw-x11 freetype2
 ```
 
+**On Windows (using MSYS2 / MinGW-w64):**
+1. Install [MSYS2](https://www.msys2.org/).
+2. Open the "MSYS2 UCRT64" or "MSYS2 MINGW64" terminal.
+3. Install the required packages:
+```bash
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-make mingw-w64-x86_64-pkgconf mingw-w64-x86_64-glfw mingw-w64-x86_64-freetype mingw-w64-x86_64-python mingw-w64-x86_64-python-pybind11
+```
+
+*(Note: PyBind11 is required for all platforms. You may need to run `pip install pybind11` or install via your package manager if not included by default.)*
+
 #### For the Web Editor:
 You will need Node.js/npm and Python `pip` installed to run the visual editor.
 - **Node.js & npm** (v16+ recommended): [Download here](https://nodejs.org/) or install via your package manager (e.g., `sudo apt install nodejs npm`).
@@ -31,8 +41,11 @@ You can compile the engine using `make`.
 # Compile in parallel (fastest)
 make
 
-# Run the compiled engine
+# Run the compiled engine (Linux/macOS)
 ./bin/framework
+
+# Run the compiled engine (Windows)
+./bin/framework.exe
 ```
 
 **Build Options:**
@@ -122,7 +135,12 @@ The backend runs on Python and manages file reads/writes for your project. You m
 ```bash
 cd editor/backend
 python3 -m venv venv
+
+# On Linux/macOS:
 source venv/bin/activate
+# On Windows:
+# .\venv\Scripts\activate
+
 pip install -r requirements.txt
 python main.py
 ```
@@ -139,6 +157,8 @@ npm run dev
 
 ### 3. Edit Live
 Open `http://localhost:3000` in your browser. You can select your `level1.scene`, drag entities around, upload `.tga` textures, and define animations visually. When you save, the JSON is updated immediately, and the C++ engine will hot-reload the changes!
+
+*(Note: You can also start both services at once by running `./run_editor.sh` on Linux/macOS or `run_editor.bat` on Windows from the project root!)*
 
 ## Documentation
 

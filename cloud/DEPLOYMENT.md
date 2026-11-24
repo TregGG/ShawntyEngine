@@ -1,5 +1,7 @@
 # Deploying to one Azure VM
 
+**First deployment: work through [deploy/PRE_DEPLOY.md](../deploy/PRE_DEPLOY.md).**
+
 The editor, database and every game server run on one Debian 12 VM.
 
 ```bash

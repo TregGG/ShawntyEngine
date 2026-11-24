@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include "../services/base/physics/physicssystem.h"
 #include "../scripting/scriptengine.h"
+#include "../services/replication.h"
 
 class AssetManager;
 
@@ -29,6 +30,10 @@ public:
 
     // Editor ID → Runtime EntityID lookup
     EntityID GetEntityByEditorId(const std::string& editorId) const;
+
+    // Entities from the scene file, in file order, and their state before any script ran
+    const std::vector<EntityID>& GetSceneEntities() const { return m_SceneEntities; }
+    const std::vector<NetState>& GetSceneBaseline() const { return m_SceneBaseline; }
 
     // Access physics system for external configuration
     PhysicsSystem& GetPhysics() { return m_Physics; }
@@ -58,6 +63,8 @@ private:
     std::string m_SceneFilePath;
     PhysicsSystem m_Physics;
     ScriptEngine m_ScriptEngine;
+    std::vector<EntityID> m_SceneEntities;
+    std::vector<NetState> m_SceneBaseline;
     float m_TimeAccumulator = 0.0f;
 
     std::unordered_map<std::string, EntityID> m_EditorIdMap;

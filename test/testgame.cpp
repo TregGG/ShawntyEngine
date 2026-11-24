@@ -368,6 +368,7 @@ bool TestGame::OnInit()
     m_MenuRoot = ProjectPaths::Root();
     if (m_NetControl && m_NetService) {
         m_NetControl->SetContentClient(&m_Content);
+        m_NetControl->SetAssets(&m_AssetManager);
         m_NetService->OnConnected = [this]() {
             SetStatus("Joining...");
             m_Content.OnConnected(*m_NetService);

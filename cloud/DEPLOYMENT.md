@@ -65,4 +65,6 @@ That mode does **not** limit CPU or block outgoing connections. Don't use it on 
 ```bash
 cd cloud/backend && npm test
 ./bin/framework --server --test    # from the repository root
+make BUILD=asan nettest            # sync and packet fuzzing under sanitizers
+tools/netbench.sh                  # traffic and lag measurements (make BUILD=release first)
 ```

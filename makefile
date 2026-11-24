@@ -18,6 +18,9 @@ BUILD ?= debug
 ifeq ($(BUILD),release)
 OBJ_DIR := release/obj
 BIN_DIR := release
+else ifeq ($(BUILD),asan)
+OBJ_DIR := asan/obj
+BIN_DIR := asan
 else
 OBJ_DIR := obj
 BIN_DIR := bin
@@ -62,12 +65,18 @@ else ifeq ($(BUILD),file)
 CXXFLAGS := $(BASE_FLAGS) -DENGINE_DEBUG -DENGINE_LOG_FILE
 else ifeq ($(BUILD),release)
 CXXFLAGS := $(BASE_FLAGS) -O2 -DENGINE_RELEASE
+else ifeq ($(BUILD),asan)
+CXXFLAGS := $(BASE_FLAGS) -O1 -DENGINE_RELEASE -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
 else
 CXXFLAGS := $(BASE_FLAGS) -DENGINE_DEBUG -DENGINE_LOG_BOTH
 endif
 
 LDFLAGS := $(shell pkg-config --cflags --libs glfw3 freetype2) -lGL \
            $(shell pkg-config --libs python3-embed)
+
+ifeq ($(BUILD),asan)
+LDFLAGS += -fsanitize=address,undefined
+endif
 
 # --------------------------------------------------
 # Default target
@@ -81,6 +90,16 @@ all: $(BIN)
 
 $(BIN): $(OBJS) | $(BIN_DIR)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
+
+# --------------------------------------------------
+# Network tests: make BUILD=asan nettest
+# --------------------------------------------------
+
+nettest: $(BIN_DIR)/nettest
+	ASAN_OPTIONS=detect_leaks=0 $<
+
+$(BIN_DIR)/nettest: tests/nettest.cpp $(filter-out $(OBJ_DIR)/main.o,$(OBJS)) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 # --------------------------------------------------
 # Compile C++ files
@@ -113,7 +132,7 @@ $(BIN_DIR):
 # --------------------------------------------------
 
 clean:
-	rm -rf obj bin release
+	rm -rf obj bin release asan
 
 # --------------------------------------------------
 # Dependency files

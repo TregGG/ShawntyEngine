@@ -1,6 +1,7 @@
 #pragma once
 
 #include "component.h"
+#include <cstdint>
 #include <string>
 
 // forward declarations (data-only)
@@ -27,6 +28,15 @@ public:
     bool IsActive() const { return m_Active; }
 
     void SetSpeed(float speed) { m_Speed = speed; }
+    float GetSpeed() const { return m_Speed; }
+    bool GetLoop() const { return m_Loop; }
+    const std::string& GetClipName() const { return m_ClipName; }
+    // Counts Play and Stop calls, to notice when a clip is restarted
+    uint8_t GetCommandCount() const { return m_Commands; }
+    // Stopped by Stop(), as opposed to a clip that reached its end
+    bool IsStopped() const { return m_Stopped; }
+
+    std::string objectId; // which object asset the animations came from
 
     // ---------- Output (used by Scene) ----------
     int GetFrameIndex() const;
@@ -43,6 +53,9 @@ private:
     // Runtime state
     const AnimationClip* m_CurrentClip = nullptr;
 
+    std::string m_ClipName;
+    uint8_t m_Commands = 0;
+    bool   m_Stopped = false;
     bool   m_Playing = false;
     bool   m_Loop    = true;
 

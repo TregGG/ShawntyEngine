@@ -76,6 +76,10 @@ void EntityRegistryService::Destroy(EntityID entity)
     if (!slot.alive || slot.generation != generation)
         return;
 
+    // Destroying twice would put the slot on the free list twice
+    if (std::find(m_PendingDestroy.begin(), m_PendingDestroy.end(), index) != m_PendingDestroy.end())
+        return;
+
     // Defer destruction
     m_PendingDestroy.push_back(index);
 }

@@ -30,7 +30,7 @@ bool NetworkService::Host(int port) {
     address.host = ENET_HOST_ANY;
     address.port = static_cast<enet_uint16>(port);
 
-    m_Host = enet_host_create(&address, 32, 2, 0, 0); // up to 32 clients, 2 channels, no bandwidth limits
+    m_Host = enet_host_create(&address, 32, 3, 0, 0); // up to 32 clients, 3 channels (game, content, snapshots), no bandwidth limits
     if (m_Host == nullptr) {
         ENGINE_ERROR("An error occurred while trying to create an ENet server host.");
         return false;
@@ -49,7 +49,7 @@ bool NetworkService::Connect(const std::string& ip, int port) {
         Disconnect();
     }
 
-    m_Host = enet_host_create(NULL, 1, 2, 0, 0); // 1 connection, 2 channels
+    m_Host = enet_host_create(NULL, 1, 3, 0, 0); // 1 connection, 3 channels
     if (m_Host == nullptr) {
         ENGINE_ERROR("An error occurred while trying to create an ENet client host.");
         return false;
@@ -63,7 +63,7 @@ bool NetworkService::Connect(const std::string& ip, int port) {
     }
     address.port = port;
 
-    m_ServerPeer = enet_host_connect(m_Host, &address, 2, 0);
+    m_ServerPeer = enet_host_connect(m_Host, &address, 3, 0);
     if (m_ServerPeer == nullptr) {
         ENGINE_ERROR("No available peers for initiating an ENet connection.");
         Disconnect();

@@ -43,6 +43,8 @@ void DataDrivenScene::OnEnter()
     }
     if (result.success) {
         m_EditorIdMap = std::move(result.editorIdMap);
+        m_SceneEntities = std::move(result.entities);
+        for (EntityID e : m_SceneEntities) m_SceneBaseline.push_back(CaptureNetState(registry, e, true));
         ENGINE_LOG("DataDrivenScene entered: %s (%zu entities loaded)",
                    m_SceneFilePath.c_str(), m_EditorIdMap.size());
     } else {
@@ -103,6 +105,8 @@ void DataDrivenScene::OnExit()
     ShutdownUdpListener();
     m_ScriptEngine.Shutdown();
     m_EditorIdMap.clear();
+    m_SceneEntities.clear();
+    m_SceneBaseline.clear();
     m_GameObjects.clear();
     m_Physics.Shutdown();
     registry.Shutdown();

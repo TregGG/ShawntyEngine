@@ -156,7 +156,10 @@ bool ServerTestGame::OnInit()
         ENGINE_ERROR("Cannot share project content: %s", contentError.c_str());
         DevEvents::Emit("error", "Players cannot download this project: " + contentError);
     }
-    if (m_NetControl) m_NetControl->SetContentServer(&m_Content);
+    if (m_NetControl) {
+        m_NetControl->SetContentServer(&m_Content);
+        m_NetControl->SetAssets(&m_AssetManager);
+    }
 
     // ---- Create Initial Scene from JSON ----
     DataDrivenScene* initialScene = GetOrCreateScene(ProjectPaths::IsDefault()

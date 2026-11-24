@@ -10,6 +10,7 @@
 #include <enet/enet.h>
 #include "../core/network_data.h"
 #include "clientclock.h"
+#include "replication.h"
 #include "../services/base/entityregistry/entityregistry.h" // For EntityID
 
 class NetworkService;
@@ -18,7 +19,9 @@ class ContentClient;
 class Scene;
 class Input;
 
-class NetworkControl : public Service {
+class AssetManager;
+
+class NetworkControl : public Service, private ReplicationClient::Sink {
 public:
     NetworkControl();
     virtual ~NetworkControl() override;
@@ -38,6 +41,8 @@ public:
     // Players rejoining after a hot reload continue where they were.
     void RememberPlayerPositions();
     void ForgetPlayerPositions() { m_RememberedPositions.clear(); }
+
+    void SetAssets(AssetManager* assets) { m_AssetManager = assets; }
 
     void BindScene(Scene* scene, Input* input) { m_Scene = scene; m_Input = input; }
 
@@ -81,6 +86,9 @@ protected:
     std::map<ENetPeer*, std::map<uint32_t, uint16_t>> m_BufferedPeerInputs;
     std::map<ENetPeer*, uint16_t> m_LastExecutedInputs;
     uint32_t m_ServerTick = 0;
+    ReplicationServer m_ReplicationServer;
+    bool m_ReplicationStale = true;
+    void EnsureReplicationScene();
     void SendToPlayers(const void* data, size_t size, enet_uint32 flags);
     std::vector<ENetPeer*> m_Receivers;
     inline static bool s_PrintStats = false;
@@ -92,7 +100,26 @@ protected:
     // Client state
     ContentClient* m_ContentClient = nullptr;
     bool m_InGame = false; // welcomed into the current scene
-    std::map<uint32_t, EntityID> m_ServerToLocalEntity;
+    AssetManager* m_AssetManager = nullptr;
+    ReplicationClient m_Replication;
+    uint16_t m_PendingEpoch = 0;
+    uint32_t m_PendingSceneCount = 0;
+    struct RemoteEntity
+    {
+        EntityID entity = 0;
+        bool player = false;
+        bool body = false;             // physics moves it
+        glm::vec2 velocity{0.0f};      // otherwise this does
+        uint8_t animCommand = 0;
+    };
+    std::unordered_map<uint32_t, RemoteEntity> m_Remote; // by network ID
+    void BeginClientScene();
+    bool OnNetKnows(uint32_t netId) override { return m_Remote.count(netId) > 0; }
+    void OnNetSpawn(const NetSpawn& spawn, uint32_t tick) override;
+    void OnNetDestroy(uint32_t netId) override;
+    void OnNetMotion(uint32_t netId, const NetMotion& motion, uint32_t tick) override;
+    void OnNetLook(uint32_t netId, const NetLook& look) override;
+    void OnNetOwnPosition(const glm::vec2& position, uint32_t tick) override;
     uint32_t m_MyServerPlayerID = 0;
     EntityID m_MyLocalPlayerID = 0;
     ClientClock m_Clock;

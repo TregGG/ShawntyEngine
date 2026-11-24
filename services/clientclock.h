@@ -28,8 +28,9 @@ public:
     bool OnServerTick(uint32_t serverTick, const ENetPeer* peer)
     {
         m_Lead = LeadFor(peer);
-        const int diff = static_cast<int>(m_Tick) - static_cast<int>(serverTick + m_Lead);
-        if (std::abs(diff) > kMaxDrift) {
+        // Unsigned subtraction wraps safely for any tick a server might send
+        const int64_t diff = static_cast<int32_t>(m_Tick - (serverTick + m_Lead));
+        if (diff > kMaxDrift || diff < -kMaxDrift) {
             Start(serverTick, peer);
             return true;
         }

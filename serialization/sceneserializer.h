@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include <glm/vec2.hpp>
 #include "../core/entityid.h"
@@ -14,7 +15,8 @@ class SceneSerializer {
 public:
     struct SceneLoadResult {
         bool success = false;
-        std::unordered_map<std::string, EntityID> editorIdMap; // editorId -> runtime EntityID
+        std::unordered_map<std::string, EntityID> editorIdMap;
+        std::vector<EntityID> entities; // in file order // editorId -> runtime EntityID
         std::string errorMessage;
     };
 

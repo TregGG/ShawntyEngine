@@ -114,6 +114,7 @@ void LoadComponents(const json& compJson, EntityID entityId,
         if (!objectId.empty() && assets) {
             try {
                 sc.spriteSheet = assets->GetSpriteSheet(objectId);
+                sc.objectId = objectId;
             } catch (const std::exception& e) {
                 ENGINE_WARN("Failed to resolve spriteSheet for objectId '%s': %s",
                             objectId.c_str(), e.what());
@@ -165,6 +166,7 @@ void LoadComponents(const json& compJson, EntityID entityId,
                 const SpriteSheetAsset* sheet = assets->GetSpriteSheet(objectId);
                 const AnimationSetAsset* animSet = assets->GetAnimationSet(objectId);
                 ac.BindAnimationSet(animSet, sheet);
+                ac.objectId = objectId;
             } catch (const std::exception& e) {
                 ENGINE_WARN("Failed to resolve animator assets for objectId '%s': %s",
                             objectId.c_str(), e.what());
@@ -347,7 +349,7 @@ SceneSerializer::SceneLoadResult SceneSerializer::LoadScene(
     // Load entities
     if (sceneData.contains("entities") && sceneData["entities"].is_array()) {
         for (const auto& entityJson : sceneData["entities"]) {
-            LoadEntity(entityJson, scene, assets, result.editorIdMap);
+            result.entities.push_back(LoadEntity(entityJson, scene, assets, result.editorIdMap));
         }
     }
 

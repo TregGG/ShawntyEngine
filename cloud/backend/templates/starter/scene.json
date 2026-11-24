@@ -1,0 +1,73 @@
+{
+  "entities": [
+    {
+      "editorId": "floor",
+      "name": "Floor",
+      "category": "Environment",
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            -3
+          ],
+          "size": [
+            24,
+            1
+          ],
+          "rotation": 0
+        },
+        "sprite": {
+          "objectId": "ground_2",
+          "frameIndex": 0,
+          "layer": "Background"
+        },
+        "collider": {
+          "autoBounds": true,
+          "isTrigger": false
+        },
+        "rigidbody": {
+          "bodyType": "Static"
+        }
+      }
+    },
+    {
+      "editorId": "platform",
+      "name": "Moving Platform",
+      "category": "Environment",
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            3,
+            0.5
+          ],
+          "rotation": 0
+        },
+        "sprite": {
+          "objectId": "ground_2",
+          "frameIndex": 0,
+          "layer": "Background"
+        },
+        "collider": {
+          "autoBounds": true,
+          "isTrigger": false
+        },
+        "rigidbody": {
+          "bodyType": "Static"
+        },
+        "script": {
+          "path": "scripts/mover.py",
+          "class": "Mover",
+          "properties": {
+            "distance": 4.0,
+            "speed": 1.0
+          }
+        }
+      }
+    }
+  ],
+  "relationships": []
+}

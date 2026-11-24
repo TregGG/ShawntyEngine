@@ -2,6 +2,7 @@
 #include "networkservice.h"
 #include "contentsync.h"
 #include "../core/projectpaths.h"
+#include "../assets/assetmanager.h"
 #include "../levels/scene.h"
 #include "../levels/datadrivenscene.h"
 #include "../core/input.h"
@@ -41,24 +42,20 @@ void NetworkControl::SetNetworkService(NetworkService* netService) {
 
 void NetworkControl::Update(float dt) {
     if (m_NetService && m_NetService->GetMode() == NetworkMode::Client && m_Scene) {
-        for (auto const& [sID, localID] : m_ServerToLocalEntity) {
-            if (localID != m_MyLocalPlayerID) {
-                if (m_Scene->registry.HasComponent<TransformComponent>(localID)) {
-                    
-                    auto& trans = m_Scene->registry.GetComponent<TransformComponent>(localID);
-                    
-                    auto it = m_VelocityCorrections.find(localID);
-                    if (it != m_VelocityCorrections.end()) {
-                        // Apply the correction velocity to the physical position
-                        trans.position += it->second * dt;
-                        
-                        // Decay the correction so it smoothly stops
-                        it->second *= std::exp(-5.0f * dt);
-                        if (glm::length(it->second) < 0.01f) {
-                            it->second = glm::vec2(0.0f);
-                        }
-                    }
-                }
+        for (auto& [netId, remote] : m_Remote) {
+            if (!m_Scene->registry.HasComponent<TransformComponent>(remote.entity)) continue;
+            auto& trans = m_Scene->registry.GetComponent<TransformComponent>(remote.entity);
+            glm::vec2& position = trans.parentTransform ? trans.localPosition : trans.position;
+            if (!remote.body) position += remote.velocity * dt;
+
+            auto it = m_VelocityCorrections.find(remote.entity);
+            if (it != m_VelocityCorrections.end()) {
+                // Apply the correction velocity to the physical position
+                position += it->second * dt;
+
+                // Decay the correction so it smoothly stops
+                it->second *= std::exp(-5.0f * dt);
+                if (glm::length(it->second) < 0.01f) m_VelocityCorrections.erase(it);
             }
         }
     }
@@ -115,66 +112,12 @@ void NetworkControl::Tick(float tickInterval) {
             SendToPlayers(&tickHeader, sizeof(PacketHeader), ENET_PACKET_FLAG_RELIABLE);
         }
 
-        // 3. Broadcast StateSync (every 15 ticks) or ServerUpdate
-        if (m_ServerTick % 15 == 0) {
-            std::vector<char> buffer(sizeof(PacketHeader) + sizeof(uint32_t) + m_PeerToEntity.size() * sizeof(EntityPositionData));
-            
-            PacketHeader* header = reinterpret_cast<PacketHeader*>(buffer.data());
-            header->type = PacketType::StateSync;
-            header->tick = m_ServerTick;
-            
-            uint32_t* count = reinterpret_cast<uint32_t*>(buffer.data() + sizeof(PacketHeader));
-            *count = m_PeerToEntity.size();
-            
-            EntityPositionData* positions = reinterpret_cast<EntityPositionData*>(buffer.data() + sizeof(PacketHeader) + sizeof(uint32_t));
-            
-            int idx = 0;
-            for (auto const& [peer, entID] : m_PeerToEntity) {
-                positions[idx].entityID = entID;
-                if (m_Scene->registry.HasComponent<TransformComponent>(entID)) {
-                    glm::vec2 projectedPos = ProjectPlayerState(entID, peer, m_ServerTick, 3);
-                    positions[idx].x = projectedPos.x;
-                    positions[idx].y = projectedPos.y;
-                } else {
-                    positions[idx].x = 0; positions[idx].y = 0;
-                }
-                idx++;
-            }
-            
-            if (m_PeerToEntity.size() > 0) {
-                SendToPlayers(buffer.data(), buffer.size(), 0);
-            }
-        } else {
-            std::vector<char> buffer(sizeof(PacketHeader) + sizeof(uint32_t) + m_PeerToEntity.size() * sizeof(EntityVelocityData));
-            
-            PacketHeader* header = reinterpret_cast<PacketHeader*>(buffer.data());
-            header->type = PacketType::ServerUpdate;
-            header->tick = m_ServerTick;
-            
-            uint32_t* count = reinterpret_cast<uint32_t*>(buffer.data() + sizeof(PacketHeader));
-            *count = m_PeerToEntity.size();
-            
-            EntityVelocityData* velocities = reinterpret_cast<EntityVelocityData*>(buffer.data() + sizeof(PacketHeader) + sizeof(uint32_t));
-            
-            int idx = 0;
-            for (auto const& [peer, entID] : m_PeerToEntity) {
-                velocities[idx].entityID = entID;
-                if (m_Scene->registry.HasComponent<RigidBodyComponent>(entID)) {
-                    auto& rb = m_Scene->registry.GetComponent<RigidBodyComponent>(entID);
-                    glm::vec2 vel = rb.GetVelocity();
-                    velocities[idx].vx = vel.x;
-                    velocities[idx].vy = vel.y;
-                } else {
-                    velocities[idx].vx = 0.0f; velocities[idx].vy = 0.0f;
-                }
-                idx++;
-            }
-            
-            if (m_PeerToEntity.size() > 0) {
-                SendToPlayers(buffer.data(), buffer.size(), 0);
-            }
-        }
-        
+        // 3. Entity state
+        EnsureReplicationScene();
+        std::map<ENetPeer*, glm::vec2> own;
+        for (auto const& [peer, entID] : m_PeerToEntity) own[peer] = ProjectPlayerState(entID, peer, m_ServerTick, 3);
+        m_ReplicationServer.Tick(*m_NetService, m_ServerTick, own);
+
     } else if (m_NetService->GetMode() == NetworkMode::Client) {
         if (m_ContentClient && !m_ContentClient->IsReady()) return; // still downloading
 
@@ -236,8 +179,11 @@ void NetworkControl::SendClientInput(uint16_t inputMask, float mouseX, float mou
     (void)inputMask; // already the newest entry in m_RecentInputs
     packet.header.tick = m_Clock.GetTick();
     std::memcpy(packet.inputMasks, m_RecentInputs, sizeof(packet.inputMasks));
-    packet.mouseDeltaX = mouseX;
-    packet.mouseDeltaY = mouseY;
+    (void)mouseX;
+    (void)mouseY;
+    packet.epoch = m_Replication.GetEpoch();
+    packet.ackSeq = m_Replication.GetAckSeq();
+    packet.ackBits = m_Replication.GetAckBits();
     m_NetService->SendPacket(m_NetService->GetServerPeer(), 0, &packet, sizeof(packet), 0);
 }
 
@@ -272,6 +218,7 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
     if (m_NetService->GetMode() == NetworkMode::Server) {
         if (header->type == PacketType::ClientInput && size >= sizeof(ClientInputPacket)) {
             if (m_PeerToEntity.find(peer) == m_PeerToEntity.end()) {
+                EnsureReplicationScene();
                 EntityID pID = OnSpawnPlayer(peer, false);
                 m_PeerToEntity[peer] = pID;
 
@@ -285,7 +232,9 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
                 ConnectPacket welcomePacket;
                 welcomePacket.header.type = PacketType::Connect;
                 welcomePacket.header.tick = m_ServerTick;
-                welcomePacket.clientEntityID = pID;
+                welcomePacket.clientEntityID = m_ReplicationServer.RegisterPlayer(*m_NetService, pID, m_ServerTick);
+                welcomePacket.sceneEntityCount = m_ReplicationServer.GetSceneEntityCount();
+                welcomePacket.epoch = m_ReplicationServer.GetEpoch();
                 
                 std::string scenePath = "";
                 if (m_Scene && dynamic_cast<DataDrivenScene*>(m_Scene)) {
@@ -295,9 +244,11 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
                 welcomePacket.sceneName[sizeof(welcomePacket.sceneName) - 1] = '\0';
                 
                 m_NetService->SendPacket(peer, 0, &welcomePacket, sizeof(welcomePacket), ENET_PACKET_FLAG_RELIABLE);
+                m_ReplicationServer.AddPeer(*m_NetService, peer, pID, m_ServerTick);
             }
             
             ClientInputPacket* inputPacket = reinterpret_cast<ClientInputPacket*>(data);
+            m_ReplicationServer.OnAck(peer, inputPacket->epoch, inputPacket->ackSeq, inputPacket->ackBits);
             uint32_t targetTick = inputPacket->header.tick;
             auto& buffered = m_BufferedPeerInputs[peer];
             for (int i = 0; i < ClientInputPacket::kInputs; ++i) {
@@ -317,13 +268,15 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
             m_ServerTick = 0;
             m_MyLocalPlayerID = 0;
             m_PeerToEntity.clear();
-            m_ServerToLocalEntity.clear();
+            m_Remote.clear();
             m_BufferedPeerInputs.clear();
             m_LastExecutedInputs.clear();
             m_ClientStateHistory.clear();
             m_ClientInputHistory.clear();
 
             m_MyServerPlayerID = connectPacket->clientEntityID;
+            m_PendingEpoch = connectPacket->epoch;
+            m_PendingSceneCount = connectPacket->sceneEntityCount;
             
             uint32_t serverTick = connectPacket->header.tick;
             m_Clock.Start(serverTick, m_NetService->GetServerPeer());
@@ -336,48 +289,6 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
             } else {
                 SpawnLocalPlayer();
             }
-        } else if (header->type == PacketType::ServerUpdate) {
-            if (!m_InGame || !m_Scene) return;
-            size_t countOffset = sizeof(PacketHeader);
-            if (size < countOffset + sizeof(uint32_t)) return;
-            uint32_t count = *reinterpret_cast<uint32_t*>(static_cast<char*>(data) + countOffset);
-            
-            size_t dataOffset = countOffset + sizeof(uint32_t);
-            if (size < dataOffset + count * sizeof(EntityVelocityData)) return;
-            EntityVelocityData* velocities = reinterpret_cast<EntityVelocityData*>(static_cast<char*>(data) + dataOffset);
-            
-            std::vector<uint32_t> activeServerIDs;
-            activeServerIDs.reserve(count);
-            
-            for (uint32_t i = 0; i < count; ++i) {
-                uint32_t sID = velocities[i].entityID;
-                activeServerIDs.push_back(sID);
-                
-                if (m_ServerToLocalEntity.find(sID) == m_ServerToLocalEntity.end()) {
-                    EntityID lID = OnSpawnPlayer(nullptr, false);
-                    m_ServerToLocalEntity[sID] = lID;
-                }
-                
-                EntityID localID = m_ServerToLocalEntity[sID];
-                if (localID != m_MyLocalPlayerID) {
-                    if (m_Scene->registry.HasComponent<RigidBodyComponent>(localID)) {
-                        auto& rb = m_Scene->registry.GetComponent<RigidBodyComponent>(localID);
-                        rb.SetVelocity(glm::vec2(velocities[i].vx, velocities[i].vy));
-                    }
-                }
-            }
-            
-            std::vector<uint32_t> toRemove;
-            for (auto const& [sID, lID] : m_ServerToLocalEntity) {
-                if (std::find(activeServerIDs.begin(), activeServerIDs.end(), sID) == activeServerIDs.end()) {
-                    toRemove.push_back(sID);
-                }
-            }
-            
-            for (uint32_t sID : toRemove) {
-                OnDestroyPlayer(m_ServerToLocalEntity[sID]);
-                m_ServerToLocalEntity.erase(sID);
-            }
         } else if (header->type == PacketType::ServerCommand && size >= sizeof(ServerCommandPacket)) {
             ServerCommandPacket* cmdPacket = reinterpret_cast<ServerCommandPacket*>(data);
             cmdPacket->command[sizeof(cmdPacket->command) - 1] = '\0';
@@ -386,107 +297,211 @@ void NetworkControl::OnPacketReceived(ENetPeer* peer, void* data, size_t size) {
             }
         } else if (header->type == PacketType::TickSync) {
             SyncClock(header->tick);
-        } else if (header->type == PacketType::StateSync) {
-            if (!m_InGame || !m_Scene) return;
-            size_t countOffset = sizeof(PacketHeader);
-            if (size < countOffset + sizeof(uint32_t)) return;
-            uint32_t count = *reinterpret_cast<uint32_t*>(static_cast<char*>(data) + countOffset);
-            
-            size_t dataOffset = countOffset + sizeof(uint32_t);
-            if (size < dataOffset + count * sizeof(EntityPositionData)) return;
-            EntityPositionData* positions = reinterpret_cast<EntityPositionData*>(static_cast<char*>(data) + dataOffset);
-            
-            uint32_t serverUpdateTick = header->tick;
-            SyncClock(serverUpdateTick);
+        } else if (m_InGame && m_Scene && m_Replication.OnPacket(data, size, *this)) {
+            if (header->type == PacketType::NetSnapshot) SyncClock(header->tick);
+        }
+    }
+}
 
-            std::vector<uint32_t> activeServerIDs;
-            activeServerIDs.reserve(count);
-            
-            for (uint32_t i = 0; i < count; ++i) {
-                uint32_t sID = positions[i].entityID;
-                activeServerIDs.push_back(sID);
-                
-                if (m_ServerToLocalEntity.find(sID) == m_ServerToLocalEntity.end()) {
-                    EntityID lID = OnSpawnPlayer(nullptr, false);
-                    m_ServerToLocalEntity[sID] = lID;
-                }
-                
-                EntityID localID = m_ServerToLocalEntity[sID];
-                if (m_Scene->registry.HasComponent<TransformComponent>(localID)) {
-                    auto& trans = m_Scene->registry.GetComponent<TransformComponent>(localID);
-                    glm::vec2 serverPos(positions[i].x, positions[i].y);
-                    
-                    if (localID == m_MyLocalPlayerID) {
-                        uint32_t reconTick = serverUpdateTick + 3;
-                        auto historyIt = m_ClientStateHistory.find(reconTick);
-                        if (historyIt != m_ClientStateHistory.end()) {
-                            glm::vec2 predictedPos = historyIt->second.position;
-                            glm::vec2 error = serverPos - predictedPos;
-                            float errorLen = glm::length(error);
-                            
-                            if (errorLen > 1.5f) {
-                                trans.position = serverPos;
-                                if (m_Scene->registry.HasComponent<RigidBodyComponent>(localID)) {
-                                    m_Scene->registry.GetComponent<RigidBodyComponent>(localID).SetVelocity(glm::vec2(0.0f));
-                                }
-                                ENGINE_LOG("[Client] Large desync detected (%.2f units) at tick %u. Snapping.", errorLen, reconTick);
-                                m_ClientStateHistory.clear();
-                            } else if (errorLen > 0.001f) {
-                                glm::vec2 correction = error * 0.5f;
-                                trans.position += correction;
-                                
-                                for (auto& [tick, state] : m_ClientStateHistory) {
-                                    if (tick > reconTick) {
-                                        state.position += correction;
-                                    }
-                                }
-                            }
-                        } else {
-                            float dist = glm::distance(trans.position, serverPos);
-                            if (dist > 1.5f) {
-                                trans.position = serverPos;
-                                if (m_Scene->registry.HasComponent<RigidBodyComponent>(localID)) {
-                                    m_Scene->registry.GetComponent<RigidBodyComponent>(localID).SetVelocity(glm::vec2(0.0f));
-                                }
-                                ENGINE_LOG("[Client] No history for tick %u and large desync (%.2f units). Snapping.", reconTick, dist);
-                            } else {
-                                trans.position = glm::mix(trans.position, serverPos, 0.4f);
-                            }
-                        }
-                    } else {
-                        // Project server position to current client tick
-                        int ticksAhead = (int)m_Clock.GetTick() - (int)(serverUpdateTick + 3);
-                        glm::vec2 projectedPos = serverPos;
-                        glm::vec2 clientVel(0.0f);
-                        if (m_Scene->registry.HasComponent<RigidBodyComponent>(localID)) {
-                            auto& rb = m_Scene->registry.GetComponent<RigidBodyComponent>(localID);
-                            clientVel = rb.GetVelocity();
-                            if (ticksAhead != 0) {
-                                projectedPos += clientVel * ((float)ticksAhead / 60.0f);
-                            }
-                        }
+// ============================================================
+// Entities
+// ============================================================
+void NetworkControl::EnsureReplicationScene() {
+    auto* scene = dynamic_cast<DataDrivenScene*>(m_Scene);
+    if (!m_ReplicationStale || !scene) return;
+    m_ReplicationStale = false;
+    m_ReplicationServer.BeginScene(scene->registry, scene->GetSceneEntities(), scene->GetSceneBaseline());
+}
 
-                        // Compare projected position with current position
-                        glm::vec2 error = projectedPos - trans.position;
-                        float dist = glm::length(error);
-                        
-                        // If completely desynced or first spawn, snap instantly
-                        if (dist > 2.0f) {
-                            trans.position = projectedPos;
-                            m_VelocityCorrections[localID] = glm::vec2(0.0f);
-                        } else {
-                            // If they stopped moving and the error is just a small latency overshoot,
-                            // DO NOT moonwalk them backward. Hide the error until they start moving again!
-                            if (glm::length(clientVel) < 0.1f && dist < 0.5f) {
-                                m_VelocityCorrections[localID] = glm::vec2(0.0f);
-                            } else {
-                                // Otherwise calculate a velocity to smoothly close the gap over ~0.2s
-                                m_VelocityCorrections[localID] = error * 5.0f;
-                            }
-                        }
-                    }
+// The scene was just loaded and the local player created. From here on the server moves everything else.
+void NetworkControl::BeginClientScene() {
+    m_Remote.clear();
+    m_VelocityCorrections.clear();
+    m_Replication.Reset(m_PendingEpoch);
+
+    if (auto* scene = dynamic_cast<DataDrivenScene*>(m_Scene)) {
+        const auto& entities = scene->GetSceneEntities();
+        if (entities.size() != m_PendingSceneCount) {
+            ENGINE_ERROR("The scene has %zu entities, the server has %u", entities.size(), m_PendingSceneCount);
+            return;
+        }
+        for (uint32_t i = 0; i < entities.size(); ++i) {
+            RemoteEntity remote;
+            remote.entity = entities[i];
+            if (scene->registry.HasComponent<RigidBodyComponent>(entities[i])) {
+                auto& rb = scene->registry.GetComponent<RigidBodyComponent>(entities[i]);
+                // Only bodies with a collider are moved by the physics system
+                if (rb.GetType() != BodyType::Static && scene->registry.HasComponent<ColliderComponent>(entities[i])) {
+                    remote.body = true;
+                    rb.SetType(BodyType::Kinematic);
+                    rb.SetUseGravity(false);
+                    rb.SetDrag(0.0f);
                 }
             }
+            if (scene->registry.HasComponent<AnimatorComponent>(entities[i]))
+                remote.animCommand = scene->registry.GetComponent<AnimatorComponent>(entities[i]).GetCommandCount();
+            m_Remote[i + 1] = remote;
+        }
+    }
+    RemoteEntity self;
+    self.entity = m_MyLocalPlayerID;
+    self.player = self.body = true;
+    m_Remote[m_MyServerPlayerID] = self;
+}
+
+void NetworkControl::OnNetSpawn(const NetSpawn& spawn, uint32_t tick) {
+    RemoteEntity remote;
+    auto& registry = m_Scene->registry;
+    const NetLook& look = spawn.state.look;
+
+    if (spawn.kind == NetSpawn::kPlayer) {
+        remote.entity = OnSpawnPlayer(nullptr, false);
+        remote.player = true;
+        remote.body = true;
+        if (remote.entity == 0) return;
+    } else {
+        remote.entity = m_Scene->CreateEntity(static_cast<EntityCategory>(spawn.category), spawn.name);
+        registry.AddComponent<TransformComponent>(remote.entity);
+        if (look.flags & NetLook::kSprite) registry.AddComponent<SpriteComponent2D>(remote.entity);
+        if (look.flags & NetLook::kAnimator) registry.AddComponent<AnimatorComponent>(remote.entity);
+        if (look.flags & NetLook::kCollider) {
+            ColliderComponent collider(spawn.colliderOffset, spawn.colliderSize, (look.flags & NetLook::kTrigger) != 0);
+            collider.SetAutoBounds(spawn.autoBounds);
+            collider.SetLayerMask(spawn.layerMask);
+            registry.AddComponent<ColliderComponent>(remote.entity, collider);
+            RigidBodyComponent rb;
+            remote.body = (look.flags & NetLook::kBody) != 0;
+            rb.SetType(remote.body ? BodyType::Kinematic : BodyType::Static);
+            registry.AddComponent<RigidBodyComponent>(remote.entity, rb);
+        }
+    }
+    m_Remote[spawn.netId] = remote;
+    if (registry.HasComponent<TransformComponent>(remote.entity))
+        registry.GetComponent<TransformComponent>(remote.entity).position = spawn.state.motion.Position();
+    OnNetLook(spawn.netId, look);
+    OnNetMotion(spawn.netId, spawn.state.motion, tick);
+}
+
+void NetworkControl::OnNetDestroy(uint32_t netId) {
+    const auto it = m_Remote.find(netId);
+    if (it == m_Remote.end() || it->second.entity == m_MyLocalPlayerID) return;
+    m_VelocityCorrections.erase(it->second.entity);
+    if (it->second.player) OnDestroyPlayer(it->second.entity);
+    else m_Scene->registry.Destroy(it->second.entity); // the server lists children separately
+    m_Remote.erase(it);
+}
+
+void NetworkControl::OnNetLook(uint32_t netId, const NetLook& look) {
+    RemoteEntity& remote = m_Remote[netId];
+    auto& registry = m_Scene->registry;
+    const EntityID e = remote.entity;
+    if (registry.HasComponent<TransformComponent>(e))
+        registry.GetComponent<TransformComponent>(e).size = {look.width / 256.0f, look.height / 256.0f};
+    if (registry.HasComponent<ColliderComponent>(e))
+        registry.GetComponent<ColliderComponent>(e).SetTrigger((look.flags & NetLook::kTrigger) != 0);
+
+    if ((look.flags & NetLook::kSprite) && registry.HasComponent<SpriteComponent2D>(e)) {
+        auto& sprite = registry.GetComponent<SpriteComponent2D>(e);
+        sprite.frameIndex = look.frame;
+        sprite.layer = static_cast<Layer>(look.layer);
+        if (m_AssetManager && !look.sprite.empty() && look.sprite != sprite.objectId) {
+            try {
+                sprite.spriteSheet = m_AssetManager->GetSpriteSheet(look.sprite);
+                sprite.objectId = look.sprite;
+            } catch (const std::out_of_range&) {
+                ENGINE_WARN("Unknown sprite '%s'", look.sprite.c_str());
+            }
+        }
+    }
+    if ((look.flags & NetLook::kAnimator) && registry.HasComponent<AnimatorComponent>(e)) {
+        auto& animator = registry.GetComponent<AnimatorComponent>(e);
+        bool rebound = false;
+        if (m_AssetManager && !look.animator.empty() && look.animator != animator.objectId) {
+            try {
+                animator.BindAnimationSet(m_AssetManager->GetAnimationSet(look.animator), m_AssetManager->GetSpriteSheet(look.animator));
+                animator.objectId = look.animator;
+                rebound = true;
+            } catch (const std::out_of_range&) {
+                ENGINE_WARN("Unknown animations '%s'", look.animator.c_str());
+            }
+        }
+        animator.SetSpeed(look.animSpeed / 64.0f);
+        if (rebound || look.animCommand != remote.animCommand) {
+            remote.animCommand = look.animCommand;
+            if (look.flags & NetLook::kAnimStopped) animator.Stop();
+            else animator.Play(look.clip, (look.flags & NetLook::kAnimLoop) != 0);
+        }
+    }
+}
+
+void NetworkControl::OnNetMotion(uint32_t netId, const NetMotion& motion, uint32_t tick) {
+    RemoteEntity& remote = m_Remote[netId];
+    auto& registry = m_Scene->registry;
+    if (remote.entity == m_MyLocalPlayerID || !registry.HasComponent<TransformComponent>(remote.entity)) return;
+    auto& trans = registry.GetComponent<TransformComponent>(remote.entity);
+    glm::vec2& position = trans.parentTransform ? trans.localPosition : trans.position;
+    const glm::vec2 velocity = motion.Velocity();
+
+    trans.rotation = motion.Rotation();
+    remote.velocity = velocity;
+    if (remote.body && registry.HasComponent<RigidBodyComponent>(remote.entity))
+        registry.GetComponent<RigidBodyComponent>(remote.entity).SetVelocity(velocity);
+
+    // Project server position to current client tick
+    // Bounded, so a bad tick can't fling entities away
+    const int ticksAhead = std::clamp(static_cast<int32_t>(GetClientTick() - tick), -120, 120);
+    const glm::vec2 projected = motion.Position() + velocity * (static_cast<float>(ticksAhead) / 60.0f);
+    const glm::vec2 error = projected - position;
+    const float dist = glm::length(error);
+
+    if (dist > 2.0f) {
+        // Completely desynced or first spawn: snap
+        position = projected;
+        m_VelocityCorrections.erase(remote.entity);
+    } else if (remote.player && glm::length(velocity) < 0.1f && dist < 0.5f) {
+        // If a player stopped and the error is just a small latency overshoot,
+        // DO NOT moonwalk them backward. Hide the error until they start moving again!
+        m_VelocityCorrections.erase(remote.entity);
+    } else {
+        // A velocity that smoothly closes the gap over ~0.2s
+        m_VelocityCorrections[remote.entity] = error * 5.0f;
+    }
+}
+
+void NetworkControl::OnNetOwnPosition(const glm::vec2& serverPos, uint32_t serverUpdateTick) {
+    if (m_MyLocalPlayerID == 0 || !m_Scene->registry.HasComponent<TransformComponent>(m_MyLocalPlayerID)) return;
+    auto& trans = m_Scene->registry.GetComponent<TransformComponent>(m_MyLocalPlayerID);
+    const auto stop = [&] {
+        if (m_Scene->registry.HasComponent<RigidBodyComponent>(m_MyLocalPlayerID))
+            m_Scene->registry.GetComponent<RigidBodyComponent>(m_MyLocalPlayerID).SetVelocity(glm::vec2(0.0f));
+    };
+
+    const uint32_t reconTick = serverUpdateTick + 3;
+    const auto historyIt = m_ClientStateHistory.find(reconTick);
+    if (historyIt != m_ClientStateHistory.end()) {
+        const glm::vec2 error = serverPos - historyIt->second.position;
+        const float errorLen = glm::length(error);
+        if (errorLen > 1.5f) {
+            // Shift by the error instead of moving to serverPos: that is where the player was some
+            // ticks ago, so a fast player would be wrong again right away
+            trans.position += error;
+            for (auto& [tick, state] : m_ClientStateHistory)
+                if (tick >= reconTick) state.position += error;
+            ENGINE_LOG("[Client] Large desync detected (%.2f units) at tick %u. Snapping.", errorLen, reconTick);
+        } else if (errorLen > 0.001f) {
+            const glm::vec2 correction = error * 0.5f;
+            trans.position += correction;
+            for (auto& [tick, state] : m_ClientStateHistory)
+                if (tick > reconTick) state.position += correction;
+        }
+    } else {
+        const float dist = glm::distance(trans.position, serverPos);
+        if (dist > 1.5f) {
+            trans.position = serverPos;
+            stop();
+            ENGINE_LOG("[Client] No history for tick %u and large desync (%.2f units). Snapping.", reconTick, dist);
+        } else {
+            trans.position = glm::mix(trans.position, serverPos, 0.4f);
         }
     }
 }
@@ -500,6 +515,7 @@ void NetworkControl::RememberPlayerPositions() {
 }
 
 void NetworkControl::OnClientDisconnected(ENetPeer* peer) {
+    m_ReplicationServer.RemovePeer(peer);
     m_RememberedPositions.erase(peer);
     m_BufferedPeerInputs.erase(peer);
     m_LastExecutedInputs.erase(peer);
@@ -522,18 +538,21 @@ void NetworkControl::OnSceneChanged() {
     m_MyLocalPlayerID = 0;
     // m_MyServerPlayerID stays: the scene is often reloaded between the welcome and the spawn
     m_PeerToEntity.clear();
-    m_ServerToLocalEntity.clear();
+    m_Remote.clear();
     m_BufferedPeerInputs.clear();
     m_LastExecutedInputs.clear();
     m_ClientStateHistory.clear();
     m_ClientInputHistory.clear();
     m_VelocityCorrections.clear();
     m_InGame = false;
+    m_ReplicationStale = true;
     ENGINE_LOG("NetworkControl: Cleared connection entities and ticks for scene transition.");
 }
 
 void NetworkControl::SpawnLocalPlayer() {
     m_MyLocalPlayerID = OnSpawnPlayer(nullptr, true);
-    m_InGame = true;
-    m_ServerToLocalEntity[m_MyServerPlayerID] = m_MyLocalPlayerID;
+    if (m_NetService && m_NetService->GetMode() == NetworkMode::Client) {
+        m_InGame = true;
+        BeginClientScene();
+    }
 }

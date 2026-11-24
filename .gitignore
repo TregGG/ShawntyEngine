@@ -31,3 +31,5 @@ cloud/frontend/dist/
 cloud/backend/database.sqlite*
 cloud/backend/runtime/
 cloud/backend/uploads/
+release/
+asan/

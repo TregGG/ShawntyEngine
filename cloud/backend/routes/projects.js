@@ -6,6 +6,7 @@ const crypto = require('crypto');
 
 const { rateLimit } = require('express-rate-limit');
 const { buildProjectBundle } = require('../services/bundler');
+const { starterScene, addStarterAssets } = require('../services/starter');
 const serverManager = require('../services/serverManager');
 const { unwrapScene } = require('../lib/validate');
 
@@ -65,23 +66,9 @@ router.post('/', (req, res) => {
         const projectId = 'proj_' + crypto.randomBytes(6).toString('hex');
         const serverToken = 'token_' + crypto.randomBytes(16).toString('hex');
         
-        // Default empty scene
-        const defaultScene = {
-            entities: [
-                {
-                    editorId: 'entity_camera',
-                    name: 'Camera',
-                    category: 'Environment',
-                    components: {
-                        transform: { position: [0, 0], size: [1, 1], rotation: 0 }
-                    }
-                }
-            ],
-            relationships: []
-        };
-        
         const stmt = db.prepare('INSERT INTO projects (id, name, owner_id, server_token, scene_data, join_code) VALUES (?, ?, ?, ?, ?, ?)');
-        stmt.run(projectId, name, req.user.id, serverToken, JSON.stringify(defaultScene), db.newJoinCode());
+        stmt.run(projectId, name, req.user.id, serverToken, starterScene(), db.newJoinCode());
+        addStarterAssets(projectId);
         
         res.json({ id: projectId, name, serverToken });
     } catch (err) {

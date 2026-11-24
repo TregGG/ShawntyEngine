@@ -24,6 +24,9 @@ public:
     uint32_t GetLayerMask() const { return m_LayerMask; }
     void SetLayerMask(uint32_t mask) { m_LayerMask = mask; }
 
+    const glm::vec2& GetLocalOffset() const { return m_LocalOffset; }
+    const glm::vec2& GetLocalSize() const { return m_LocalSize; }
+
     bool IsTrigger() const { return m_IsTrigger; }
     void SetTrigger(bool trigger) { m_IsTrigger = trigger; }
 

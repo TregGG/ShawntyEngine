@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 #include <glm/glm.hpp>
 #include "../../core/entityid.h"
@@ -25,6 +26,7 @@ struct TransformComponent {
 
 struct SpriteComponent2D {
     const SpriteSheetAsset* spriteSheet = nullptr;
+    std::string objectId; // which object asset the sheet came from
     int frameIndex = 0;
     Layer layer = Layer::Foreground;
 };

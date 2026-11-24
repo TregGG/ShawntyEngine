@@ -67,7 +67,7 @@ TestPlayer::TestPlayer(Scene* scene, const std::string& name, const SpriteSheetA
     } else {
         // Fallback if prefab failed to load
         ENGINE_ERROR("Failed to load player prefab, falling back to creating default Player entity");
-        m_ID = m_Scene->CreateEntity(EntityCategory::Player, name);
+        // m_ID already exists (created by GameObject); just fill it in
         
         TransformComponent pt;
         pt.position = glm::vec2(0.0f, 5.0f);
@@ -76,6 +76,7 @@ TestPlayer::TestPlayer(Scene* scene, const std::string& name, const SpriteSheetA
 
         SpriteComponent2D ps;
         ps.spriteSheet = sheet;
+        if (sheet) ps.objectId = "player_box";
         ps.frameIndex = 0;
         ps.layer = Layer::Player;
         scene->registry.AddComponent<SpriteComponent2D>(m_ID, ps);

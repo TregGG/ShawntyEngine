@@ -164,6 +164,11 @@ public:
         else { static_assert(sizeof(T) == 0, "Unsupported component type"); }
     }
 
+    template<typename F> void ForEachAlive(F&& f) const {
+        for (size_t i = 0; i < m_Slots.size(); ++i)
+            if (m_Slots[i].alive) f(MakeEntityID(static_cast<uint32_t>(i), m_Slots[i].generation));
+    }
+
     // Specific views for our engine
     const std::vector<EntityID>& ViewTransformAndSprite() const;
     const std::vector<EntityID>& ViewPhysicsObjects() const;

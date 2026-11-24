@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "prefab": {
+    "name": "Player",
+    "category": "Player",
+    "components": {
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "size": [
+          1,
+          1
+        ]
+      },
+      "sprite": {
+        "objectId": "player_box",
+        "frameIndex": 0,
+        "layer": "Player"
+      },
+      "collider": {
+        "autoBounds": true
+      },
+      "rigidbody": {
+        "bodyType": "Dynamic",
+        "drag": 2,
+        "useGravity": true,
+        "gravityScale": 2
+      }
+    }
+  }
+}

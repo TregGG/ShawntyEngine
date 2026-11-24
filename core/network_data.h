@@ -5,8 +5,8 @@
 enum class PacketType : uint8_t {
     Connect,
     ClientInput,     // Client -> Server (Raw inputs only: W,A,S,D, mouse delta)
-    ServerUpdate,    // Server -> Client (Priority 1/2: Delta ECS Transforms)
-    StateSync,       // Server -> Client (Priority 3: Full Verification of all states)
+    ServerUpdate,    // unused, replaced by NetSnapshot
+    StateSync,       // unused, replaced by NetSnapshot
     ActionRequest,   // Client -> Server (Shoot, Interact)
     ActionConfirm,   // Server -> Client (Action validated)
     AdminCommand,    // Client -> Server (e.g., Kick, Stop)
@@ -17,7 +17,11 @@ enum class PacketType : uint8_t {
     ContentManifest, // Server -> Client
     ContentRequest,  // Client -> Server
     ContentChunk,    // Server -> Client
-    ContentReady     // Client -> Server
+    ContentReady,    // Client -> Server
+    // Replication (see services/replication.h)
+    NetSnapshot,     // Server -> Client (unreliable)
+    NetSpawn,        // Server -> Client (reliable)
+    NetDestroy       // Server -> Client (reliable)
 };
 
 #pragma pack(push, 1)
@@ -30,7 +34,9 @@ struct PacketHeader {
 // Server -> Client: Welcome / Connection handshake
 struct ConnectPacket {
     PacketHeader header;
-    uint32_t clientEntityID;
+    uint32_t clientEntityID;   // network ID of the client's own player
+    uint32_t sceneEntityCount; // must match the client's scene
+    uint16_t epoch;
     char sceneName[64];
 };
 
@@ -39,8 +45,10 @@ struct ClientInputPacket {
     static constexpr int kInputs = 4;
     PacketHeader header;          // tick of inputMasks[0]
     uint16_t inputMasks[kInputs]; // newest first; repeats cover lost packets. Bits for W, A, S, D, Space, etc.
-    float mouseDeltaX;
-    float mouseDeltaY;
+    // Acknowledges snapshots
+    uint16_t epoch;
+    uint16_t ackSeq;
+    uint64_t ackBits;
 };
 
 // Client -> Server: Sent occasionally
@@ -53,20 +61,6 @@ struct AdminCommandPacket {
 struct ServerCommandPacket {
     PacketHeader header;
     char command[128]; // e.g. "load_scene levels/level1"
-};
-
-// The ServerUpdate packets send a PacketHeader, count, and array of EntityVelocityData structs.
-struct EntityVelocityData {
-    uint32_t entityID;
-    float vx;
-    float vy;
-};
-
-// The StateSync packets send a PacketHeader, count, and array of EntityPositionData structs.
-struct EntityPositionData {
-    uint32_t entityID;
-    float x;
-    float y;
 };
 
 struct EntityTransformData {

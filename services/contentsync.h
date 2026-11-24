@@ -17,7 +17,7 @@ class NetworkService;
 // Content uses its own reliable channel so it doesn't delay gameplay packets.
 namespace ContentLimits
 {
-    constexpr uint8_t  kProtocol = 2;
+    constexpr uint8_t  kProtocol = 3;
     constexpr uint8_t  kChannel = 1;
     constexpr uint32_t kMaxFiles = 2000;
     constexpr uint32_t kMaxFileSize = 16u << 20;

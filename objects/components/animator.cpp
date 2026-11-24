@@ -31,6 +31,12 @@ void AnimatorComponent::Play(const std::string& clipName, bool loop)
     if (it == m_AnimSet->clips.end())
         return;
 
+    if (it->second.frames.empty())
+        return;
+
+    m_ClipName     = clipName;
+    m_Stopped      = false;
+    ++m_Commands;
     m_CurrentClip  = &it->second;
     m_Loop         = loop;
     m_Playing      = true;
@@ -41,6 +47,8 @@ void AnimatorComponent::Play(const std::string& clipName, bool loop)
 
 void AnimatorComponent::Stop()
 {
+    if (!m_Stopped) ++m_Commands;
+    m_Stopped      = true;
     m_Playing      = false;
     m_ClipFrameIdx = 0;
     m_TimeInFrame  = 0.0f;

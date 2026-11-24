@@ -196,6 +196,40 @@ test('game server runs the project sandboxed, hot-reloads and stops', { skip: !c
   assert.equal(serverManager.getServer(project.id), null);
 });
 
+test('a new project is playable and scripts are visible to players', { skip: !canHost }, async () => {
+  const fresh = (await api('POST', '/projects', { token: alice, body: { name: 'Fresh' } })).json;
+  const socket = connect(url, { forceNew: true });
+  sockets.push(socket);
+  const info = await new Promise(resolve => {
+    socket.on('joined', resolve);
+    socket.on('connect', () => socket.emit('join_project', fresh.id, alice));
+  });
+  await new Promise(r => setTimeout(r, 1500));
+  const address = info.address.replace(/^[^:]+/, '127.0.0.1');
+  const run = seconds => new Promise(resolve => {
+    const child = spawn(config.engineBin, ['--probe', address, '--seconds', String(seconds)], { env: { ...process.env, XDG_CACHE_HOME: path.join(dataDir, 'c' + Math.random()) } });
+    let out = '';
+    child.stdout.on('data', d => { out += d; });
+    child.on('exit', () => resolve(out));
+  });
+  const first = run(9);
+  await new Promise(r => setTimeout(r, 2000));
+  const [a, b] = await Promise.all([first, run(4)]);
+
+  // The platform (second entity in the scene) moves back and forth for both players
+  for (const out of [a, b]) {
+    const xs = [...out.matchAll(/entity: id=2 x=(-?[\d.]+)/g)].map(m => Number(m[1]));
+    assert.ok(xs.length > 2 && Math.max(...xs) - Math.min(...xs) > 1, out.slice(-1500));
+    assert.ok(xs.every(x => Math.abs(x) < 4.5), `platform out of range: ${xs}`);
+    assert.ok(!/entity: id=1 /.test(out), 'the floor never moves, so it is never sent');
+  }
+  // The first player is told about the second, joining and leaving. The second already knows the first.
+  assert.match(a, /spawn: id=\d+ kind=player/);
+  assert.match(b, /spawn: id=\d+ kind=player/);
+  assert.match(a, /destroy: id=\d+/);
+  serverManager.stopServer(fresh.id);
+});
+
 test('players download the project, see changes live, and never get scripts', { skip: !canHost }, async () => {
   const cache = path.join(dataDir, 'cache');
   const setScript = src => db.prepare("UPDATE assets_text SET content = ? WHERE project_id = ? AND name = 'probe.py'").run(src, project.id);

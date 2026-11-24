@@ -1,5 +1,6 @@
 #pragma once
 #include "scene.h"
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include "../services/base/physics/physicssystem.h"
@@ -42,6 +43,10 @@ public:
 
     // UDP Listener controls
     static void SetUdpPort(int port) { s_UdpPort = port; }
+    // Clients never run a project's scripts: they come from other people.
+    void SetScriptsEnabled(bool enabled) { m_ScriptsEnabled = enabled; }
+    // Called before a requested hot reload; returning false keeps the running scene.
+    std::function<bool()> OnBeforeReload;
     void SetUdpListenerEnabled(bool enabled);
     std::function<void()> OnSceneReloadedCallback;
 
@@ -62,6 +67,7 @@ private:
 
     // UDP Live Sync Socket
     inline static int s_UdpPort = 9090;
+    bool m_ScriptsEnabled = true;
     int m_UdpSocket = -1;
     bool m_UdpListenerEnabled = false;
 };

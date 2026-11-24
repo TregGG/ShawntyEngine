@@ -12,6 +12,7 @@
 #include <filesystem>
 
 #include "../core/projectpaths.h"
+#include "../core/devevents.h"
 #define ENGINE_CLASS "ScriptEngine"
 #include "../core/enginedebug.h"
 
@@ -58,7 +59,7 @@ void ScriptEngine::Init()
 {
     if (!s_PythonInitialized) {
         try {
-            py::initialize_interpreter();
+            py::initialize_interpreter(false); // leave Ctrl+C to the engine
             py::module_::import("shawnty"); // registers the types passed to scripts that never import it
             s_PythonInitialized = true;
             ENGINE_LOG("Python interpreter initialized (Python %s)", Py_GetVersion());
@@ -80,6 +81,37 @@ void ScriptEngine::Shutdown()
     DetachAll();
     m_Initialized = false;
     ENGINE_LOG("ScriptEngine shut down");
+}
+
+// ============================================================
+// CheckScript — loads a script in a throwaway module to find errors
+// ============================================================
+bool ScriptEngine::CheckScript(const std::string& path, const std::string& className, std::string& error)
+{
+    if (!s_PythonInitialized) return true;
+    try {
+        const std::string absPath = std::filesystem::absolute(ProjectPaths::Resolve(path)).string();
+        if (!std::filesystem::exists(absPath)) {
+            error = "file not found";
+            return false;
+        }
+        py::module_ util = py::module_::import("importlib.util");
+        py::object spec = util.attr("spec_from_file_location")("_shawnty_check", absPath);
+        if (spec.is_none()) {
+            error = "not a Python file";
+            return false;
+        }
+        py::object module = util.attr("module_from_spec")(spec);
+        spec.attr("loader").attr("exec_module")(module);
+        if (!py::hasattr(module, className.c_str())) {
+            error = "class '" + className + "' not found";
+            return false;
+        }
+        return true;
+    } catch (const std::exception& e) {
+        error = e.what();
+        return false;
+    }
 }
 
 // ============================================================
@@ -137,6 +169,7 @@ void ScriptEngine::AttachScript(EntityID entity, const ScriptComponent& scriptCo
         // Check file exists
         if (!std::filesystem::exists(absPath)) {
             ENGINE_ERROR("Script file not found: %s", absPath.c_str());
+            DevEvents::ScriptError(scriptComp.scriptPath, "file not found");
             return;
         }
 
@@ -192,6 +225,7 @@ void ScriptEngine::AttachScript(EntityID entity, const ScriptComponent& scriptCo
     } catch (const std::exception& e) {
         ENGINE_ERROR("Python error loading script '%s': %s",
                      scriptComp.scriptPath.c_str(), e.what());
+        DevEvents::ScriptError(scriptComp.scriptPath, e.what());
     }
 }
 
@@ -252,6 +286,7 @@ void ScriptEngine::StartPendingScripts()
             } catch (const std::exception& e) {
                 ENGINE_ERROR("[%s.%s] OnStart error: %s",
                              si.scriptPath.c_str(), si.className.c_str(), e.what());
+                DevEvents::ScriptError(si.scriptPath + " " + si.className + ".OnStart", e.what());
             }
         }
     }
@@ -277,6 +312,7 @@ void ScriptEngine::UpdateAll(float deltaTime)
             } catch (const std::exception& e) {
                 ENGINE_ERROR("[%s.%s] OnUpdate error: %s",
                              si.scriptPath.c_str(), si.className.c_str(), e.what());
+                DevEvents::ScriptError(si.scriptPath + " " + si.className + ".OnUpdate", e.what());
             }
         }
     }
@@ -302,6 +338,7 @@ void ScriptEngine::CallOnTriggerEnter(EntityID self, EntityID other)
         } catch (const std::exception& e) {
             ENGINE_ERROR("[%s.%s] OnTriggerEnter error: %s",
                          it->second.scriptPath.c_str(), it->second.className.c_str(), e.what());
+            DevEvents::ScriptError(it->second.scriptPath + " " + it->second.className + ".OnTriggerEnter", e.what());
         }
     }
 }
@@ -323,6 +360,7 @@ void ScriptEngine::CallOnTriggerExit(EntityID self, EntityID other)
         } catch (const std::exception& e) {
             ENGINE_ERROR("[%s.%s] OnTriggerExit error: %s",
                          it->second.scriptPath.c_str(), it->second.className.c_str(), e.what());
+            DevEvents::ScriptError(it->second.scriptPath + " " + it->second.className + ".OnTriggerExit", e.what());
         }
     }
 }

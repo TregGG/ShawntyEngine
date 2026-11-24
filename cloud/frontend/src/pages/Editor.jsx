@@ -1,5 +1,5 @@
 import { API_URL, getToken } from '../api';
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 
 import Toolbar from '../components/Toolbar'
@@ -100,12 +100,23 @@ function Editor() {
   // Camera
   const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 40 })
 
+  const [joinAddress, setJoinAddress] = useState(null)
+  const lastAddress = useRef(null)
+  const addLog = (message, level = 'log') =>
+    setConsoleLogs(prev => [...prev.slice(-499), { timestamp: Date.now(), message, level }])
+
   // Socket connection
   const { connected, joinProject, sendUpdate } = useSocket((update) => {
     setConsoleLogs(prev => [...prev, { timestamp: Date.now(), message: `Received: ${JSON.stringify(update)}` }])
-  }, ({ server }) => {
-    if (!server) return
-    setConsoleLogs(prev => [...prev, { timestamp: Date.now(), message: `Game server address: ${server.host}:${server.port}` }])
+  }, {
+    onAddress: (address) => {
+      if (address === lastAddress.current) return
+      lastAddress.current = address
+      setJoinAddress(address)
+      addLog(address ? `Game server running. Join with: ${address}` : 'Game server stopped. Save to start it again.', 'info')
+    },
+    onGameLog: ({ level, message }) => addLog(message, level),
+    onError: (message) => addLog(message || 'Connection error', 'error'),
   })
 
   // Join project room on connect
@@ -324,6 +335,7 @@ function Editor() {
         onAddEntity={addEntity}
         saveStatus={saveStatus}
         connected={connected}
+        joinAddress={joinAddress}
         uiMode={uiMode}
         setUiMode={setUiMode}
         scenes={scenes}

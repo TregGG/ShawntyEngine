@@ -10,7 +10,14 @@ function sameToken(a, b) {
     return crypto.timingSafeEqual(ha, hb);
 }
 
+// Game output and the join address go to editors only, not to game clients
+const editorsOf = (projectId) => `editors:${projectId}`;
+
 module.exports = function(io) {
+    serverManager.events.on('log', (projectId, event) => io.to(editorsOf(projectId)).emit('game_log', event));
+    serverManager.events.on('status', (projectId) =>
+        io.to(editorsOf(projectId)).emit('game_status', { address: serverManager.getJoinAddress(projectId) }));
+
     io.on('connection', (socket) => {
         // projectId -> { editor: boolean, expires: seconds | null }
         const access = new Map();
@@ -36,8 +43,14 @@ module.exports = function(io) {
 
                 access.set(projectId, grant);
                 socket.join(projectId);
+                if (grant.editor) socket.join(editorsOf(projectId));
                 const server = serverManager.startServer(projectId);
-                socket.emit('joined', { projectId, server, message: `Successfully joined project ${projectId}` });
+                socket.emit('joined', {
+                    projectId,
+                    server,
+                    address: grant.editor ? serverManager.getJoinAddress(projectId) : undefined,
+                    message: `Successfully joined project ${projectId}`
+                });
             } catch (err) {
                 console.error('join_project failed:', err);
                 socket.emit('error', { message: 'Server error' });
@@ -65,7 +78,9 @@ module.exports = function(io) {
                     return reply({ ok: false, error: 'Failed to save scene' });
                 }
                 try {
-                    serverManager.reloadServer(projectId);
+                    // Servers stop when nobody plays for a while; a save brings them back
+                    if (serverManager.getServer(projectId)) serverManager.reloadServer(projectId);
+                    else serverManager.startServer(projectId);
                 } catch (err) {
                     console.error('Game server reload failed:', err);
                 }

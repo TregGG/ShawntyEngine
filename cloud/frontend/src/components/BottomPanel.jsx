@@ -18,7 +18,7 @@ export default function BottomPanel({ logs = [] }) {
               logs.map((log, i) => (
                 <div key={i} className="log-entry" style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ color: '#888', marginRight: '8px' }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-                  <span>{log.message}</span>
+                  <span style={{ whiteSpace: 'pre-wrap', color: log.level === 'error' ? '#f87171' : log.level === 'info' ? '#4ade80' : undefined }}>{log.message}</span>
                 </div>
               ))
             )}

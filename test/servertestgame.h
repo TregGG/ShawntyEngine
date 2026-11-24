@@ -4,6 +4,7 @@
 #include "../levels/scenemanager.h"
 #include "../assets/assetmanager.h"
 #include "../core/entityid.h"
+#include "../services/contentsync.h"
 
 class Scene;
 class DataDrivenScene;
@@ -29,4 +30,12 @@ private:
 
     // Fixed timestep accumulator for networking ticks
     float m_NetworkTimeAccumulator = 0.0f;
+
+    // Project content sent to clients
+    ContentServer m_Content;
+    std::string m_LoadedFingerprint;
+    bool m_ReadyReported = false;
+    std::string Fingerprint() const;
+    void ReadServerSettings();
+    bool PrepareReload(const std::string& scenePath);
 };

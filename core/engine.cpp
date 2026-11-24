@@ -137,6 +137,7 @@ void Engine::Run()
         m_NetworkControl->Update(m_Timer->GetDeltaTime());
 
         m_Game->OnUpdate(m_Timer->GetDeltaTime());
+        m_NetworkService->Flush();
 
         // Rendering phase - delegate to Game
         m_Game->OnRender();

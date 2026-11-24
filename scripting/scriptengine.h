@@ -24,6 +24,7 @@ public:
     void SetInput(const Input* input) { m_Input = input; }
 
     // Script management
+    static bool CheckScript(const std::string& path, const std::string& className, std::string& error);
     void AttachScript(EntityID entity, const ScriptComponent& scriptComp);
     void DetachScript(EntityID entity);
     void DetachAll();

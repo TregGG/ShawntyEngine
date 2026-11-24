@@ -3,6 +3,7 @@
 #include "../assets/assetmanager.h"
 #include "../core/input.h"
 #include "../core/projectpaths.h"
+#include "../core/devevents.h"
 #include "../objects/components/collidercomponent.h"
 #include "../objects/components/scriptcomponent.h"
 #include <algorithm>
@@ -32,13 +33,27 @@ void DataDrivenScene::OnEnter()
         return;
     }
 
-    auto result = SceneSerializer::LoadScene(m_SceneFilePath, this, m_Assets, m_FontEngine, m_EventService);
+    SceneSerializer::SceneLoadResult result;
+    try {
+        result = SceneSerializer::LoadScene(m_SceneFilePath, this, m_Assets, m_FontEngine, m_EventService);
+    } catch (const std::exception& e) {
+        // Valid JSON with unexpected types, e.g. text where a number belongs
+        result.success = false;
+        result.errorMessage = m_SceneFilePath + ": " + e.what();
+    }
     if (result.success) {
         m_EditorIdMap = std::move(result.editorIdMap);
         ENGINE_LOG("DataDrivenScene entered: %s (%zu entities loaded)",
                    m_SceneFilePath.c_str(), m_EditorIdMap.size());
     } else {
         ENGINE_ERROR("Failed to load scene: %s", result.errorMessage.c_str());
+        DevEvents::Emit("error", "Failed to load scene: " + result.errorMessage);
+        InitUdpListener(); // a later save can still fix it
+        return;
+    }
+
+    if (!m_ScriptsEnabled) {
+        InitUdpListener();
         return;
     }
 
@@ -144,7 +159,11 @@ void DataDrivenScene::Reload()
     if (m_Assets) {
         m_Assets->Reload(ProjectPaths::Root());
     }
+    // Keep the socket open, or a save arriving during the reload would be lost
+    const int udpSocket = m_UdpSocket;
+    m_UdpSocket = -1;
     OnExit();
+    m_UdpSocket = udpSocket;
     OnEnter();
     ENGINE_LOG("Scene reloaded successfully");
     if (OnSceneReloadedCallback) {
@@ -240,16 +259,14 @@ void DataDrivenScene::PollUdpReload()
 {
     if (m_UdpSocket < 0) return;
 
+    // Several saves can be queued; one reload covers them all
+    bool reload = false;
     char buffer[64];
-    struct sockaddr_in senderAddr;
-    socklen_t senderLen = sizeof(senderAddr);
-    ssize_t len = recvfrom(m_UdpSocket, buffer, sizeof(buffer) - 1, 0, (struct sockaddr*)&senderAddr, &senderLen);
-    if (len > 0) {
-        buffer[len] = '\0';
-        std::string msg(buffer);
-        if (msg == "reload") {
-            ENGINE_LOG("UDP trigger packet received: reloading scene!");
-            Reload();
-        }
+    ssize_t len;
+    while ((len = recv(m_UdpSocket, buffer, sizeof(buffer), 0)) > 0) {
+        if (std::string(buffer, static_cast<size_t>(len)) == "reload") reload = true;
     }
+    if (!reload || (OnBeforeReload && !OnBeforeReload())) return;
+    ENGINE_LOG("UDP trigger packet received: reloading scene!");
+    Reload();
 }

@@ -6,12 +6,23 @@
 #include <cstdlib>
 #include <string>
 
-// Parses "host:port" (or just "host", using defaultPort).
-inline bool ParseEndpoint(const std::string& text, std::string& host, int& port, int defaultPort = 7777)
+// Parses "host", "host:port" or "host:port/CODE".
+inline bool ParseEndpoint(const std::string& text, std::string& host, int& port, std::string& code, int defaultPort = 7777)
 {
     const auto first = text.find_first_not_of(" \t");
     if (first == std::string::npos) return false;
-    const std::string s = text.substr(first, text.find_last_not_of(" \t") - first + 1);
+    std::string s = text.substr(first, text.find_last_not_of(" \t") - first + 1);
+
+    code.clear();
+    if (const auto slash = s.find('/'); slash != std::string::npos) {
+        code = s.substr(slash + 1);
+        s.resize(slash);
+        if (code.empty() || code.size() > 16) return false;
+        for (char& c : code) {
+            if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
+            else if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) return false;
+        }
+    }
 
     const auto colon = s.find(':');
     host = s.substr(0, colon);

@@ -87,7 +87,7 @@ void RenderManager::CollectRenderables()
         const auto& transform = m_Scene->registry.GetComponent<TransformComponent>(e);
         const auto& sprite = m_Scene->registry.GetComponent<SpriteComponent2D>(e);
 
-        if (!sprite.spriteSheet)
+        if (!sprite.spriteSheet || !sprite.spriteSheet->texture)
             continue;
 
         int frameIndex = sprite.frameIndex;

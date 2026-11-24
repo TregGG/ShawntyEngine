@@ -167,18 +167,13 @@ void TestGame::CreateNetworkUI(Scene* scene) {
 #else
             std::system("./bin/framework --server &");
 #endif
-            m_NetService->Connect("127.0.0.1", 7777);
-            if (m_StatusText) m_StatusText->Text = "Connecting...";
+            Join("127.0.0.1:7777");
         }
     };
 
     joinBtn->OnClickCallback = [this, inputPtr = inputF.get()]() {
         if (m_NetService) {
-            std::string host;
-            int port = 0;
-            const bool ok = ParseEndpoint(inputPtr->GetTextElement()->Text, host, port)
-                            && m_NetService->Connect(host, port);
-            if (m_StatusText) m_StatusText->Text = ok ? "Connecting..." : "Enter address as IP:port";
+            if (!Join(inputPtr->GetTextElement()->Text)) SetStatus("Enter IP:port or IP:port/CODE");
         }
     };
 
@@ -187,6 +182,44 @@ void TestGame::CreateNetworkUI(Scene* scene) {
     panel->AddChild(std::move(joinBtn));
 
     scene->registry.AddUIElement(std::move(panel));
+}
+
+bool TestGame::Join(const std::string& address)
+{
+    std::string host, code;
+    int port = 0;
+    if (!m_NetService || m_NetService->GetMode() != NetworkMode::Offline) return false;
+    if (!ParseEndpoint(address, host, port, code)) {
+        ENGINE_WARN("Invalid server address '%s'. Use IP:port or IP:port/CODE", address.c_str());
+        return false;
+    }
+    m_Content.SetJoinCode(code);
+    return m_NetService->Connect(host, port);
+}
+
+void TestGame::SetStatus(const std::string& text)
+{
+    ENGINE_LOG("%s", text.c_str());
+    if (m_StatusText) m_StatusText->Text = text;
+}
+
+// Drops everything from the current project and starts another one.
+void TestGame::SwitchProject(const std::string& root, const std::string& scenePath)
+{
+    m_StatusText = nullptr;
+    if (m_NetControl) {
+        m_NetControl->OnSceneChanged();
+        m_NetControl->BindScene(nullptr, nullptr);
+    }
+    SetScene(nullptr);
+    for (auto& [path, scene] : m_Scenes) delete scene;
+    m_Scenes.clear();
+
+    ProjectPaths::SetRoot(root);
+    m_AssetManager.Reload(root);
+    DataDrivenScene* scene = GetOrCreateScene(scenePath);
+    SetScene(scene);
+    if (m_NetControl) m_NetControl->BindScene(scene, nullptr);
 }
 
 DataDrivenScene* TestGame::GetOrCreateScene(const std::string& rawPath) {
@@ -198,11 +231,15 @@ DataDrivenScene* TestGame::GetOrCreateScene(const std::string& rawPath) {
 
     ENGINE_LOG("Loading dynamic scene on client: %s", path.c_str());
     DataDrivenScene* scene = new DataDrivenScene(&m_AssetManager, path, &m_FontEngine, m_EventService);
+    scene->SetScriptsEnabled(!m_Remote);
     scene->OnSceneReloadedCallback = [this, path, scene]() {
         this->HandleSceneReloaded(path, scene);
     };
 
     scene->registry.SetUIActionCallback([this, scene](const std::string& action, const std::string& target) {
+        if (m_Remote && (action == "Host" || action == "Join")) {
+            return; // a downloaded project may not start servers or redirect players
+        }
         if (action == "Host") {
             ENGINE_LOG("Host Action triggered. Launching dedicated server...");
 #ifdef _WIN32
@@ -212,7 +249,7 @@ DataDrivenScene* TestGame::GetOrCreateScene(const std::string& rawPath) {
 #else
             std::system("./bin/framework --server &");
 #endif
-            if (m_NetService) m_NetService->Connect("127.0.0.1", 7777);
+            Join("127.0.0.1:7777");
         } else if (action == "Join") {
             std::string address = "127.0.0.1:7777";
             if (!target.empty() && scene) {
@@ -222,14 +259,7 @@ DataDrivenScene* TestGame::GetOrCreateScene(const std::string& rawPath) {
                     }
                 }
             }
-            std::string host;
-            int port = 0;
-            if (!ParseEndpoint(address, host, port)) {
-                ENGINE_WARN("Invalid server address '%s'. Use IP:port", address.c_str());
-            } else if (m_NetService) {
-                ENGINE_LOG("Join Action triggered. Connecting to %s:%d", host.c_str(), port);
-                m_NetService->Connect(host, port);
-            }
+            Join(address);
         } else if (action == "Quit") {
             ENGINE_LOG("Quit Action triggered.");
             exit(0);
@@ -314,6 +344,12 @@ bool TestGame::OnInit()
         
         m_NetControl->OnClientConnectedCallback = [this](const std::string& sceneName) {
             ENGINE_LOG("Connected! Server requests scene: %s", sceneName.c_str());
+            if (!IsSafeContentPath(sceneName) || sceneName.compare(0, 7, "scenes/") != 0) {
+                ENGINE_ERROR("Server requested an invalid scene");
+                m_NetService->Disconnect();
+                m_ReturnToMenu = true;
+                return;
+            }
             DataDrivenScene* targetScene = GetOrCreateScene(sceneName);
             if (targetScene) {
                 if (m_SceneManager.GetActiveScene() == targetScene) {
@@ -329,6 +365,32 @@ bool TestGame::OnInit()
         };
     }
 
+    m_MenuRoot = ProjectPaths::Root();
+    if (m_NetControl && m_NetService) {
+        m_NetControl->SetContentClient(&m_Content);
+        m_NetService->OnConnected = [this]() {
+            SetStatus("Joining...");
+            m_Content.OnConnected(*m_NetService);
+        };
+        m_NetService->OnDisconnected = [this](uint32_t reason) {
+            m_Content.OnDisconnected();
+            ENGINE_WARN("%s", DescribeDisconnect(reason));
+            m_ReturnToMenu = m_Remote;
+        };
+        m_Content.OnProgress = [this](size_t done, size_t total) {
+            if (total > 0) SetStatus("Downloading " + std::to_string(done) + "/" + std::to_string(total));
+        };
+        m_Content.OnError = [](const std::string& error) {
+            (void)error;
+            ENGINE_ERROR("%s", error.c_str());
+        };
+        m_Content.OnContent = [this](const std::string& root) {
+            m_Remote = true;
+            SwitchProject(root, "scenes/main.scene");
+            m_Content.SendReady(*m_NetService);
+        };
+    }
+
     // UI Actions are now registered in GetOrCreateScene
 
     // ---- Client: server command handler for other commands if needed ----
@@ -337,11 +399,13 @@ bool TestGame::OnInit()
             // Can add other commands here later
             ENGINE_LOG("Received server command: %s", command.c_str());
         };
-        if (std::getenv("ENGINE_BOT")) {
+        if (std::getenv("ENGINE_BOT") && m_AutoConnect.empty()) {
             ENGINE_LOG("Bot mode: Auto-connecting to local server");
-            m_NetService->Connect("127.0.0.1", 7777);
+            Join("127.0.0.1:7777");
         }
     }
+
+    if (!m_AutoConnect.empty()) Join(m_AutoConnect);
 
     ENGINE_LOG("OnInit completed");
     return true;
@@ -362,7 +426,7 @@ void TestGame::OnInput(const Input& input)
     if (m_NetService && m_NetControl) {
         if (input.IsKeyPressed(GLFW_KEY_C)) {
             if (m_NetService->GetMode() == NetworkMode::Offline) {
-                m_NetService->Connect("127.0.0.1", 7777);
+                Join("127.0.0.1:7777");
             }
         }
         if (input.IsKeyPressed(GLFW_KEY_H)) {
@@ -382,6 +446,13 @@ void TestGame::OnInput(const Input& input)
 void TestGame::OnUpdate(float deltaTime)
 {
     // Scene update (physics, animators, etc.)
+    if (m_ReturnToMenu) {
+        m_ReturnToMenu = false;
+        m_Remote = false;
+        m_UIHidden = false;
+        SwitchProject(m_MenuRoot, m_MenuRoot == ProjectPaths::kDefaultRoot ? "test_compiled/scenes/mainmenu.scene" : "scenes/main.scene");
+    }
+
     m_SceneManager.Update(deltaTime);
 
     // --- Network ticks (moved from scene to game code) ---
@@ -427,7 +498,7 @@ void TestGame::OnUpdate(float deltaTime)
 
     // --- Clear UI menu once client connects ---
     if (m_NetService && m_NetService->GetMode() == NetworkMode::Client) {
-        if (m_NetService->IsConnected() && !m_UIHidden) {
+        if (m_NetService->IsConnected() && !m_UIHidden && !m_Remote) {
             Scene* scene = m_SceneManager.GetActiveScene();
             if (scene) {
                 scene->registry.ClearUIElements();

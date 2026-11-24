@@ -27,6 +27,13 @@ namespace ProjectPaths
 
     inline bool IsDefault() { return Root() == kDefaultRoot; }
 
+    // The path relative to the project root, as sent over the network
+    inline std::string MakeRelative(const std::string& path)
+    {
+        const std::string prefix = Root() + "/";
+        return path.compare(0, prefix.size(), prefix) == 0 ? path.substr(prefix.size()) : path;
+    }
+
     inline std::string Resolve(const std::string& path)
     {
         if (IsDefault() || path.empty() || path.front() == '/') return path;

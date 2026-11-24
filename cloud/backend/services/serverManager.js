@@ -3,7 +3,14 @@ const path = require('path');
 const fs = require('fs');
 const dgram = require('dgram');
 const config = require('../config');
+const { EventEmitter } = require('events');
+const db = require('../db');
 const { syncProjectToDisk } = require('./bundler');
+
+// 'log' (projectId, { level, message }) and 'status' (projectId)
+const events = new EventEmitter();
+const EVENT_PREFIX = '@@shawnty ';
+const MAX_LINES_PER_SECOND = 20;
 
 // projectId -> { child, slot, port, reloadPort }
 const active = new Map();
@@ -53,7 +60,8 @@ function sandboxCommand(projectDir, port, reloadPort) {
     '--setenv', 'PATH', '/usr/bin',
     '--setenv', 'HOME', '/tmp',
     '--setenv', 'PYTHONDONTWRITEBYTECODE', '1',
-    '/engine/framework', '--server', '--project-dir', '/project',
+    '--setenv', 'PYTHONUNBUFFERED', '1',
+    '/engine/framework', '--server', '--dev-events', '--project-dir', '/project',
     '--port', String(port), '--reload-port', String(reloadPort)
   );
   return ['prlimit', args];
@@ -72,6 +80,48 @@ function freeSlot() {
 function getServer(projectId) {
   const entry = active.get(projectId);
   return entry ? { host: config.publicGameHost, port: entry.port } : null;
+}
+
+// What a player types. Contains the join code, so only for the project's owner.
+function getJoinAddress(projectId) {
+  const entry = active.get(projectId);
+  if (!entry) return null;
+  const { join_code: code } = db.prepare('SELECT join_code FROM projects WHERE id = ?').get(projectId);
+  return `${config.publicGameHost}:${entry.port}/${code}`;
+}
+
+// Forwards script output and engine events to the project's editors. Output is written by
+// untrusted scripts, so lines are capped in length and rate.
+function watchOutput(projectId, stream, defaultLevel) {
+  let pending = '', windowStart = 0, counts = {};
+  // Separate budgets, so engine logs or a chatty script can't crowd out error reports
+  const allow = (kind, limit) => (counts[kind] = (counts[kind] || 0) + 1) <= limit;
+  stream.setEncoding('utf8');
+  stream.on('data', chunk => {
+    const lines = (pending + chunk).split('\n');
+    pending = lines.pop().slice(-8192);
+    for (const raw of lines) {
+      // Engine log lines start with a colored [HH:MM:SS]; they go to the server log only
+      // eslint-disable-next-line no-control-regex
+      const line = raw.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\x00-\x08\x0b-\x1f]/g, '').slice(0, 8192);
+      if (!line.trim()) continue;
+      const now = Date.now();
+      if (now - windowStart > 1000) { windowStart = now; counts = {}; }
+      if (/^\[\d\d:\d\d:\d\d\]\[/.test(line)) {
+        if (allow('engine', 200)) process.stdout.write(`[game:${projectId}] ${line}\n`);
+        continue;
+      }
+      if (!allow(line.startsWith(EVENT_PREFIX) ? 'event' : 'print', MAX_LINES_PER_SECOND)) continue;
+      let event = { level: defaultLevel, message: line };
+      if (line.startsWith(EVENT_PREFIX)) {
+        try {
+          const { level, message } = JSON.parse(line.slice(EVENT_PREFIX.length));
+          event = { level: ['info', 'error'].includes(level) ? level : 'log', message: String(message) };
+        } catch { continue; }
+      }
+      events.emit('log', projectId, event);
+    }
+  });
 }
 
 function startServer(projectId) {
@@ -95,12 +145,17 @@ function startServer(projectId) {
   entry.child = child;
   active.set(projectId, entry);
 
-  child.stdout.on('data', d => process.stdout.write(`[game:${projectId}] ${d}`));
-  child.stderr.on('data', d => process.stderr.write(`[game:${projectId}] ${d}`));
-  const forget = () => { if (active.get(projectId) === entry) active.delete(projectId); };
+  watchOutput(projectId, child.stdout, 'log');
+  watchOutput(projectId, child.stderr, 'error');
+  const forget = () => {
+    if (active.get(projectId) !== entry) return;
+    active.delete(projectId);
+    events.emit('status', projectId);
+  };
   child.on('error', err => { console.error(`Game server for ${projectId} failed to start:`, err.message); forget(); });
   child.on('exit', (code, signal) => { console.log(`Game server for ${projectId} exited (${signal || code})`); forget(); });
 
+  events.emit('status', projectId);
   console.log(`Game server for ${projectId} started on port ${entry.port}`);
   return getServer(projectId);
 }
@@ -128,4 +183,4 @@ function stopAll() {
   for (const projectId of active.keys()) stopServer(projectId);
 }
 
-module.exports = { startServer, reloadServer, stopServer, stopAll, getServer };
+module.exports = { startServer, reloadServer, stopServer, stopAll, getServer, getJoinAddress, events };

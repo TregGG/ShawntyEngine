@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shawnty-test-'));
 const base = 20000 + (process.pid % 20000);
@@ -60,6 +60,7 @@ const savedScene = async () => (await api('GET', `/projects/${project.id}/scene`
 
 // Captures stdout lines from the sandboxed game server
 let gameLog = '';
+serverManager.events.on('log', (id, e) => { gameLog += `${e.level}: ${e.message}\n`; });
 const realWrite = process.stdout.write.bind(process.stdout);
 process.stdout.write = (chunk, ...rest) => {
   if (String(chunk).startsWith('[game:')) { gameLog += chunk; return true; }
@@ -184,16 +185,122 @@ test('game server runs the project sandboxed, hot-reloads and stops', { skip: !c
   assert.equal(owner.info.server.port, base);
   await waitForLog('SEES_DB False HOME False ENV False');
   await waitForLog('READONLY');
-  await waitForLog('UDP live sync listener bound');
+  await waitForLog('info: Game server ready');
 
   s.entities.push({ ...scene('second').entities[0], editorId: 'e2' });
   assert.equal((await update(owner.socket, { action: 'save_scene', scene: s })).ok, true);
-  await waitForLog('Scene reloaded successfully');
-  await waitForLog('(2 entities loaded)');
+  await waitForLog('info: Change applied');
 
   serverManager.stopServer(project.id);
   for (let i = 0; i < 50 && serverManager.getServer(project.id); i++) await new Promise(r => setTimeout(r, 100));
   assert.equal(serverManager.getServer(project.id), null);
+});
+
+test('players download the project, see changes live, and never get scripts', { skip: !canHost }, async () => {
+  const cache = path.join(dataDir, 'cache');
+  const setScript = src => db.prepare("UPDATE assets_text SET content = ? WHERE project_id = ? AND name = 'probe.py'").run(src, project.id);
+  const good = 'class Probe:\n    def OnUpdate(self, entity, dt, input):\n        pass\n';
+  setScript(good);
+  const s = scene('v1');
+  s.entities[0].components.script = { path: 'scripts/probe.py', class: 'Probe' };
+  s.entities.push({ editorId: 'floor', name: 'Floor', components: {
+    transform: { position: [0, -3], size: [500, 1], rotation: 0 }, collider: { autoBounds: true },
+    rigidbody: { bodyType: 'Static' } } });
+  db.prepare('UPDATE projects SET scene_data = ? WHERE id = ?').run(JSON.stringify(s), project.id);
+  // Larger than one packet, one send window and one chunk; plus a list too long for one packet
+  const big = require('crypto').randomBytes(3_000_000);
+  fs.mkdirSync(path.join(dataDir, 'uploads', project.id, 'textures'), { recursive: true });
+  fs.writeFileSync(path.join(dataDir, 'uploads', project.id, 'textures', 'big.tga'), big);
+  for (let i = 0; i < 150; i++) {
+    db.prepare('INSERT INTO assets_text (project_id, type, name, content) VALUES (?,?,?,?)').run(project.id, 'objects', `object_${i}`, `spritesheet:s${i}\nanimations:s${i}\n`);
+  }
+  gameLog = '';
+
+  const owner = await join(alice);
+  const received = [];
+  owner.socket.on('game_log', e => received.push(e));
+  const game = await join(project.serverToken);
+  assert.equal(game.info.address, undefined); // the code is for the owner
+  await waitForLog('info: Game server ready');
+  const address = owner.info.address.replace(/^[^:]+/, '127.0.0.1');
+  assert.match(address, /^127\.0\.0\.1:\d+\/[A-Z2-9]{8}$/);
+
+  const probe = (addr, seconds, dir) => {
+    const child = spawn(config.engineBin, ['--probe', addr, '--seconds', String(seconds)], { env: { ...process.env, XDG_CACHE_HOME: dir } });
+    const p = { out: '', done: new Promise(r => child.on('exit', r)) };
+    child.stdout.on('data', d => { p.out += String(d).split('\n').filter(l => !l.includes('][')).join('\n'); });
+    p.until = async (text, n = 1) => {
+      for (let i = 0; i < 80; i++) {
+        if (p.out.split(text).length > n) return;
+        await new Promise(r => setTimeout(r, 100));
+      }
+      assert.fail(`"${text}" x${n} not in:\n${p.out}\n--- game\n${gameLog.slice(-1500)}`);
+    };
+    return p;
+  };
+
+  const wrong = probe(address.replace(/\/.*/, '/WRONG222'), 4, cache);
+  await wrong.done;
+  assert.match(wrong.out, /Wrong join code/);
+  assert.doesNotMatch(wrong.out, /content:/);
+
+  const player = probe(address, 20, cache);
+  await player.until('welcome: scene=scenes/main.scene');
+  const root = /root=(\S+)/.exec(player.out)[1];
+  assert.ok(fs.existsSync(path.join(root, 'scenes/main.scene')));
+  assert.ok(fs.readFileSync(path.join(root, 'textures/big.tga')).equals(big));
+  assert.ok(!fs.existsSync(path.join(root, 'scripts')) && !fs.existsSync(path.join(root, 'server.json')) && !fs.existsSync(path.join(root, 'manifest.json')));
+  await player.until('position: x=', 3); // moving right
+
+  // A saved change reaches the connected player, who keeps playing
+  s.entities[0].name = 'v2';
+  assert.equal((await update(owner.socket, { action: 'save_scene', scene: s })).ok, true);
+  await player.until('content:', 2);
+  await player.until('welcome:', 2);
+  const second = player.out.split('content:')[2];
+  assert.match(second, /downloaded=1 /); // only the changed file
+  assert.match(fs.readFileSync(path.join(/root=(\S+)/.exec(second)[1], 'scenes/main.scene'), 'utf8'), /v2/);
+  const xs = [...player.out.matchAll(/x=(-?[\d.]+)/g)].map(m => Number(m[1]));
+  for (let i = 1; i < xs.length; i++) assert.ok(xs[i] > xs[i - 1] - 1, `player was moved back: ${xs}`);
+
+  // Saves in quick succession: the last one always arrives
+  for (let i = 0; i < 10; i++) {
+    s.entities[0].name = `burst${i}`;
+    update(owner.socket, { action: 'save_scene', scene: s });
+  }
+  const latest = () => {
+    const roots = [...player.out.matchAll(/root=(\S+)/g)];
+    try { return fs.readFileSync(path.join(roots.at(-1)[1], 'scenes/main.scene'), 'utf8'); } catch { return ''; }
+  };
+  for (let i = 0; i < 50 && !latest().includes('burst9'); i++) await new Promise(r => setTimeout(r, 100));
+  assert.match(latest(), /burst9/);
+  const versions = player.out.split('content:').length;
+
+  // A broken script is reported and the running version stays
+  await api('PUT', `/projects/${project.id}/scripts/probe.py`, { token: alice, body: { content: 'class Probe(:\n' } });
+  await waitForLog('error: Change not applied');
+  await new Promise(r => setTimeout(r, 300)); // reaches the editor's socket
+  assert.ok(received.some(e => e.level === 'error' && /probe\.py/.test(e.message) && /SyntaxError/.test(e.message)), JSON.stringify(received));
+  await new Promise(r => setTimeout(r, 500));
+  assert.equal(player.out.split('content:').length, versions);
+
+  // Runtime errors are reported once, not every frame
+  await api('PUT', `/projects/${project.id}/scripts/probe.py`, { token: alice, body: { content: good.replace('pass', 'boom()') } });
+  await waitForLog("NameError: name 'boom' is not defined");
+  await new Promise(r => setTimeout(r, 500));
+  const nameErrors = received.filter(e => /NameError/.test(e.message));
+  assert.equal(nameErrors.length, 1, JSON.stringify(nameErrors));
+
+  const rotated = await api('POST', `/projects/${project.id}/join-code`, { token: alice });
+  await new Promise(r => setTimeout(r, 500));
+  const stale = probe(address, 4, cache);
+  await stale.done;
+  assert.match(stale.out, /Wrong join code/);
+  const fresh = probe(address.replace(/\/.*/, '/' + rotated.json.joinCode), 3, cache);
+  await fresh.until('welcome:');
+  assert.match(fresh.out, /downloaded=0 /); // everything cached
+  await player.done;
+  assert.ok(!fs.existsSync(root)); // temporary copies are cleaned up
 });
 
 test('resetting a password revokes sessions; rotating a token revokes the old one', async () => {

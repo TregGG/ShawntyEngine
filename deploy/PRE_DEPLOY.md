@@ -38,7 +38,7 @@ or CI-built images; launching is confined to `serverManager.js` and `shawnty-gam
 
 - [ ] HTTPS and `/api/health` work; log in, edit, save and reopen a project in a browser.
 - [ ] Image upload works (Debian has ImageMagick 6, development used 7).
-- [ ] Join from the game client with `host:port`; two projects get different ports.
+- [ ] Join from the game client with `host:port/CODE`; two projects get different ports.
 - [ ] CPU and memory limits hold (`systemd-cgtop`); a memory hog is killed.
 - [ ] A game script cannot connect to localhost, the internet or `169.254.169.254`.
 - [ ] After a reboot, the firewall rules, backend and Caddy all come back.
@@ -46,5 +46,5 @@ or CI-built images; launching is confined to `serverManager.js` and `shawnty-gam
 
 ## Later
 
-- Player login in the client, so joining doesn't need an address. Until then anyone with it can join.
+- Player login in the client, so joining doesn't need an address and code.
 - Email verification and self-service password reset (now `admin.js` only).

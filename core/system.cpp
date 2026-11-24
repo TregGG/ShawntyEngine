@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include"system.h"
 #include<glad/glad.h>
 #include<GLFW/glfw3.h>
@@ -98,6 +99,7 @@ bool System::Initialize(int width, int height, const char* title, bool headless)
 //    glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
 
 
+    if (std::getenv("ENGINE_HIDDEN")) glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // for automated tests
     m_Window= glfwCreateWindow(width,height,title,nullptr,nullptr);
     if(!m_Window)
     {
@@ -120,7 +122,7 @@ bool System::Initialize(int width, int height, const char* title, bool headless)
         ENGINE_ERROR("Failed to initialize GLAD");
         return false;
     }
-    glfwSwapInterval(1);                            //VSYNC ON
+    glfwSwapInterval(std::getenv("ENGINE_HIDDEN") ? 0 : 1); // VSYNC, except that it stalls hidden windows
     ENGINE_LOG("OpenGL Vendor: %s", reinterpret_cast<const char*>(glGetString(GL_VENDOR)));
     ENGINE_LOG("OpenGL Renderer: %s", reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
     ENGINE_LOG("OpenGL Version: %s", reinterpret_cast<const char*>(glGetString(GL_VERSION)));

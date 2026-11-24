@@ -11,7 +11,13 @@ enum class PacketType : uint8_t {
     ActionConfirm,   // Server -> Client (Action validated)
     AdminCommand,    // Client -> Server (e.g., Kick, Stop)
     ServerCommand,   // Server -> Client (e.g., Switch Scene)
-    TickSync         // Server -> Client (Reliable tick synchronization)
+    TickSync,        // Server -> Client (Reliable tick synchronization)
+    // Content sync (see services/contentsync.h). Keep these five together.
+    JoinRequest,     // Client -> Server
+    ContentManifest, // Server -> Client
+    ContentRequest,  // Client -> Server
+    ContentChunk,    // Server -> Client
+    ContentReady     // Client -> Server
 };
 
 #pragma pack(push, 1)
@@ -30,8 +36,9 @@ struct ConnectPacket {
 
 // Client -> Server: Sent continuously
 struct ClientInputPacket {
-    PacketHeader header;
-    uint16_t inputMask; // bits for W, A, S, D, Space, etc.
+    static constexpr int kInputs = 4;
+    PacketHeader header;          // tick of inputMasks[0]
+    uint16_t inputMasks[kInputs]; // newest first; repeats cover lost packets. Bits for W, A, S, D, Space, etc.
     float mouseDeltaX;
     float mouseDeltaY;
 };

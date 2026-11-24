@@ -10,6 +10,15 @@
 #include "../core/projectpaths.h"
 #include "../services/networkservice.h"
 #include "testnetworkcontrol.h"
+#include "../core/devevents.h"
+#include "../scripting/scriptengine.h"
+
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <map>
+#include <set>
+#include <nlohmann/json.hpp>
 
 // Forward declaration for asset compilation function if we want to share it
 extern bool WriteTestCompiledAssets(const std::string& rootFolder);
@@ -32,10 +41,86 @@ DataDrivenScene* ServerTestGame::GetOrCreateScene(const std::string& rawPath) {
         if (m_NetControl) {
             m_NetControl->OnSceneChanged();
         }
+        if (m_NetService) m_Content.Announce(*m_NetService);
     };
+    scene->OnBeforeReload = [this, path]() { return PrepareReload(path); };
 
     m_Scenes[path] = scene;
     return scene;
+}
+
+// Written by the cloud backend. Never sent to clients.
+void ServerTestGame::ReadServerSettings()
+{
+    std::ifstream file(ProjectPaths::Root() + "/server.json");
+    if (!file) return;
+    try {
+        m_Content.SetJoinCode(nlohmann::json::parse(file).value("joinCode", ""));
+    } catch (const std::exception& e) {
+        ENGINE_ERROR("Invalid server.json: %s", e.what());
+    }
+}
+
+// Changes whenever any project file does, including scripts
+std::string ServerTestGame::Fingerprint() const
+{
+    namespace fs = std::filesystem;
+    std::map<std::string, std::string> hashes;
+    std::error_code ec;
+    for (fs::recursive_directory_iterator it(ProjectPaths::Root(), ec), end; !ec && it != end; it.increment(ec)) {
+        std::error_code entryError;
+        if (!it->is_regular_file(entryError) || it->path().extension() == ".pyc" || it->path().extension() == ".tmp"
+            || it->path().filename() == "server.json") continue;
+        std::ifstream file(it->path(), std::ios::binary);
+        const std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        hashes[it->path().string()] = ToHex(Sha256(bytes.data(), bytes.size()));
+    }
+    std::string all;
+    for (const auto& [path, hash] : hashes) all += path + '\0' + hash + '\n';
+    return ToHex(Sha256(all.data(), all.size()));
+}
+
+// Checks a saved change before it replaces the running version.
+bool ServerTestGame::PrepareReload(const std::string& scenePath)
+{
+    ReadServerSettings();
+    const std::string fingerprint = Fingerprint();
+    if (fingerprint == m_LoadedFingerprint) return false;
+
+    std::string problems;
+    try {
+        std::ifstream file(scenePath);
+        const auto scene = nlohmann::json::parse(file).at("scene");
+        std::set<std::pair<std::string, std::string>> scripts;
+        if (scene.contains("entities")) {
+            for (const auto& entity : scene["entities"]) {
+                if (!entity.contains("components") || !entity["components"].contains("script")) continue;
+                const auto& script = entity["components"]["script"];
+                const std::string path = script.value("path", ""), cls = script.value("class", "");
+                if (!path.empty() && !cls.empty()) scripts.insert({path, cls});
+            }
+        }
+        for (const auto& [path, cls] : scripts) {
+            std::string error;
+            if (!ScriptEngine::CheckScript(path, cls, error)) problems += "\n" + path + ": " + error;
+        }
+    } catch (const std::exception& e) {
+        problems += "\n" + ProjectPaths::MakeRelative(scenePath) + ": " + e.what();
+    }
+    std::string contentError;
+    if (problems.empty() && !m_Content.Load(ProjectPaths::Root(), contentError)) problems = "\n" + contentError;
+
+    if (!problems.empty()) {
+        ENGINE_ERROR("Change not applied:%s", problems.c_str());
+        DevEvents::Emit("error", "Change not applied, the previous version keeps running:" + problems);
+        return false;
+    }
+
+    m_LoadedFingerprint = fingerprint;
+    DevEvents::ResetSeen();
+    DevEvents::Emit("info", "Change applied");
+    if (m_NetControl) m_NetControl->RememberPlayerPositions();
+    return true;
 }
 
 bool ServerTestGame::OnInit()
@@ -54,6 +139,7 @@ bool ServerTestGame::OnInit()
         DataDrivenScene* targetScene = GetOrCreateScene(scenePath);
         if (targetScene) {
             if (m_NetControl) {
+                m_NetControl->ForgetPlayerPositions();
                 m_NetControl->OnSceneChanged();
             }
             m_SceneManager.SetActiveScene(targetScene);
@@ -62,6 +148,15 @@ bool ServerTestGame::OnInit()
             }
         }
     };
+
+    ReadServerSettings();
+    m_LoadedFingerprint = Fingerprint();
+    std::string contentError;
+    if (!m_Content.Load(ProjectPaths::Root(), contentError)) {
+        ENGINE_ERROR("Cannot share project content: %s", contentError.c_str());
+        DevEvents::Emit("error", "Players cannot download this project: " + contentError);
+    }
+    if (m_NetControl) m_NetControl->SetContentServer(&m_Content);
 
     // ---- Create Initial Scene from JSON ----
     DataDrivenScene* initialScene = GetOrCreateScene(ProjectPaths::IsDefault()
@@ -96,6 +191,10 @@ void ServerTestGame::OnUpdate(float deltaTime)
         if (auto* activeDD = dynamic_cast<DataDrivenScene*>(currentScene)) {
             // Server always enables live sync UDP listener on the active scene
             activeDD->SetUdpListenerEnabled(true);
+            if (!m_ReadyReported) {
+                m_ReadyReported = true;
+                DevEvents::Emit("info", "Game server ready");
+            }
         }
     }
 }

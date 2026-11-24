@@ -35,8 +35,8 @@ start)
         -p "RestrictAddressFamilies=AF_INET AF_INET6" -p LockPersonality=yes -p RestrictRealtime=yes \
         -p SystemCallArchitectures=native -p "SystemCallFilter=@system-service" -p "SystemCallFilter=~@privileged @resources" \
         -p SystemCallErrorNumber=EPERM \
-        -p WorkingDirectory=/tmp -E HOME=/tmp -E PYTHONDONTWRITEBYTECODE=1 \
-        /engine/framework --server --project-dir /project \
+        -p WorkingDirectory=/tmp -E HOME=/tmp -E PYTHONDONTWRITEBYTECODE=1 -E PYTHONUNBUFFERED=1 \
+        /engine/framework --server --dev-events --project-dir /project \
         --port "$((GAME_PORT_BASE + slot))" --reload-port "$((RELOAD_PORT_BASE + slot))"
     ;;
 stop)

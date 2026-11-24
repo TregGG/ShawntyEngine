@@ -1,6 +1,9 @@
 #include "core/engine.h"
 #include "core/serverengine.h"
 #include "core/projectpaths.h"
+#include "core/devevents.h"
+#include "core/probe.h"
+#include "services/networkcontrol.h"
 #include "levels/datadrivenscene.h"
 #include "test/testgame.h"
 #include "test/servertestgame.h"
@@ -22,6 +25,9 @@ int main(int argc, char** argv)
 {
     bool isServer = false;
     bool isTest = false;
+    std::string connectTo;
+    std::string probe;
+    int probeSeconds = 5;
     int port = 7777;
     int reloadPort = 9090;
     for (int i = 1; i < argc; ++i) {
@@ -31,10 +37,15 @@ int main(int argc, char** argv)
         if (strcmp(argv[i], "--test") == 0) {
             isTest = true;
         }
+        if (strcmp(argv[i], "--net-stats") == 0) NetworkControl::SetPrintStats(true);
+        if (strcmp(argv[i], "--dev-events") == 0) DevEvents::Enabled() = true;
+        const bool isConnect = strcmp(argv[i], "--connect") == 0;
+        const bool isProbe = strcmp(argv[i], "--probe") == 0;
+        const bool isSeconds = strcmp(argv[i], "--seconds") == 0;
         const bool isProjectDir = strcmp(argv[i], "--project-dir") == 0;
         const bool isPort = strcmp(argv[i], "--port") == 0;
         const bool isReloadPort = strcmp(argv[i], "--reload-port") == 0;
-        if (isProjectDir || isPort || isReloadPort) {
+        if (isProjectDir || isPort || isReloadPort || isConnect || isProbe || isSeconds) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "Missing value for %s\n", argv[i]);
                 return 2;
@@ -42,6 +53,12 @@ int main(int argc, char** argv)
             const char* value = argv[++i];
             if (isProjectDir) {
                 ProjectPaths::SetRoot(value);
+            } else if (isConnect) {
+                connectTo = value;
+            } else if (isProbe) {
+                probe = value;
+            } else if (isSeconds) {
+                probeSeconds = std::atoi(value);
             } else if (!ParsePort(value, isPort ? port : reloadPort)) {
                 fprintf(stderr, "Invalid port: %s\n", value);
                 return 2;
@@ -50,6 +67,7 @@ int main(int argc, char** argv)
     }
 
     DataDrivenScene::SetUdpPort(reloadPort);
+    if (!probe.empty()) return RunProbe(probe, probeSeconds);
 
     if (isServer) {
         ServerEngine engine;
@@ -69,6 +87,7 @@ int main(int argc, char** argv)
     } else {
         Engine engine;
         TestGame game;
+        game.SetAutoConnect(connectTo);
 
         if (!engine.Initialize(&game))
             return -1;

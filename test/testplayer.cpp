@@ -53,6 +53,10 @@ TestPlayer::TestPlayer(Scene* scene, const std::string& name, const SpriteSheetA
         }
     }
 
+    if (prefabName.find_first_of("/\\") != std::string::npos || prefabName.find("..") != std::string::npos) {
+        ENGINE_WARN("Ignoring invalid player prefab name: %s", prefabName.c_str());
+        prefabName = "player";
+    }
     std::string prefabPath = ProjectPaths::Resolve("test_compiled/prefabs/" + prefabName + ".prefab");
 
     // Try loading the prefab dynamically using the SceneSerializer onto our existing Player category entity

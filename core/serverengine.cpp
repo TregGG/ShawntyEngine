@@ -109,6 +109,7 @@ void ServerEngine::Run()
         m_NetworkControl->Update(m_Timer->GetDeltaTime());
 
         m_Game->OnUpdate(m_Timer->GetDeltaTime());
+        m_NetworkService->Flush();
 
         // Cap server tick rate to ~60 Hz to avoid CPU core pegging and network packet flooding
         std::this_thread::sleep_for(std::chrono::milliseconds(16));

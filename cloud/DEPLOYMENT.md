@@ -24,8 +24,13 @@ unit (`systemctl status 'shawnty-game-*'`, `systemd-cgtop`) under its own user, 
 the database or secrets. A firewall rule lets games answer players but not open connections.
 Games stop after five minutes without players and restart when the project is next opened.
 
-Players enter `host:port` in the game client. The editor console shows the address on opening a
-project. **There is no player login yet: anyone with the address can join.**
+Players enter `host:port/CODE` in the game client, or run `framework --connect host:port/CODE`.
+The editor toolbar shows the address. The code can be replaced with `POST /api/projects/ID/join-code`.
+Game traffic, including the code, is not encrypted. Player login will replace codes later.
+
+The server sends players the project's data files, never scripts. Saving in the editor updates
+connected players; a change with a script error is rejected and shown in the editor console.
+To check a server without a window: `framework --probe host:port/CODE --seconds 5`.
 
 Logs: `journalctl -u shawnty`. Back up `/var/lib/shawnty`. Health check: `/api/health`.
 

@@ -28,13 +28,16 @@ bool NetworkService::Host(int port) {
 
     ENetAddress address;
     address.host = ENET_HOST_ANY;
-    address.port = port;
+    address.port = static_cast<enet_uint16>(port);
 
     m_Host = enet_host_create(&address, 32, 2, 0, 0); // up to 32 clients, 2 channels, no bandwidth limits
     if (m_Host == nullptr) {
         ENGINE_ERROR("An error occurred while trying to create an ENet server host.");
         return false;
     }
+
+    m_Host->maximumPacketSize = 1024 * 1024; // ENet applies this to outgoing packets too
+    m_Host->maximumWaitingData = 256 * 1024;  // per client, incoming
 
     m_Mode = NetworkMode::Server;
     ENGINE_LOG("Started Hosting on port %d", port);
@@ -66,6 +69,8 @@ bool NetworkService::Connect(const std::string& ip, int port) {
         Disconnect();
         return false;
     }
+
+    m_Host->maximumPacketSize = 1024 * 1024;
 
     m_Mode = NetworkMode::Client;
     ENGINE_LOG("Connecting to %s:%d...", ip.c_str(), port);
@@ -123,26 +128,33 @@ void NetworkService::Update(float dt) {
 }
 
 void NetworkService::SendPacket(ENetPeer* peer, enet_uint8 channel, const void* data, size_t size, enet_uint32 flags) {
-    if (!peer) return;
+    if (!peer || peer->state != ENET_PEER_STATE_CONNECTED) return;
     ENetPacket* packet = enet_packet_create(data, size, flags);
-    enet_peer_send(peer, channel, packet);
+    if (enet_peer_send(peer, channel, packet) < 0) {
+        ENGINE_ERROR("Failed to send a packet of %zu bytes", size);
+        enet_packet_destroy(packet);
+    }
 }
 
-void NetworkService::BroadcastPacket(enet_uint8 channel, const void* data, size_t size, enet_uint32 flags) {
+void NetworkService::Multicast(const std::vector<ENetPeer*>& peers, enet_uint8 channel, const void* data, size_t size, enet_uint32 flags) {
     if (m_Mode != NetworkMode::Server || !m_Host) return;
-    ENetPacket* packet = enet_packet_create(data, size, flags);
-    enet_host_broadcast(m_Host, channel, packet);
+    ENetPacket* packet = enet_packet_create(data, size, flags); // shared by all receivers
+    for (ENetPeer* peer : peers) {
+        if (peer->state == ENET_PEER_STATE_CONNECTED) enet_peer_send(peer, channel, packet);
+    }
+    if (packet->referenceCount == 0) enet_packet_destroy(packet);
 }
 
 void NetworkService::PollEvents() {
     ENetEvent event;
     // timeout of 0 makes it non-blocking
-    while (enet_host_service(m_Host, &event, 0) > 0) {
+    while (m_Host && enet_host_service(m_Host, &event, 0) > 0) {
         switch (event.type) {
             case ENET_EVENT_TYPE_CONNECT:
                 ENGINE_LOG("A new client connected.");
                 if (m_Mode == NetworkMode::Server) {
                     m_ConnectedClients++;
+                    if (OnClientConnected) OnClientConnected(event.peer);
                     if (m_AdminPeer == nullptr) {
                         m_AdminPeer = event.peer;
                         m_AdminDisconnectTimer = -1.0f; // Cancel grace period
@@ -150,6 +162,7 @@ void NetworkService::PollEvents() {
                     }
                 } else if (m_Mode == NetworkMode::Client) {
                     m_IsConnected = true;
+                    if (OnConnected) OnConnected();
                 }
                 break;
             case ENET_EVENT_TYPE_RECEIVE: {
@@ -167,9 +180,11 @@ void NetworkService::PollEvents() {
             case ENET_EVENT_TYPE_DISCONNECT:
                 ENGINE_LOG("Client disconnected.");
                 if (m_Mode == NetworkMode::Client) {
-                    m_Mode = NetworkMode::Offline;
+                    const uint32_t reason = event.data;
                     m_ServerPeer = nullptr;
-                    m_IsConnected = false;
+                    Disconnect(); // destroys the host, so stop polling it
+                    if (OnDisconnected) OnDisconnected(reason);
+                    return;
                 } else if (m_Mode == NetworkMode::Server) {
                     m_ConnectedClients--;
                     if (OnClientDisconnected) {

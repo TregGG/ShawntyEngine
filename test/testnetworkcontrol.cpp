@@ -14,7 +14,13 @@ TestNetworkControl::TestNetworkControl(AssetManager* assets) : m_Assets(assets) 
 TestNetworkControl::~TestNetworkControl() {}
 
 EntityID TestNetworkControl::OnSpawnPlayer(ENetPeer* peer, bool isLocal) {
-    auto playerObj = std::make_unique<TestPlayer>(m_Scene, "Player", m_Assets->GetSpriteSheet("player_box"), m_Assets);
+    const SpriteSheetAsset* sheet = nullptr;
+    try {
+        sheet = m_Assets->GetSpriteSheet("player_box");
+    } catch (const std::out_of_range&) {
+        // The project has no such sprite; the player prefab may still provide one
+    }
+    auto playerObj = std::make_unique<TestPlayer>(m_Scene, "Player", sheet, m_Assets);
     EntityID lID = playerObj->GetID();
 
     if (!isLocal && peer == nullptr) { // It's a remote proxy on the client

@@ -317,6 +317,11 @@ const AnimationSetAsset* AssetManager::GetAnimationSet(const ObjectID& objectId)
 bool AssetManager::Reload(const std::string& compiledAssetRoot)
 {
     Shutdown();
-    return Initialize(compiledAssetRoot, m_Headless);
+    try {
+        return Initialize(compiledAssetRoot, m_Headless);
+    } catch (const std::exception& e) {
+        ENGINE_ERROR("Failed to load assets: %s", e.what());
+        return false;
+    }
 }
 

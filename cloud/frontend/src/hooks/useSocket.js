@@ -2,16 +2,16 @@ import { API_URL } from '../api';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 
-export function useSocket(onSceneUpdate, onJoined) {
+export function useSocket(onSceneUpdate, { onAddress, onGameLog, onError } = {}) {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
 
   const onSceneUpdateRef = useRef(onSceneUpdate);
-  const onJoinedRef = useRef(onJoined);
+  const handlersRef = useRef({});
   useEffect(() => {
     onSceneUpdateRef.current = onSceneUpdate;
-    onJoinedRef.current = onJoined;
-  }, [onSceneUpdate, onJoined]);
+    handlersRef.current = { onAddress, onGameLog, onError };
+  }, [onSceneUpdate, onAddress, onGameLog, onError]);
 
   useEffect(() => {
     const socket = io(API_URL || undefined);
@@ -23,7 +23,10 @@ export function useSocket(onSceneUpdate, onJoined) {
       if (onSceneUpdateRef.current) onSceneUpdateRef.current(data);
     });
 
-    socket.on('joined', (info) => onJoinedRef.current?.(info));
+    socket.on('joined', (info) => handlersRef.current.onAddress?.(info.address ?? null));
+    socket.on('game_status', (status) => handlersRef.current.onAddress?.(status.address));
+    socket.on('game_log', (event) => handlersRef.current.onGameLog?.(event));
+    socket.on('error', (err) => handlersRef.current.onError?.(err?.message));
 
     return () => socket.close();
   }, []);

@@ -2,6 +2,7 @@
 
 #include "service.h"
 #include <string>
+#include <vector>
 #include <functional>
 #include <enet/enet.h>
 #include "../core/network_data.h"
@@ -40,14 +41,21 @@ public:
     std::function<void()> OnShutdownRequested;
     
     using PeerCallback = std::function<void(ENetPeer* peer)>;
+    PeerCallback OnClientConnected;
     PeerCallback OnClientDisconnected;
+
+    // Client side
+    std::function<void()> OnConnected;
+    std::function<void(uint32_t reason)> OnDisconnected;
     
     using PacketCallback = std::function<void(ENetPeer* peer, void* data, size_t size)>;
     void SetPacketCallback(PacketCallback cb) { m_PacketCallback = cb; }
     
     // Low level packet sending
     void SendPacket(ENetPeer* peer, enet_uint8 channel, const void* data, size_t size, enet_uint32 flags);
-    void BroadcastPacket(enet_uint8 channel, const void* data, size_t size, enet_uint32 flags);
+    void Multicast(const std::vector<ENetPeer*>& peers, enet_uint8 channel, const void* data, size_t size, enet_uint32 flags);
+    // Sends everything queued now instead of on the next Update
+    void Flush() { if (m_Host) enet_host_flush(m_Host); }
 
 private:
     void PollEvents();

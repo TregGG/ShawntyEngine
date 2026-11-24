@@ -6,6 +6,7 @@ const crypto = require('crypto');
 
 const { rateLimit } = require('express-rate-limit');
 const { buildProjectBundle } = require('../services/bundler');
+const serverManager = require('../services/serverManager');
 const { unwrapScene } = require('../lib/validate');
 
 router.use('/by-token', rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false }));
@@ -79,11 +80,25 @@ router.post('/', (req, res) => {
             relationships: []
         };
         
-        const stmt = db.prepare('INSERT INTO projects (id, name, owner_id, server_token, scene_data) VALUES (?, ?, ?, ?, ?)');
-        stmt.run(projectId, name, req.user.id, serverToken, JSON.stringify(defaultScene));
+        const stmt = db.prepare('INSERT INTO projects (id, name, owner_id, server_token, scene_data, join_code) VALUES (?, ?, ?, ?, ?, ?)');
+        stmt.run(projectId, name, req.user.id, serverToken, JSON.stringify(defaultScene), db.newJoinCode());
         
         res.json({ id: projectId, name, serverToken });
     } catch (err) {
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+// Replace the join code; the old one stops working for new players
+router.post('/:id/join-code', (req, res) => {
+    try {
+        const code = db.newJoinCode();
+        const info = db.prepare('UPDATE projects SET join_code = ? WHERE id = ? AND owner_id = ?').run(code, req.params.id, req.user.id);
+        if (info.changes === 0) return res.status(404).json({ error: "Project not found" });
+        serverManager.reloadServer(req.params.id);
+        res.json({ joinCode: code });
+    } catch (err) {
+        console.error(err);
         res.status(500).json({ error: "Server error" });
     }
 });

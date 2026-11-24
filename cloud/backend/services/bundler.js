@@ -71,8 +71,13 @@ function syncProjectToDisk(projectId, targetDir) {
       if (!files.has(`${dir}/${name}`)) fs.rmSync(path.join(full, name), { recursive: true, force: true });
     }
   }
+  // Read by the game server only; not part of the bundle or of what players download
+  const { join_code: joinCode } = db.prepare('SELECT join_code FROM projects WHERE id = ?').get(projectId);
+  files.set('server.json', Buffer.from(JSON.stringify({ joinCode }), 'utf8'));
   for (const [name, data] of files) {
     const target = path.join(targetDir, name);
+    // Untouched files stay as they are: the running server may be reading them
+    if (fs.existsSync(target) && fs.readFileSync(target).equals(data)) continue;
     const temp = `${target}.tmp`;
     fs.writeFileSync(temp, data);
     fs.renameSync(temp, target);

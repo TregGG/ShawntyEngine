@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 export default function Toolbar({ 
-  projectName, onSave, onAddEntity, saveStatus, connected, uiMode, setUiMode,
+  projectName, onSave, onAddEntity, saveStatus, connected, joinAddress, uiMode, setUiMode,
   onOpenProjectSettings, scenes = ['main'], currentScene = 'main', onSceneChange, onCreateScene, onDeleteScene
 }) {
   const [showNewScene, setShowNewScene] = useState(false)
@@ -81,6 +81,12 @@ export default function Toolbar({
           {saveStatus === 'saving' ? '⏳ Saving...' : saveStatus === 'saved' ? '✅ Saved!' : saveStatus === 'error' ? '❌ Error' : '💾 Save'}
         </button>
         <span className="toolbar-shortcut">Ctrl+S</span>
+        {joinAddress && (
+          <button className="btn-secondary btn-sm" title="Copy: enter this in the game client to join"
+            onClick={() => navigator.clipboard?.writeText(joinAddress)}>
+            🎮 {joinAddress}
+          </button>
+        )}
         <div className={`status-dot ${connected ? 'connected' : ''}`} title={connected ? 'Live sync connected' : 'Disconnected'} />
       </div>
     </div>

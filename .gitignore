@@ -28,3 +28,6 @@ pnpm-debug.log*
 cloud/backend/node_modules/
 cloud/frontend/node_modules/
 cloud/frontend/dist/
+cloud/backend/database.sqlite*
+cloud/backend/runtime/
+cloud/backend/uploads/

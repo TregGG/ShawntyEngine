@@ -1,3 +1,4 @@
+import { API_URL } from '../api';
 import { useState, useEffect, useCallback } from 'react';
 
 export default function AnimatorEditor({ data, onChange, onRemove, projectId, token, ComponentSection, NumberInput, SelectInput, TextInput, CheckboxInput, objects = [] }) {
@@ -6,7 +7,7 @@ export default function AnimatorEditor({ data, onChange, onRemove, projectId, to
   const [expandedClip, setExpandedClip] = useState(null);
 
   const apiHeaders = { 'Authorization': `Bearer ${token}` };
-  const baseUrl = `http://localhost:3001/api/projects/${projectId}`;
+  const baseUrl = `${API_URL}/api/projects/${projectId}`;
 
   useEffect(() => {
     if (data.objectId) {

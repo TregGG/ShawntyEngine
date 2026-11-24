@@ -11,12 +11,12 @@ You need a C++17 compatible compiler and standard OpenGL/GLFW libraries installe
 
 **On Ubuntu/Debian:**
 ```bash
-sudo apt-get install build-essential libglfw3-dev libgl1-mesa-dev pkg-config libfreetype6-dev python3-dev
+sudo apt-get install build-essential libglfw3-dev libgl1-mesa-dev pkg-config libfreetype6-dev python3-dev pybind11-dev
 ```
 
 **On Arch Linux (using pacman):**
 ```bash
-sudo pacman -S base-devel glfw-x11 freetype2
+sudo pacman -S base-devel glfw-x11 freetype2 pybind11
 ```
 
 #### For the Web Editor:
@@ -28,6 +28,9 @@ You will need Node.js/npm and Python `pip` installed to run the visual editor.
 You can compile the engine using `make`.
 
 ```bash
+# Fetch bundled libraries (first time only)
+git submodule update --init
+
 # Compile in parallel (fastest)
 make
 
@@ -147,6 +150,7 @@ Want to learn more? Check out the detailed guides in the `documentation/` folder
 - **[Web Editor Guide](documentation/editor.md)**: How to set up and use the visual level editor.
 
 - **[Python Scripting](documentation/scripting_guide.md)**: How to write gameplay logic in Python.
+- **[Cloud Deployment](cloud/DEPLOYMENT.md)**: How to run the cloud editor in production.
 - **[Multiplayer Architecture](documentation/multiplayer/architecture_physics_scenes.md)**: How client-server state sync works.
 - **[Entity-Component System](documentation/components.md)**: How the underlying C++ components work.
 - **[Physics & Collisions](documentation/physics.md)**: How bounding boxes, rigid bodies, and collisions work.

@@ -1,10 +1,15 @@
 const { DatabaseSync } = require('node:sqlite');
+const fs = require('fs');
 const path = require('path');
+const { dbPath } = require('./config');
 
-const dbPath = path.join(__dirname, 'database.sqlite');
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new DatabaseSync(dbPath);
 
 db.exec(`
+  PRAGMA journal_mode = WAL;
+  PRAGMA busy_timeout = 5000;
+
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT UNIQUE NOT NULL,
@@ -32,6 +37,15 @@ db.exec(`
     FOREIGN KEY(project_id) REFERENCES projects(id),
     UNIQUE(project_id, type, name)
   );
+
+  CREATE INDEX IF NOT EXISTS idx_projects_server_token ON projects(server_token);
 `);
+
+if (!db.prepare('PRAGMA table_info(users)').all().some(c => c.name === 'token_version')) {
+  db.exec('ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0');
+}
+
+// SQLITE_CONSTRAINT_UNIQUE
+db.isUniqueViolation = (err) => err && err.errcode === 2067;
 
 module.exports = db;

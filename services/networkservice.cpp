@@ -53,7 +53,11 @@ bool NetworkService::Connect(const std::string& ip, int port) {
     }
 
     ENetAddress address;
-    enet_address_set_host(&address, ip.c_str());
+    if (enet_address_set_host(&address, ip.c_str()) != 0) {
+        ENGINE_ERROR("Could not resolve server address: %s", ip.c_str());
+        Disconnect();
+        return false;
+    }
     address.port = port;
 
     m_ServerPeer = enet_host_connect(m_Host, &address, 2, 0);
@@ -172,9 +176,11 @@ void NetworkService::PollEvents() {
                         OnClientDisconnected(event.peer);
                     }
                     if (event.peer == m_AdminPeer) {
-                        ENGINE_LOG("Admin client disconnected! Starting 10s grace period...");
                         m_AdminPeer = nullptr;
-                        m_AdminDisconnectTimer = 10.0f;
+                        if (!m_Persistent) {
+                            ENGINE_LOG("Admin client disconnected! Starting 10s grace period...");
+                            m_AdminDisconnectTimer = 10.0f;
+                        }
                     }
                 }
                 break;

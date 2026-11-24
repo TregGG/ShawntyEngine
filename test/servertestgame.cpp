@@ -7,6 +7,7 @@
 #include "../core/enginedebug.h"
 #include "../objects/components/rigidbodycomponent.h"
 #include "../levels/datadrivenscene.h"
+#include "../core/projectpaths.h"
 #include "../services/networkservice.h"
 #include "testnetworkcontrol.h"
 
@@ -17,7 +18,8 @@ NetworkControl* ServerTestGame::CreateNetworkControl() {
     return new TestNetworkControl(&m_AssetManager);
 }
 
-DataDrivenScene* ServerTestGame::GetOrCreateScene(const std::string& path) {
+DataDrivenScene* ServerTestGame::GetOrCreateScene(const std::string& rawPath) {
+    const std::string path = ProjectPaths::Resolve(rawPath);
     auto it = m_Scenes.find(path);
     if (it != m_Scenes.end()) {
         return it->second;
@@ -38,7 +40,7 @@ DataDrivenScene* ServerTestGame::GetOrCreateScene(const std::string& path) {
 
 bool ServerTestGame::OnInit()
 {
-    const std::string compiledRoot = "test_compiled";
+    const std::string compiledRoot = ProjectPaths::Root();
 
     if (!m_AssetManager.Initialize(compiledRoot, true))
     {
@@ -62,7 +64,8 @@ bool ServerTestGame::OnInit()
     };
 
     // ---- Create Initial Scene from JSON ----
-    DataDrivenScene* initialScene = GetOrCreateScene("test_compiled/scenes/testscene1.scene");
+    DataDrivenScene* initialScene = GetOrCreateScene(ProjectPaths::IsDefault()
+        ? "test_compiled/scenes/testscene1.scene" : "scenes/main.scene");
     m_SceneManager.SetInitialScene(initialScene);
 
     // ---- Wire networking ----

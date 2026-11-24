@@ -74,11 +74,11 @@
                 "type": "Input",
                 "active": true,
                 "position": [
-                    540,
+                    440,
                     350
                 ],
                 "size": [
-                    200,
+                    400,
                     40
                 ],
                 "backgroundColor": [
@@ -87,7 +87,7 @@
                     0.1,
                     1
                 ],
-                "text": "127.0.0.1",
+                "text": "127.0.0.1:7777",
                 "textColor": [
                     1,
                     1,

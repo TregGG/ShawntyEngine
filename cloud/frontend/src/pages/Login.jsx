@@ -1,3 +1,4 @@
+import { API_URL } from '../api';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,7 +16,7 @@ const Login = () => {
     setError(null);
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const res = await fetch(`http://localhost:3001${endpoint}`, {
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -29,19 +30,19 @@ const Login = () => {
       
       if (!isLogin) {
         // Auto-login after register
-        const loginRes = await fetch('http://localhost:3001/api/auth/login', {
+        const loginRes = await fetch(`${API_URL}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
         const loginData = await loginRes.json();
         if (loginRes.ok) {
-           document.cookie = `token=${loginData.token}; path=/; max-age=${7 * 24 * 60 * 60}`;
+           document.cookie = `token=${loginData.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Strict${window.location.protocol === 'https:' ? '; Secure' : ''}`;
            localStorage.setItem('user', JSON.stringify(loginData.user));
            navigate('/dashboard');
         }
       } else {
-        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}`;
+        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Strict${window.location.protocol === 'https:' ? '; Secure' : ''}`;
         localStorage.setItem('user', JSON.stringify(data.user));
         navigate('/dashboard');
       }

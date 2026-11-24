@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <filesystem>
 
+#include "../core/projectpaths.h"
 #define ENGINE_CLASS "ScriptEngine"
 #include "../core/enginedebug.h"
 
@@ -58,6 +59,7 @@ void ScriptEngine::Init()
     if (!s_PythonInitialized) {
         try {
             py::initialize_interpreter();
+            py::module_::import("shawnty"); // registers the types passed to scripts that never import it
             s_PythonInitialized = true;
             ENGINE_LOG("Python interpreter initialized (Python %s)", Py_GetVersion());
         } catch (const std::exception& e) {
@@ -127,7 +129,7 @@ void ScriptEngine::AttachScript(EntityID entity, const ScriptComponent& scriptCo
         }
 
         // Resolve to absolute path for importlib
-        std::string absPath = scriptComp.scriptPath;
+        std::string absPath = ProjectPaths::Resolve(scriptComp.scriptPath);
         if (!std::filesystem::path(absPath).is_absolute()) {
             absPath = std::filesystem::absolute(absPath).string();
         }
@@ -187,11 +189,8 @@ void ScriptEngine::AttachScript(EntityID entity, const ScriptComponent& scriptCo
         ENGINE_LOG("Script attached: %s.%s -> entity %u",
                    scriptComp.scriptPath.c_str(), scriptComp.className.c_str(), entity);
 
-    } catch (py::error_already_set& e) {
-        ENGINE_ERROR("Python error loading script '%s': %s",
-                     scriptComp.scriptPath.c_str(), e.what());
     } catch (const std::exception& e) {
-        ENGINE_ERROR("Error loading script '%s': %s",
+        ENGINE_ERROR("Python error loading script '%s': %s",
                      scriptComp.scriptPath.c_str(), e.what());
     }
 }
@@ -209,7 +208,7 @@ void ScriptEngine::DetachScript(EntityID entity)
                 EntityHandle handle{m_Registry, entity};
                 it->second.pyInstance.attr("OnDestroy")(handle);
             }
-        } catch (py::error_already_set& e) {
+        } catch (const std::exception& e) {
             ENGINE_ERROR("Python error in OnDestroy for entity %u: %s", entity, e.what());
         }
         m_Impl->scripts.erase(it);
@@ -225,7 +224,7 @@ void ScriptEngine::DetachAll()
                 EntityHandle handle{m_Registry, entityId};
                 si.pyInstance.attr("OnDestroy")(handle);
             }
-        } catch (py::error_already_set& e) {
+        } catch (const std::exception& e) {
             ENGINE_ERROR("Python error in OnDestroy for entity %u: %s", entityId, e.what());
         }
     }
@@ -250,7 +249,7 @@ void ScriptEngine::StartPendingScripts()
                 EntityHandle handle{m_Registry, entityId};
                 InputProxy inputProxy{m_Input};
                 si.pyInstance.attr("OnStart")(handle, inputProxy);
-            } catch (py::error_already_set& e) {
+            } catch (const std::exception& e) {
                 ENGINE_ERROR("[%s.%s] OnStart error: %s",
                              si.scriptPath.c_str(), si.className.c_str(), e.what());
             }
@@ -275,7 +274,7 @@ void ScriptEngine::UpdateAll(float deltaTime)
             try {
                 EntityHandle handle{m_Registry, entityId};
                 si.pyInstance.attr("OnUpdate")(handle, deltaTime, inputProxy);
-            } catch (py::error_already_set& e) {
+            } catch (const std::exception& e) {
                 ENGINE_ERROR("[%s.%s] OnUpdate error: %s",
                              si.scriptPath.c_str(), si.className.c_str(), e.what());
             }
@@ -300,7 +299,7 @@ void ScriptEngine::CallOnTriggerEnter(EntityID self, EntityID other)
             EntityHandle otherHandle{m_Registry, other};
             InputProxy inputProxy{m_Input};
             it->second.pyInstance.attr("OnTriggerEnter")(selfHandle, otherHandle, inputProxy);
-        } catch (py::error_already_set& e) {
+        } catch (const std::exception& e) {
             ENGINE_ERROR("[%s.%s] OnTriggerEnter error: %s",
                          it->second.scriptPath.c_str(), it->second.className.c_str(), e.what());
         }
@@ -321,7 +320,7 @@ void ScriptEngine::CallOnTriggerExit(EntityID self, EntityID other)
             EntityHandle otherHandle{m_Registry, other};
             InputProxy inputProxy{m_Input};
             it->second.pyInstance.attr("OnTriggerExit")(selfHandle, otherHandle, inputProxy);
-        } catch (py::error_already_set& e) {
+        } catch (const std::exception& e) {
             ENGINE_ERROR("[%s.%s] OnTriggerExit error: %s",
                          it->second.scriptPath.c_str(), it->second.className.c_str(), e.what());
         }

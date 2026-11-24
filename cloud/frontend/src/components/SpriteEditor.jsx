@@ -1,3 +1,5 @@
+import { API_URL } from '../api';
+import { useTexture } from '../hooks/useTexture';
 import { useState, useEffect } from 'react';
 
 const parseSpritesheet = (content) => {
@@ -36,7 +38,13 @@ export default function SpriteEditor({ data, onChange, onRemove, projectId, toke
   const [showSliceForm, setShowSliceForm] = useState(false);
 
   const apiHeaders = { 'Authorization': `Bearer ${token}` };
-  const baseUrl = `http://localhost:3001/api/projects/${projectId}`;
+  const baseUrl = `${API_URL}/api/projects/${projectId}`;
+
+  const textureSrc = useTexture(
+    spritesheet?.texture ? `${baseUrl}/textures/${encodeURIComponent(spritesheet.texture)}/image` : null,
+    token,
+    spritesheet?.frames.length
+  );
 
   useEffect(() => {
     if (!data.objectId || data.objectId === '(none)') {
@@ -253,11 +261,10 @@ export default function SpriteEditor({ data, onChange, onRemove, projectId, toke
                       const objRes = await fetch(`${baseUrl}/objects/${data.objectId}`, { headers: apiHeaders });
                       if (objRes.ok) {
                         const objData = await objRes.json();
-                        await fetch(`${baseUrl}/spritesheets`, {
-                          method: 'POST',
+                        await fetch(`${baseUrl}/spritesheets/${objData.spritesheet}`, {
+                          method: 'PUT',
                           headers: { 'Content-Type': 'application/json', ...apiHeaders },
                           body: JSON.stringify({
-                            name: objData.spritesheet,
                             texture: spritesheet.texture || objData.spritesheet,
                             width: sliceW,
                             height: sliceH,
@@ -321,7 +328,7 @@ export default function SpriteEditor({ data, onChange, onRemove, projectId, toke
                         position: 'absolute',
                         top: '50%',
                         left: '50%',
-                        backgroundImage: `url(${baseUrl}/textures/${spritesheet.texture}/image?token=${token}&v=${spritesheet.frames.length})`,
+                        backgroundImage: textureSrc ? `url(${textureSrc})` : 'none',
                         backgroundPosition: `-${f.x}px -${f.y}px`,
                         backgroundRepeat: 'no-repeat',
                         transformOrigin: 'center center',

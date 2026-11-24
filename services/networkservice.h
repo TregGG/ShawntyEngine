@@ -35,6 +35,8 @@ public:
     bool IsPlayersTransparent() const { return m_PlayersTransparent; }
     void SetPlayersTransparent(bool transparent) { m_PlayersTransparent = transparent; }
     
+    void SetPersistent(bool persistent) { m_Persistent = persistent; }
+
     std::function<void()> OnShutdownRequested;
     
     using PeerCallback = std::function<void(ENetPeer* peer)>;
@@ -59,6 +61,7 @@ private:
     float m_EmptyServerTimer = 0.0f;
     float m_AdminDisconnectTimer = -1.0f;
     
+    bool m_Persistent = false;
     float m_PacketLogTimer = 0.0f;
     int m_PacketsReceivedInLastSecond = 0;
     

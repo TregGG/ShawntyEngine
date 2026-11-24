@@ -1,0 +1,52 @@
+#!/bin/bash
+# Runs as root via sudo from the backend. Installed to /usr/local/sbin/shawnty-game.
+# Every game server is a separate systemd unit with its own limits, inside shawnty-games.slice.
+set -euo pipefail
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+# Root-owned: DATA_DIR ENGINE_BIN GAME_PORT_BASE RELOAD_PORT_BASE MAX_GAME_SERVERS GAME_CPU GAME_MEMORY
+. /etc/shawnty/games.conf
+
+die() { echo "shawnty-game: $*" >&2; exit 2; }
+
+case "${1:-}" in
+start)
+    [[ $# -eq 3 ]] || die "usage: start SLOT PROJECT"
+    slot=$2 project=$3
+    [[ $slot =~ ^[0-9]{1,3}$ ]] && (( 10#$slot < MAX_GAME_SERVERS )) || die "bad slot"
+    slot=$((10#$slot))
+    [[ $project =~ ^proj_[A-Za-z0-9_]{1,64}$ ]] || die "bad project"
+    dir=$DATA_DIR/runtime/$project
+    [[ -d $dir && ! -L $dir ]] || die "no such project directory"
+    # Refuse to run untrusted scripts if the egress rules are not loaded
+    nft list chain inet shawnty output >/dev/null 2>&1 || die "firewall rules missing"
+
+    exec systemd-run --quiet --collect --pipe --wait \
+        --unit="shawnty-game-$slot" --slice=shawnty-games.slice --uid=shawnty-game --gid=shawnty-game \
+        -p CPUQuota="$GAME_CPU" -p MemoryMax="$GAME_MEMORY" -p MemorySwapMax=0 -p OOMPolicy=kill \
+        -p TasksMax=32 -p LimitNOFILE=256 -p LimitFSIZE=16M -p LimitCORE=0 -p RuntimeMaxSec=12h \
+        -p RootDirectory=/var/empty/shawnty -p MountAPIVFS=yes \
+        -p "BindReadOnlyPaths=/usr /lib -/lib64 /bin -/etc/ld.so.cache $ENGINE_BIN:/engine/framework $dir:/project" \
+        -p "TemporaryFileSystem=/tmp:size=16M,mode=1777" \
+        -p PrivateDevices=yes -p PrivateIPC=yes -p ProtectProc=invisible -p ProcSubset=pid \
+        -p ProtectKernelTunables=yes -p ProtectKernelModules=yes -p ProtectKernelLogs=yes \
+        -p ProtectControlGroups=yes -p ProtectClock=yes -p ProtectHostname=yes \
+        -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p RestrictNamespaces=yes -p RestrictSUIDSGID=yes \
+        -p "RestrictAddressFamilies=AF_INET AF_INET6" -p LockPersonality=yes -p RestrictRealtime=yes \
+        -p SystemCallArchitectures=native -p "SystemCallFilter=@system-service" -p "SystemCallFilter=~@privileged @resources" \
+        -p SystemCallErrorNumber=EPERM \
+        -p WorkingDirectory=/tmp -E HOME=/tmp -E PYTHONDONTWRITEBYTECODE=1 \
+        /engine/framework --server --project-dir /project \
+        --port "$((GAME_PORT_BASE + slot))" --reload-port "$((RELOAD_PORT_BASE + slot))"
+    ;;
+stop)
+    [[ $# -eq 2 && $2 =~ ^[0-9]{1,3}$ ]] || die "usage: stop SLOT"
+    exec systemctl kill --signal=SIGKILL "shawnty-game-$((10#$2)).service"
+    ;;
+stop-all)
+    exec systemctl stop shawnty-games.slice
+    ;;
+*)
+    die "usage: start SLOT PROJECT | stop SLOT | stop-all"
+    ;;
+esac

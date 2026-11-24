@@ -1,3 +1,4 @@
+import { API_URL } from '../api';
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -28,7 +29,7 @@ const Dashboard = () => {
 
   const fetchProjects = async (token) => {
     try {
-      const res = await fetch('http://localhost:3001/api/projects', {
+      const res = await fetch(`${API_URL}/api/projects`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -52,7 +53,7 @@ const Dashboard = () => {
     
     const token = getCookie('token') || localStorage.getItem('token');
     try {
-      const res = await fetch('http://localhost:3001/api/projects', {
+      const res = await fetch(`${API_URL}/api/projects`, {
         method: 'POST',
         headers: { 
             'Authorization': `Bearer ${token}`,

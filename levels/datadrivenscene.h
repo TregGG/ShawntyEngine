@@ -41,6 +41,7 @@ public:
     const std::string& GetSceneFilePath() const { return m_SceneFilePath; }
 
     // UDP Listener controls
+    static void SetUdpPort(int port) { s_UdpPort = port; }
     void SetUdpListenerEnabled(bool enabled);
     std::function<void()> OnSceneReloadedCallback;
 
@@ -60,6 +61,7 @@ private:
     EventService* m_EventService = nullptr;
 
     // UDP Live Sync Socket
+    inline static int s_UdpPort = 9090;
     int m_UdpSocket = -1;
     bool m_UdpListenerEnabled = false;
 };

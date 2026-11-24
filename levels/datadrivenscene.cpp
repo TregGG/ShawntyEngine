@@ -2,6 +2,7 @@
 #include "../serialization/sceneserializer.h"
 #include "../assets/assetmanager.h"
 #include "../core/input.h"
+#include "../core/projectpaths.h"
 #include "../objects/components/collidercomponent.h"
 #include "../objects/components/scriptcomponent.h"
 #include <algorithm>
@@ -141,7 +142,7 @@ void DataDrivenScene::Reload()
 {
     ENGINE_LOG("Reloading scene from: %s", m_SceneFilePath.c_str());
     if (m_Assets) {
-        m_Assets->Reload("test_compiled");
+        m_Assets->Reload(ProjectPaths::Root());
     }
     OnExit();
     OnEnter();
@@ -208,22 +209,18 @@ void DataDrivenScene::InitUdpListener()
         int flags = fcntl(m_UdpSocket, F_GETFL, 0);
         fcntl(m_UdpSocket, F_SETFL, flags | O_NONBLOCK);
 
-        // Allow address reuse
-        int opt = 1;
-        setsockopt(m_UdpSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
         struct sockaddr_in addr;
         std::memset(&addr, 0, sizeof(addr));
         addr.sin_family = AF_INET;
-        addr.sin_port = htons(9090);
+        addr.sin_port = htons(static_cast<uint16_t>(s_UdpPort));
         addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1 (localhost only)
 
         if (bind(m_UdpSocket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-            ENGINE_WARN("UDP live sync listener failed to bind to 127.0.0.1:9090 (Port likely in use).");
+            ENGINE_WARN("UDP live sync listener failed to bind to 127.0.0.1:%d (Port likely in use).", s_UdpPort);
             close(m_UdpSocket);
             m_UdpSocket = -1;
         } else {
-            ENGINE_LOG("UDP live sync listener bound to 127.0.0.1:9090");
+            ENGINE_LOG("UDP live sync listener bound to 127.0.0.1:%d", s_UdpPort);
         }
     } else {
         ENGINE_ERROR("Failed to create UDP socket for live sync");

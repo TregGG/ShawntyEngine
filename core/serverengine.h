@@ -16,7 +16,8 @@ public:
     ServerEngine();
     ~ServerEngine();
 
-    bool Initialize(ServerGame* game);
+    // persistent: keep running when the first (admin) client leaves
+    bool Initialize(ServerGame* game, int port = 7777, bool persistent = false);
     void Run();
     void Shutdown();
 

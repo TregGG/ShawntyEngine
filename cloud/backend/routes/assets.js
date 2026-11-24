@@ -5,19 +5,49 @@ const { authenticateToken } = require('../middleware/auth');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
-const dgram = require('dgram');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const crypto = require('crypto');
+const os = require('os');
+const { uploadsDir } = require('../config');
+const { ASSET_TYPES, isSafeName, isSafeLine } = require('../lib/validate');
+const serverManager = require('../services/serverManager');
 
-const sendReloadPacket = () => {
+const run = promisify(execFile);
+const MAX_FRAMES = 4096;
+const IMAGE_FORMATS = { '.png': 'png', '.tga': 'tga', '.jpg': 'jpeg', '.jpeg': 'jpeg', '.gif': 'gif', '.webp': 'webp', '.bmp': 'bmp' };
+const LIMITS = ['-limit', 'memory', '256MiB', '-limit', 'map', '256MiB', '-limit', 'disk', '0',
+    '-limit', 'width', '8192', '-limit', 'height', '8192', '-limit', 'time', '20'];
+
+// Never through a shell. ImageMagick 7 is `magick`; version 6 is `convert`/`identify`.
+async function imageMagick(tool, args) {
+    const options = { timeout: 30000 };
     try {
-        const client = dgram.createSocket('udp4');
-        client.send('reload', 9090, '127.0.0.1', (err) => {
-            client.close();
-        });
+        return await run('magick', tool === 'convert' ? args : [tool, ...args], options);
     } catch (err) {
-        console.error('Failed to send reload packet:', err);
+        if (err.code !== 'ENOENT') throw err;
+        return run(tool, args, options);
     }
-};
+}
+
+// Explicit formats, so file contents cannot select another ImageMagick coder.
+// [0] takes only the first frame of animated inputs.
+const inputImage = (file) => `${IMAGE_FORMATS[path.extname(file).toLowerCase()]}:${file}[0]`;
+const outputImage = (file) => `${IMAGE_FORMATS[path.extname(file).toLowerCase()]}:${file}`;
+
+// Temporary files keep readers from seeing half-written images.
+async function writeImage(inputs, dest, extra = []) {
+    const ext = path.extname(dest);
+    const temp = path.join(os.tmpdir(), `shawnty_${crypto.randomUUID()}${ext}`);
+    try {
+        await imageMagick('convert', [...LIMITS, ...inputs.map(inputImage), ...extra, outputImage(temp)]);
+        await fs.promises.copyFile(temp, dest);
+    } finally {
+        await fs.promises.rm(temp, { force: true });
+    }
+}
+
+const texturesDirFor = (projectId) => path.join(uploadsDir, projectId, 'textures');
 
 router.use(authenticateToken);
 
@@ -34,76 +64,75 @@ const checkProjectOwnership = (req, res, next) => {
     }
 };
 
-// Multer setup for textures
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const projectId = req.params.projectId;
-        const dir = path.join(__dirname, '..', 'uploads', projectId, 'textures');
-        fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-        cb(null, 'temp_' + file.originalname);
+const upload = multer({
+    storage: multer.diskStorage({
+        destination: os.tmpdir(),
+        filename: (req, file, cb) => cb(null, `shawnty_${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+    }),
+    limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    fileFilter: (req, file, cb) => {
+        const ok = path.extname(file.originalname).toLowerCase() in IMAGE_FORMATS;
+        cb(ok ? null : Object.assign(new Error('Unsupported image type'), { status: 400 }), ok);
     }
 });
-const upload = multer({ storage });
+
+router.param('type', (req, res, next, type) => {
+    if (!ASSET_TYPES.includes(type)) return res.status(404).json({ error: "Unknown asset type" });
+    next();
+});
+router.param('name', (req, res, next, name) => {
+    if (!isSafeName(name)) return res.status(400).json({ error: "Invalid name" });
+    next();
+});
+
+function isValidClips(clips) {
+    return Array.isArray(clips) && clips.length <= 256 && clips.every(c =>
+        c && isSafeLine(c.name) && Array.isArray(c.frames) && c.frames.length <= MAX_FRAMES &&
+        c.frames.every(f => f && [f.frame, f.duration].every(v => v === undefined || Number.isFinite(v))));
+}
+
+// Returns the sheet text, or null if the grid is invalid.
+function gridSheet(body, name) {
+    const { texture = name, width = 32, height = 32, cols = 1, rows = 1 } = body;
+    const ints = [width, height, cols, rows];
+    if (!isSafeName(texture) || !ints.every(v => Number.isInteger(v) && v > 0 && v <= 8192) || cols * rows > MAX_FRAMES) return null;
+    const lines = [`texture:${texture}`];
+    for (let i = 0; i < cols * rows; i++) {
+        lines.push(`${i}: x=${(i % cols) * width} y=${Math.floor(i / cols) * height} w=${width} h=${height}`);
+    }
+    return lines.join('\n') + '\n';
+}
 
 // TEXTURES
-router.post('/:projectId/assets/upload', checkProjectOwnership, upload.single('file'), (req, res) => {
+router.post('/:projectId/assets/upload', checkProjectOwnership, upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-    const projectId = req.params.projectId;
-    const name = path.parse(req.file.originalname).name;
     const tempPath = req.file.path;
-    const dir = path.dirname(tempPath);
-    
-    const tgaPath = path.join(dir, `${name}.tga`);
-    const pngPath = path.join(dir, `${name}.png`);
+    try {
+        // Spaces and symbols in uploaded names become underscores
+        const name = path.parse(req.file.originalname).name
+            .replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^-+/, '').slice(0, 90);
+        if (!isSafeName(name)) return res.status(400).json({ error: "Invalid file name" });
 
-    // Helper to convert using imagemagick
-    const convertImg = (src, dest) => {
-        return new Promise((resolve, reject) => {
-            exec(`convert "${src}" "${dest}"`, (err) => {
-                if (err) {
-                    exec(`magick "${src}" "${dest}"`, (err2) => {
-                        if (err2) reject(err2);
-                        else resolve();
-                    });
-                } else resolve();
-            });
-        });
-    };
-
-    const processUpload = async () => {
-        try {
-            const ext = path.extname(req.file.originalname).toLowerCase();
-            if (ext === '.tga') {
-                fs.copyFileSync(tempPath, tgaPath);
-                await convertImg(tempPath, pngPath);
-            } else if (ext === '.png') {
-                fs.copyFileSync(tempPath, pngPath);
-                await convertImg(tempPath, tgaPath);
-            } else {
-                await convertImg(tempPath, tgaPath);
-                await convertImg(tempPath, pngPath);
-            }
-            fs.unlinkSync(tempPath);
-            sendReloadPacket();
-            res.json({ status: "ok", name, filename: `${name}.tga` });
-        } catch (err) {
-            console.error('Image conversion failed:', err);
-            if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-            res.status(500).json({ error: "Image conversion failed" });
-        }
-    };
-
-    processUpload();
+        const dir = texturesDirFor(req.params.projectId);
+        fs.mkdirSync(dir, { recursive: true });
+        // The engine reads only uncompressed, bottom-up 24/32-bit TGA
+        await writeImage([tempPath], path.join(dir, `${name}.png`));
+        await writeImage([tempPath], path.join(dir, `${name}.tga`), ['-compress', 'none', '-type', 'TrueColorAlpha']);
+        serverManager.reloadServer(req.params.projectId);
+        res.json({ status: "ok", name, filename: `${name}.tga` });
+    } catch (err) {
+        console.error('Image conversion failed:', err.message);
+        res.status(422).json({ error: "Image conversion failed" });
+    } finally {
+        fs.rmSync(tempPath, { force: true });
+    }
 });
 
 router.get('/:projectId/textures/:name/image', checkProjectOwnership, (req, res) => {
     const projectId = req.params.projectId;
     const name = req.params.name;
-    const pngPath = path.join(__dirname, '..', 'uploads', projectId, 'textures', `${name}.png`);
+    const pngPath = path.join(texturesDirFor(projectId), `${name}.png`);
     
     if (fs.existsSync(pngPath)) {
         res.sendFile(pngPath);
@@ -173,28 +202,18 @@ router.get('/:projectId/:type/:name', checkProjectOwnership, (req, res) => {
 
 router.post('/:projectId/:type', checkProjectOwnership, (req, res) => {
     const { projectId, type } = req.params;
-    const body = req.body;
+    const body = req.body || {};
     let name = body.name || 'new_asset';
     let content = body.content || '';
+    if (!isSafeName(name)) return res.status(400).json({ error: "Invalid name" });
+    if (typeof content !== 'string') return res.status(400).json({ error: "Invalid content" });
 
     if (type === 'spritesheets') {
-        const texture = body.texture || name;
-        const width = body.width || 32;
-        const height = body.height || 32;
-        const cols = body.cols || 1;
-        const rows = body.rows || 1;
-        
-        const lines = [`texture:${texture}`];
-        let idx = 0;
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                lines.push(`${idx}: x=${col * width} y=${row * height} w=${width} h=${height}`);
-                idx++;
-            }
-        }
-        content = lines.join('\n') + '\n';
+        content = gridSheet(body, name);
+        if (content === null) return res.status(400).json({ error: "Invalid spritesheet grid" });
     } else if (type === 'animations') {
         const clips = body.clips || [{ name: 'idle', frames: [{ frame: 0, duration: 1.0 }] }];
+        if (!isValidClips(clips)) return res.status(400).json({ error: "Invalid clips" });
         const lines = [];
         clips.forEach(clip => {
             lines.push(`clip:${clip.name}`);
@@ -206,6 +225,7 @@ router.post('/:projectId/:type', checkProjectOwnership, (req, res) => {
     } else if (type === 'objects') {
         const spritesheet = body.spritesheet || name;
         const animations = body.animations || name;
+        if (!isSafeName(spritesheet) || !isSafeName(animations)) return res.status(400).json({ error: "Invalid name" });
         content = `spritesheet:${spritesheet}\nanimations:${animations}\n`;
     } else if (type === 'scripts') {
         if (!name.endsWith('.py')) name += '.py';
@@ -216,10 +236,10 @@ router.post('/:projectId/:type', checkProjectOwnership, (req, res) => {
     try {
         const stmt = db.prepare('INSERT INTO assets_text (project_id, type, name, content) VALUES (?, ?, ?, ?)');
         stmt.run(projectId, type, name, content);
-        sendReloadPacket();
+        serverManager.reloadServer(req.params.projectId);
         res.json({ status: "ok", name });
     } catch (err) {
-        if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        if (db.isUniqueViolation(err)) {
             res.status(409).json({ error: "Asset already exists" });
         } else {
             res.status(500).json({ error: "Server error" });
@@ -229,11 +249,17 @@ router.post('/:projectId/:type', checkProjectOwnership, (req, res) => {
 
 router.put('/:projectId/:type/:name', checkProjectOwnership, (req, res) => {
     const { projectId, type, name } = req.params;
-    let content = req.body.content || '';
+    const body = req.body || {};
+    let content = body.content || '';
 
-    if (type === 'animations' && req.body.clips) {
+    if (typeof content !== 'string') return res.status(400).json({ error: "Invalid content" });
+    if (type === 'spritesheets' && body.cols !== undefined) {
+        content = gridSheet(body, name);
+        if (content === null) return res.status(400).json({ error: "Invalid spritesheet grid" });
+    } else if (type === 'animations' && body.clips) {
+        if (!isValidClips(body.clips)) return res.status(400).json({ error: "Invalid clips" });
         const lines = [];
-        req.body.clips.forEach(clip => {
+        body.clips.forEach(clip => {
             lines.push(`clip:${clip.name}`);
             clip.frames.forEach((frame, i) => {
                 lines.push(`${i}: frame=${frame.frame !== undefined ? frame.frame : i} duration=${frame.duration !== undefined ? frame.duration : 0.1}`);
@@ -246,7 +272,7 @@ router.put('/:projectId/:type/:name', checkProjectOwnership, (req, res) => {
         const stmt = db.prepare('UPDATE assets_text SET content = ? WHERE project_id = ? AND type = ? AND name = ?');
         const info = stmt.run(content, projectId, type, name);
         if (info.changes === 0) return res.status(404).json({ error: "Asset not found" });
-        sendReloadPacket();
+        serverManager.reloadServer(req.params.projectId);
         res.json({ status: "ok", name });
     } catch (err) {
         res.status(500).json({ error: "Server error" });
@@ -258,17 +284,12 @@ router.post('/:projectId/spritesheets/:name/append', checkProjectOwnership, uplo
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
     const { projectId, name } = req.params;
-    
-    // Read current spritesheet from DB
-    let ssheetContent = '';
+    const tempPath = req.file.path;
+
     try {
-        const stmt = db.prepare('SELECT content FROM assets_text WHERE project_id = ? AND type = "spritesheets" AND name = ?');
-        const row = stmt.get(projectId, name);
+        const row = db.prepare("SELECT content FROM assets_text WHERE project_id = ? AND type = 'spritesheets' AND name = ?").get(projectId, name);
         if (!row) return res.status(404).json({ error: "Spritesheet not found" });
-        ssheetContent = row.content;
-    } catch (err) {
-        return res.status(500).json({ error: "Database error" });
-    }
+        const ssheetContent = row.content;
 
     const lines = ssheetContent.trim().split('\n');
     let textureName = name;
@@ -300,78 +321,31 @@ router.post('/:projectId/spritesheets/:name/append', checkProjectOwnership, uplo
         nextX = (last.x || 0) + (last.w || 32);
     }
 
-    const tempPath = req.file.path;
-    let newW = 32, newH = 32;
+    if (!isSafeName(textureName)) return res.status(400).json({ error: "Invalid texture name" });
 
-    const getDims = (path) => {
-        return new Promise((resolve) => {
-            exec(`identify -format "%w %h" "${path}"`, (err, stdout) => {
-                if (!err && stdout) {
-                    const parts = stdout.trim().split(' ');
-                    if (parts.length === 2) {
-                        newW = parseInt(parts[0]);
-                        newH = parseInt(parts[1]);
-                    }
-                }
-                resolve();
-            });
-        });
-    };
+    const { stdout } = await imageMagick('identify', [...LIMITS, '-format', '%w %h', inputImage(tempPath)]);
+    const [newW, newH] = stdout.trim().split(' ').map(Number);
 
-    await getDims(tempPath);
-
-    const dir = path.dirname(tempPath);
+    const dir = texturesDirFor(projectId);
+    fs.mkdirSync(dir, { recursive: true });
     const tgaPath = path.join(dir, `${textureName}.tga`);
     const pngPath = path.join(dir, `${textureName}.png`);
+    const tgaOptions = ['-compress', 'none', '-type', 'TrueColorAlpha'];
 
-    const runAppend = (src, dest) => {
-        return new Promise((resolve, reject) => {
-            exec(`convert "${dest}" "${src}" +append "${dest}"`, (err) => {
-                if (err) {
-                    exec(`magick "${dest}" "${src}" +append "${dest}"`, (err2) => {
-                        if (err2) reject(err2); else resolve();
-                    });
-                } else resolve();
-            });
-        });
-    };
+    const sources = fs.existsSync(tgaPath) ? [tgaPath, tempPath] : [tempPath];
+    await writeImage(sources, tgaPath, sources.length > 1 ? ['+append', ...tgaOptions] : tgaOptions);
+    await writeImage([tgaPath], pngPath);
 
-    const runConvert = (src, dest) => {
-        return new Promise((resolve, reject) => {
-            exec(`convert "${src}" "${dest}"`, (err) => {
-                if (err) {
-                    exec(`magick "${src}" "${dest}"`, (err2) => {
-                        if (err2) reject(err2); else resolve();
-                    });
-                } else resolve();
-            });
-        });
-    };
+    const newContent = `${ssheetContent.trim()}\n${nextIdx}: x=${nextX} y=0 w=${newW} h=${newH}\n`;
+    db.prepare("UPDATE assets_text SET content = ? WHERE project_id = ? AND type = 'spritesheets' AND name = ?").run(newContent, projectId, name);
 
-    try {
-        if (fs.existsSync(tgaPath)) {
-            await runAppend(tempPath, tgaPath);
-        } else {
-            await runConvert(tempPath, tgaPath);
-        }
-        
-        // Re-generate PNG
-        if (fs.existsSync(pngPath)) fs.unlinkSync(pngPath);
-        await runConvert(tgaPath, pngPath);
-        
-        fs.unlinkSync(tempPath);
-
-        const newFrameLine = `${nextIdx}: x=${nextX} y=0 w=${newW} h=${newH}`;
-        const newContent = ssheetContent.trim() + '\n' + newFrameLine + '\n';
-
-        const stmt = db.prepare('UPDATE assets_text SET content = ? WHERE project_id = ? AND type = "spritesheets" AND name = ?');
-        stmt.run(newContent, projectId, name);
-
-        sendReloadPacket();
-        res.json({ status: "ok", frameIndex: nextIdx, x: nextX, y: 0, w: newW, h: newH });
+    serverManager.reloadServer(projectId);
+    res.json({ status: "ok", frameIndex: nextIdx, x: nextX, y: 0, w: newW, h: newH });
     } catch (err) {
-        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        console.error('Append frame failed:', err.message);
         res.status(500).json({ error: "Failed to append frame" });
+    } finally {
+        fs.rmSync(tempPath, { force: true });
     }
 });
 

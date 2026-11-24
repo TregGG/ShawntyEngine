@@ -1,3 +1,4 @@
+import { API_URL } from '../api';
 import { useState, useEffect, useCallback } from 'react'
 import SpriteEditor from './SpriteEditor'
 import AnimatorEditor from './AnimatorEditor'
@@ -66,11 +67,11 @@ export default function Inspector({ entity, onUpdate, projectId, token }) {
 
   const fetchObjects = useCallback(() => {
     if (!projectId || !token) return
-    fetch(`http://localhost:3001/api/projects/${projectId}/objects`, {
+    fetch(`${API_URL}/api/projects/${projectId}/objects`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.ok ? res.json() : [])
-      .then(data => setObjects(data.map(o => o.name)))
+      .then(data => setObjects(data))
       .catch(err => console.error(err))
   }, [projectId, token])
 

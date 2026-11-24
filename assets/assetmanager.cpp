@@ -24,6 +24,8 @@ static bool LoadTGA(const std::string& filepath,
 
     unsigned char header[18];
     file.read(reinterpret_cast<char*>(header), 18);
+    if (file.gcount() != 18)
+        return false;
 
     outWidth  = header[12] | (header[13] << 8);
     outHeight = header[14] | (header[15] << 8);
@@ -33,10 +35,13 @@ static bool LoadTGA(const std::string& filepath,
     if (outChannels != 3 && outChannels != 4)
         return false;
 
-    int imageSize = outWidth * outHeight * outChannels;
+    if (outWidth < 1 || outHeight < 1 || outWidth > 16384 || outHeight > 16384)
+        return false;
+
+    const size_t imageSize = static_cast<size_t>(outWidth) * outHeight * outChannels;
     outPixels.resize(imageSize);
 
-    file.read(reinterpret_cast<char*>(outPixels.data()), imageSize);
+    file.read(reinterpret_cast<char*>(outPixels.data()), static_cast<std::streamsize>(imageSize));
     file.close();
 
     return true;
@@ -52,6 +57,7 @@ bool AssetManager::Initialize(const std::string& compiledAssetRoot, bool headles
 
     // ---------- 1. Load Textures (.tga → GPU) ----------
     fs::path textureDir = root / "textures";
+    if (fs::is_directory(textureDir))
     for (const auto& entry : fs::directory_iterator(textureDir))
     {
         if (!entry.is_regular_file())
@@ -67,6 +73,7 @@ bool AssetManager::Initialize(const std::string& compiledAssetRoot, bool headles
 
     // ---------- 2. Load Sprite Sheets (.ssheet) ----------
     fs::path sheetDir = root / "spritesheets";
+    if (fs::is_directory(sheetDir))
     for (const auto& entry : fs::directory_iterator(sheetDir))
     {
         if (!entry.is_regular_file())
@@ -81,6 +88,7 @@ bool AssetManager::Initialize(const std::string& compiledAssetRoot, bool headles
 
     // ---------- 3. Load Animation Sets (.anim) ----------
     fs::path animDir = root / "animations";
+    if (fs::is_directory(animDir))
     for (const auto& entry : fs::directory_iterator(animDir))
     {
         if (!entry.is_regular_file())
@@ -95,6 +103,7 @@ bool AssetManager::Initialize(const std::string& compiledAssetRoot, bool headles
 
     // ---------- 4. Load Object Descriptors (.objasset) ----------
     fs::path objectDir = root / "objects";
+    if (fs::is_directory(objectDir))
     for (const auto& entry : fs::directory_iterator(objectDir))
     {
         if (!entry.is_regular_file())

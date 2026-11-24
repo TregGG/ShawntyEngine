@@ -1,17 +1,20 @@
+import { API_URL } from '../api';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 
-export function useSocket(onSceneUpdate) {
+export function useSocket(onSceneUpdate, onJoined) {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
 
   const onSceneUpdateRef = useRef(onSceneUpdate);
+  const onJoinedRef = useRef(onJoined);
   useEffect(() => {
     onSceneUpdateRef.current = onSceneUpdate;
-  }, [onSceneUpdate]);
+    onJoinedRef.current = onJoined;
+  }, [onSceneUpdate, onJoined]);
 
   useEffect(() => {
-    const socket = io('http://localhost:3001');
+    const socket = io(API_URL || undefined);
     socketRef.current = socket;
 
     socket.on('connect', () => setConnected(true));
@@ -20,6 +23,8 @@ export function useSocket(onSceneUpdate) {
       if (onSceneUpdateRef.current) onSceneUpdateRef.current(data);
     });
 
+    socket.on('joined', (info) => onJoinedRef.current?.(info));
+
     return () => socket.close();
   }, []);
 
@@ -27,8 +32,14 @@ export function useSocket(onSceneUpdate) {
     socketRef.current?.emit('join_project', projectId, token);
   }, []);
 
-  const sendUpdate = useCallback((projectId, update) => {
-    socketRef.current?.emit('editor_update', { projectId, update });
+  // Resolves to { ok, error } once the server has accepted or rejected the update
+  const sendUpdate = useCallback(async (projectId, update) => {
+    if (!socketRef.current?.connected) return { ok: false, error: 'Not connected' };
+    try {
+      return await socketRef.current.timeout(5000).emitWithAck('editor_update', { projectId, update });
+    } catch {
+      return { ok: false, error: 'No response from server' };
+    }
   }, []);
 
   return { connected, joinProject, sendUpdate };

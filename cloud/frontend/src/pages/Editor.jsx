@@ -1,12 +1,7 @@
+import { API_URL, getToken } from '../api';
 import { useState, useCallback, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
-}
 import Toolbar from '../components/Toolbar'
 import Hierarchy from '../components/Hierarchy'
 import Inspector from '../components/Inspector'
@@ -73,13 +68,13 @@ function Editor() {
 
   useEffect(() => {
     const fetchScene = async () => {
-       const token = getCookie('token') || localStorage.getItem('token')
+       const token = getToken()
        if (!token) {
            navigate('/login')
            return
        }
        try {
-         const res = await fetch(`http://localhost:3001/api/projects/${projectId}/scene`, {
+         const res = await fetch(`${API_URL}/api/projects/${projectId}/scene`, {
             headers: { 'Authorization': `Bearer ${token}` }
          })
          if (res.ok) {
@@ -108,12 +103,16 @@ function Editor() {
   // Socket connection
   const { connected, joinProject, sendUpdate } = useSocket((update) => {
     setConsoleLogs(prev => [...prev, { timestamp: Date.now(), message: `Received: ${JSON.stringify(update)}` }])
+  }, ({ server }) => {
+    if (!server) return
+    setConsoleLogs(prev => [...prev, { timestamp: Date.now(), message: `Game server address: ${server.host}:${server.port}` }])
   })
 
   // Join project room on connect
   useEffect(() => {
     if (connected && projectId) {
-      const token = localStorage.getItem('token') || 'dummy_token'
+      const token = getToken()
+      if (!token) return
       joinProject(projectId, token)
       setConsoleLogs(prev => [...prev, { timestamp: Date.now(), message: `Connected to project ${projectId}` }])
     }
@@ -267,12 +266,11 @@ function Editor() {
   // Save handler
   const handleSave = useCallback(async () => {
     setSaveStatus('saving')
-    sendUpdate(projectId, { action: 'save_scene', scene: sceneData })
-    setConsoleLogs(prev => [...prev, { timestamp: Date.now(), message: `Scene ${currentScene} saved to cloud` }])
-    setTimeout(() => {
-      setSaveStatus('saved')
-      setTimeout(() => setSaveStatus(null), 2000)
-    }, 500)
+    const result = await sendUpdate(projectId, { action: 'save_scene', scene: sceneData.scene })
+    const message = result.ok ? `Scene ${currentScene} saved to cloud` : `Save failed: ${result.error}`
+    setConsoleLogs(prev => [...prev, { timestamp: Date.now(), message }])
+    setSaveStatus(result.ok ? 'saved' : 'error')
+    setTimeout(() => setSaveStatus(null), 2000)
   }, [sceneData, projectId, sendUpdate, currentScene])
 
   // Keyboard shortcuts
@@ -391,7 +389,7 @@ function Editor() {
           entityIndex={selectedEntityIndex}
           onUpdate={(updated) => updateEntity(selectedEntityIndex, updated)}
           projectId={projectId}
-          token={getCookie('token') || localStorage.getItem('token')}
+          token={getToken()}
         />
       </div>
 

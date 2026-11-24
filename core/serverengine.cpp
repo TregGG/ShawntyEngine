@@ -22,7 +22,7 @@ ServerEngine::~ServerEngine()
 {
 }
 
-bool ServerEngine::Initialize(ServerGame* game)
+bool ServerEngine::Initialize(ServerGame* game, int port, bool persistent)
 {
 #if defined(ENGINE_RELEASE)
     // No logging in release
@@ -63,12 +63,13 @@ bool ServerEngine::Initialize(ServerGame* game)
     m_NetworkControl->Init();
     m_NetworkControl->SetNetworkService(m_NetworkService);
     
+    m_NetworkService->SetPersistent(persistent);
     m_NetworkService->OnShutdownRequested = [this]() {
         this->Quit();
     };
     
-    if (!m_NetworkService->Host(7777)) {
-        ENGINE_ERROR("Failed to start server on port 7777. ENet Host creation failed. (Port probably in use).");
+    if (!m_NetworkService->Host(port)) {
+        ENGINE_ERROR("Failed to start server on port %d. ENet Host creation failed. (Port probably in use).", port);
         return false;
     }
     

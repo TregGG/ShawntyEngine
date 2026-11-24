@@ -7,6 +7,8 @@
 #include "../services/networkservice.h"
 #include "testnetworkcontrol.h"
 #include "../levels/datadrivenscene.h"
+#include "../core/projectpaths.h"
+#include "../core/endpoint.h"
 
 #include "../objects/ui/uipanel.h"
 #include "../objects/ui/uitext.h"
@@ -116,7 +118,7 @@ void TestGame::CreateNetworkUI(Scene* scene) {
     rawInputText->HorizontalAlign = TextAlignment::Left;
     rawInputText->VerticalAlign = VerticalAlignment::Middle;
     rawInputText->Position = glm::vec2(5.0f, 0.0f);
-    rawInputText->Text = "127.0.0.1"; // Default IP
+    rawInputText->Text = "127.0.0.1:7777"; // Default address
 
     // Host Button
     auto hostBtn = std::make_unique<UIButton>(scene, "HostButton", m_EventService);
@@ -172,11 +174,11 @@ void TestGame::CreateNetworkUI(Scene* scene) {
 
     joinBtn->OnClickCallback = [this, inputPtr = inputF.get()]() {
         if (m_NetService) {
-            std::string ip = inputPtr->GetTextElement()->Text;
-            if (ip.empty()) ip = "127.0.0.1";
-            ENGINE_LOG("Join button clicked. Connecting to %s:7777", ip.c_str());
-            m_NetService->Connect(ip, 7777);
-            if (m_StatusText) m_StatusText->Text = "Connecting...";
+            std::string host;
+            int port = 0;
+            const bool ok = ParseEndpoint(inputPtr->GetTextElement()->Text, host, port)
+                            && m_NetService->Connect(host, port);
+            if (m_StatusText) m_StatusText->Text = ok ? "Connecting..." : "Enter address as IP:port";
         }
     };
 
@@ -187,7 +189,8 @@ void TestGame::CreateNetworkUI(Scene* scene) {
     scene->registry.AddUIElement(std::move(panel));
 }
 
-DataDrivenScene* TestGame::GetOrCreateScene(const std::string& path) {
+DataDrivenScene* TestGame::GetOrCreateScene(const std::string& rawPath) {
+    const std::string path = ProjectPaths::Resolve(rawPath);
     auto it = m_Scenes.find(path);
     if (it != m_Scenes.end()) {
         return it->second;
@@ -211,16 +214,22 @@ DataDrivenScene* TestGame::GetOrCreateScene(const std::string& path) {
 #endif
             if (m_NetService) m_NetService->Connect("127.0.0.1", 7777);
         } else if (action == "Join") {
-            std::string ip = "127.0.0.1";
+            std::string address = "127.0.0.1:7777";
             if (!target.empty() && scene) {
                 if (auto inputF = scene->registry.FindUIElementRecursive(target)) {
                     if (auto uiInput = dynamic_cast<UIInputField*>(inputF)) {
-                        if (uiInput->GetTextElement()) ip = uiInput->GetTextElement()->Text;
+                        if (uiInput->GetTextElement()) address = uiInput->GetTextElement()->Text;
                     }
                 }
             }
-            ENGINE_LOG("Join Action triggered. Connecting to %s:7777", ip.c_str());
-            if (m_NetService) m_NetService->Connect(ip, 7777);
+            std::string host;
+            int port = 0;
+            if (!ParseEndpoint(address, host, port)) {
+                ENGINE_WARN("Invalid server address '%s'. Use IP:port", address.c_str());
+            } else if (m_NetService) {
+                ENGINE_LOG("Join Action triggered. Connecting to %s:%d", host.c_str(), port);
+                m_NetService->Connect(host, port);
+            }
         } else if (action == "Quit") {
             ENGINE_LOG("Quit Action triggered.");
             exit(0);
@@ -257,7 +266,7 @@ bool TestGame::OnInit()
 {
     ENGINE_LOG("OnInit");
 
-    const std::string compiledRoot = "test_compiled";
+    const std::string compiledRoot = ProjectPaths::Root();
 
     if (!m_AssetManager.Initialize(compiledRoot, false))
     {
@@ -294,7 +303,8 @@ bool TestGame::OnInit()
     };
 
     // ---- Create Initial Scene from JSON ----
-    DataDrivenScene* initialScene = GetOrCreateScene("test_compiled/scenes/mainmenu.scene");
+    DataDrivenScene* initialScene = GetOrCreateScene(ProjectPaths::IsDefault()
+        ? "test_compiled/scenes/mainmenu.scene" : "scenes/main.scene");
     m_SceneManager.SetInitialScene(initialScene);
     m_RenderManager.BindScene(initialScene);
 

@@ -12,6 +12,7 @@
 
 using json = nlohmann::json;
 
+#include "../core/projectpaths.h"
 #define ENGINE_CLASS "TestPlayer"
 #include "../core/enginedebug.h"
 
@@ -30,7 +31,7 @@ TestPlayer::TestPlayer(Scene* scene, const std::string& name, const SpriteSheetA
         ENGINE_LOG("Using scene-level player prefab: %s", prefabName.c_str());
     } else {
         // 2. Check project.json
-        std::ifstream projFile("test_compiled/project.json");
+        std::ifstream projFile(ProjectPaths::Resolve("test_compiled/project.json"));
         if (projFile.is_open()) {
             try {
                 json projSettings = json::parse(projFile);
@@ -52,7 +53,7 @@ TestPlayer::TestPlayer(Scene* scene, const std::string& name, const SpriteSheetA
         }
     }
 
-    std::string prefabPath = "test_compiled/prefabs/" + prefabName + ".prefab";
+    std::string prefabPath = ProjectPaths::Resolve("test_compiled/prefabs/" + prefabName + ".prefab");
 
     // Try loading the prefab dynamically using the SceneSerializer onto our existing Player category entity
     EntityID newID = SceneSerializer::InstantiatePrefab(prefabPath, scene, assets, {0.0f, 0.0f}, nullptr, m_ID);

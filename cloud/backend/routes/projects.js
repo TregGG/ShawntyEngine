@@ -4,6 +4,45 @@ const db = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 const crypto = require('crypto');
 
+const { rateLimit } = require('express-rate-limit');
+const { buildProjectBundle } = require('../services/bundler');
+const { unwrapScene } = require('../lib/validate');
+
+router.use('/by-token', rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false }));
+
+// Public route to get project info by server_token
+router.get('/by-token/:token/info', (req, res) => {
+    try {
+        const stmt = db.prepare('SELECT id, name, created_at FROM projects WHERE server_token = ?');
+        const project = stmt.get(req.params.token);
+        if (!project) return res.status(404).json({ error: "Project not found for given token" });
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(project);
+    } catch (err) {
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+// Public route to download full project bundle by server_token
+router.get('/by-token/:token/bundle', (req, res) => {
+    try {
+        const stmt = db.prepare('SELECT id, name FROM projects WHERE server_token = ?');
+        const project = stmt.get(req.params.token);
+        if (!project) return res.status(404).json({ error: "Project not found for given token" });
+
+        const zipBuffer = buildProjectBundle(project.id);
+        if (!zipBuffer) return res.status(500).json({ error: "Failed to generate project bundle" });
+
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${project.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.spack"`);
+        res.send(zipBuffer);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
 router.use(authenticateToken);
 
 // Get user's projects
@@ -20,7 +59,8 @@ router.get('/', (req, res) => {
 // Create a new project
 router.post('/', (req, res) => {
     try {
-        const { name } = req.body;
+        const name = (req.body || {}).name || "New Project";
+        if (typeof name !== 'string' || name.length > 100) return res.status(400).json({ error: "Invalid project name" });
         const projectId = 'proj_' + crypto.randomBytes(6).toString('hex');
         const serverToken = 'token_' + crypto.randomBytes(16).toString('hex');
         
@@ -40,9 +80,9 @@ router.post('/', (req, res) => {
         };
         
         const stmt = db.prepare('INSERT INTO projects (id, name, owner_id, server_token, scene_data) VALUES (?, ?, ?, ?, ?)');
-        stmt.run(projectId, name || "New Project", req.user.id, serverToken, JSON.stringify(defaultScene));
+        stmt.run(projectId, name, req.user.id, serverToken, JSON.stringify(defaultScene));
         
-        res.json({ id: projectId, name: name || "New Project", serverToken });
+        res.json({ id: projectId, name, serverToken });
     } catch (err) {
         res.status(500).json({ error: "Server error" });
     }
@@ -56,7 +96,7 @@ router.get('/:id/scene', (req, res) => {
         
         if (!project) return res.status(404).json({ error: "Project not found" });
         
-        res.json({ name: project.name, scene: JSON.parse(project.scene_data) });
+        res.json({ name: project.name, scene: unwrapScene(JSON.parse(project.scene_data)) || { entities: [], relationships: [] } });
     } catch (err) {
         res.status(500).json({ error: "Server error" });
     }
